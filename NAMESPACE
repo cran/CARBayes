@@ -1,0 +1,30 @@
+export(
+	poisson.independent, 
+	poisson.iarCAR, 
+	poisson.lerouxCAR, 
+	poisson.properCAR, 
+	poisson.bymCAR, 
+	poisson.localisedbinaryCAR, 
+	poisson.localisedcontinuousCAR, 
+	gaussian.independent, 
+	gaussian.iarCAR, 
+	gaussian.lerouxCAR, 
+	gaussian.properCAR, 
+	gaussian.bymCAR, 
+	gaussian.localisedbinaryCAR, 
+	gaussian.localisedcontinuousCAR, 
+	binomial.independent, 
+	binomial.iarCAR, 
+	binomial.lerouxCAR, 
+	binomial.properCAR, 
+	binomial.bymCAR, 
+	binomial.localisedbinaryCAR, 
+	binomial.localisedcontinuousCAR, 
+	moran.permutation
+)
+
+import(
+  MASS,
+  coda,
+  MCMCpack
+)
