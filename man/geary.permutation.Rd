@@ -1,17 +1,17 @@
-\name{moran.permutation}
-\alias{moran.permutation}
+\name{geary.permutation}
+\alias{geary.permutation}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
-Moran's I permutation test
+Geary's C permutation test
 }
 
 \description{
-Implement a permutation test for spatial correlation based on Moran's I statistic.
+Implement a permutation test for spatial correlation based on Geary's C statistic.
 }
 
 \usage{
-moran.permutation(x, W, n.simulation)
+geary.permutation(x, W, n.simulation)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -28,19 +28,19 @@ The number of random permutations for the test.
 
 
 \details{
-Moran's I test statistic is returned, as well as a p-value for a one-sided test whose null hypothesis is that there is no positive spatial correlation.
+Geary's C test statistic is returned, as well as a p-value for a one-sided test whose null hypothesis is that there is no positive spatial correlation.
 }
 
 
 \value{
-\item{statistic }{The Moran's I statistic.}
-\item{rank }{The rank of the Moran's I statistic compared to the set of values from the permuted data sets.}
+\item{statistic }{The Geary's C statistic.}
+\item{rank }{The rank of the Geary's C statistic compared to the set of values from the permuted data sets.}
 \item{value }{The p-value from the permutation test.}
 }
 
 
 \references{
-Moran, P. (1950). Notes on continuous stochastic phenomena. Biometrika 37, 17-23.
+Geary, R. C. (1954). The Contiguity Ratio and Statistical Mapping. The Incorporated Statistician 5, 115???145.
 }
 
 \author{
@@ -63,7 +63,7 @@ distance <-array(0, c(n,n))
 W <-array(0, c(n,n))
   for(i in 1:n)
   {
-		for(j in 1:n)
+     	for(j in 1:n)
 		{
 		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
 		distance[i,j] <- sqrt(temp)
@@ -77,6 +77,6 @@ phi <- mvrnorm(n=1, mu=rep(0,n), Sigma=0.4 * exp(-0.1 * distance))
 Y <- rnorm(n=n, mean=phi, sd=rep(0.1,n))
 
 
-#### Compute Moran's I
-moran.permutation(x=Y, W=W, n.simulation=500)
+#### Compute Geary's C
+geary.permutation(x=Y, W=W, n.simulation=500)
 }

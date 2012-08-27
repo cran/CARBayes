@@ -7,9 +7,8 @@ Fit the BYM  conditional autoregressive (CAR) model to spatial binomial data
 }
 
 \description{
-The function fits a binomial logistic random effects models to spatial data, where the random effects are modelled by BYM conditional autoregressive (CAR) model (Besag et. al. 1991). The model represents the logit transform of the mean function for the set of binomial responses  by a combination of covariates and two sets of random effects. For the latter, the first set are independent, while the second are spatially correlated and come from the IAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a binomial logistic random effects models to spatial data, where the random effects are modelled by the BYM conditional autoregressive (CAR) model (Besag et. al. 1991). The model represents the logit transform of the mean function for the set of binomial responses  by a combination of covariates and two sets of random effects. For the latter, the first set are independent, while the second are spatially correlated and come from the IAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
-
 
 \usage{
 binomial.bymCAR(formula, beta = NULL, phi = NULL, theta = NULL, tau2 = NULL, 
@@ -103,8 +102,6 @@ Duncan Lee
 }
 
 
-
-
 \examples{
 ##################################################
 #### Run the model on simulated data on a lattice
@@ -119,7 +116,7 @@ n <- nrow(Grid)
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
 distance <-array(0, c(n,n))
 W <-array(0, c(n,n))
-	for(i in 1:n)
+  for(i in 1:n)
 	{
 		for(j in 1:n)
 		{

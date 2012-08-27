@@ -1,4 +1,4 @@
-gaussian.localisedcontinuousCAR <-
+gaussian.dissimilarityCARcontinuous <-
 function(formula, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, W, Z, burnin=0, n.sample=1000, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
 {
 ##############################################
@@ -872,4 +872,3 @@ W.posterior <- W
 
 return(results)
 }
-

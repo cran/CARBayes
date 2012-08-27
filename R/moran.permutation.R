@@ -50,4 +50,3 @@ pval <- punif((n.simulation-rank + 2)/(n.simulation + 1))
 results <- list(statistic=I, rank=rank, pvalue=pval)
 return(results)
 }
-
