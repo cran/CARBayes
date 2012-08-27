@@ -571,4 +571,3 @@ cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 return(results)
 }
-

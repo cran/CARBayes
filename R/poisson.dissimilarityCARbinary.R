@@ -1,5 +1,5 @@
-binomial.localisedbinaryCAR <-
-function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, trials, W, Z, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
+poisson.dissimilarityCARbinary <-
+function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, W, Z, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -81,23 +81,16 @@ alpha.threshold <- rep(NA,q)
 
 
 
-#### Response variable and trials
+#### Response variable
 ## Create the response
 Y <- model.response(frame)
     
 ## Check for errors
-    if(sum(is.na(trials))>0) stop("the numbers of trials has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(trials)) stop("the numbers of trials has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(trials)==floor(trials))
-    if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
-    if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
-
     if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
 int.check <- n-sum(ceiling(Y)==floor(Y))
     if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
     if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
-    if(sum(Y>trials)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
 
 
 
@@ -115,9 +108,7 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 #### Initial parameter values
 ## Regression parameters beta
-dat <- cbind(Y, trials-Y)
-
-	 if(is.null(beta)) beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
+	 if(is.null(beta)) beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -133,8 +124,8 @@ dat <- cbind(Y, trials-Y)
     if(length(tau2)!= 1) stop("tau2 is the wrong length.", call.=FALSE)
     if(sum(is.na(tau2))>0) stop("tau2 has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(tau2)) stop("tau2 has non-numeric values.", call.=FALSE)
-    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)   
-     
+    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)    
+
 ## Global correlation parameter rho
     if(is.null(rho) & fix.rho==TRUE) stop("rho is fixed yet a value has not been specified.", call.=FALSE)
     if(is.null(rho)) rho <- runif(1)
@@ -142,7 +133,7 @@ dat <- cbind(Y, trials-Y)
     if(sum(is.na(rho))>0) stop("rho has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(rho)) stop("rho has non-numeric values.", call.=FALSE)
     if(rho < 0 | rho >=1) stop("rho is outside the interval [0,1).", call.=FALSE)
-    
+ 
 ## Covariance parameters alpha
     if(is.null(alpha)) alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
     if(length(alpha)!= q) stop("alpha is the wrong length.", call.=FALSE)
@@ -173,7 +164,6 @@ samples.tau2 <- array(NA, c((n.sample-burnin), 1))
 samples.alpha <- array(NA, c((n.sample-burnin), q))
 samples.deviance <- array(NA, c((n.sample-burnin), 1))
 
-
 ## Metropolis quantities
 	if(fix.rho)
 	{
@@ -190,7 +180,6 @@ samples.deviance <- array(NA, c((n.sample-burnin), 1))
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
 proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-
 
 
 #### Priors
@@ -256,17 +245,13 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 
 
 
-#### Other quantities needed for the MCMC algorithm
-failures <- trials - Y
-
-
-
 ###########################
 #### Run the Bayesian model
 ###########################
+###########################
 	if(fix.rho)
-	{
-		for(j in 1:n.sample)
+	{	
+    	for(j in 1:n.sample)
     	{
     	####################
     	## Sample from beta
@@ -308,13 +293,11 @@ failures <- trials - Y
         ## Propose a value
         n.current <- length(beg[r]:fin[r])
         proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + phi + offset
-        logit.current <- as.numeric(X.standardised %*% beta) + phi + offset    
-        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
-        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
+        fitted.proposal <- exp(as.numeric(X.standardised %*% proposal.beta) + phi + offset)
+        fitted.current <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
 
         ## Calculate the acceptance probability
-        prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
+        prob1 <- sum(Y * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
         prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
         prob <- exp(prob1 + prob2)
 
@@ -377,13 +360,11 @@ failures <- trials - Y
         block.var <- chol2inv(chol(Q.current))
         block.mean <- - block.var %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
         proposal.phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=phi[beg[r]:fin[r]], Sigma=(proposal.sd.phi * block.var))
-        logit.proposal <- beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]]
-        logit.current <- beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]]    
-        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
-        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
+        fitted.proposal <- exp(beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]])
+        fitted.current <- exp(beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]])
         
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(prob.proposal) - log(prob.current)) + failures[beg[r]:fin[r]] * (log(1-prob.proposal) - log(1-prob.current)))          
+        prob1 <- sum(Y[beg[r]:fin[r]] * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
         prob2 <- t(phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (phi[beg[r]:fin[r]] - block.mean) - t(proposal.phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (proposal.phi[beg[r]:fin[r]] - block.mean)
         prob <- exp(prob1 + 0.5 * prob2)
 
@@ -400,7 +381,8 @@ failures <- trials - Y
             }
         }
         
-    	phi <- phi - mean(phi)    
+    	phi <- phi - mean(phi)
+    
     
 
     	##################
@@ -459,16 +441,13 @@ failures <- trials - Y
       		accept[6] <- accept[6] + 1
       		}
       
-      
-            
-
+ 
    
     	#########################
     	## Calculate the deviance
     	#########################
-    	logit <- as.numeric(X.standardised %*% beta) + phi + offset    
-    	prob <- exp(logit)  / (1 + exp(logit))
-	 	deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
+    	fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
+    	deviance <- -2 * sum(Y * log(fitted) -  fitted - lfactorial(Y))
 
 
 
@@ -541,7 +520,7 @@ failures <- trials - Y
 		}
 	}else
 	{
-		for(j in 1:n.sample)
+    	for(j in 1:n.sample)
     	{
     	####################
     	## Sample from beta
@@ -583,13 +562,11 @@ failures <- trials - Y
         ## Propose a value
         n.current <- length(beg[r]:fin[r])
         proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + phi + offset
-        logit.current <- as.numeric(X.standardised %*% beta) + phi + offset    
-        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
-        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
+        fitted.proposal <- exp(as.numeric(X.standardised %*% proposal.beta) + phi + offset)
+        fitted.current <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
 
         ## Calculate the acceptance probability
-        prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
+        prob1 <- sum(Y * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
         prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
         prob <- exp(prob1 + prob2)
 
@@ -652,13 +629,11 @@ failures <- trials - Y
         block.var <- chol2inv(chol(Q.current))
         block.mean <- - block.var %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
         proposal.phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=phi[beg[r]:fin[r]], Sigma=(proposal.sd.phi * block.var))
-        logit.proposal <- beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]]
-        logit.current <- beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]]    
-        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
-        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
+        fitted.proposal <- exp(beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]])
+        fitted.current <- exp(beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]])
         
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(prob.proposal) - log(prob.current)) + failures[beg[r]:fin[r]] * (log(1-prob.proposal) - log(1-prob.current)))          
+        prob1 <- sum(Y[beg[r]:fin[r]] * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
         prob2 <- t(phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (phi[beg[r]:fin[r]] - block.mean) - t(proposal.phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (proposal.phi[beg[r]:fin[r]] - block.mean)
         prob <- exp(prob1 + 0.5 * prob2)
 
@@ -675,7 +650,8 @@ failures <- trials - Y
             }
         }
         
-    	phi <- phi - mean(phi)    
+    	phi <- phi - mean(phi)
+    
     
 
     	##################
@@ -687,9 +663,9 @@ failures <- trials - Y
             {
             tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
             }
+
+
     
-    
- 
     	##################
     	## Sample from rho
     	##################
@@ -723,8 +699,8 @@ failures <- trials - Y
             accept[6] <- accept[6] + 1 
             }
 
-
-   
+    
+ 
    		######################
 		#### Sample from alpha
 		######################
@@ -769,15 +745,14 @@ failures <- trials - Y
       		proposal.alpha <- alpha
       		accept[8] <- accept[8] + 1
       		}
-          
-
+      
+ 
    
     	#########################
     	## Calculate the deviance
     	#########################
-    	logit <- as.numeric(X.standardised %*% beta) + phi + offset    
-    	prob <- exp(logit)  / (1 + exp(logit))
-	 	deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
+    	fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
+    	deviance <- -2 * sum(Y * log(fitted) -  fitted - lfactorial(Y))
 
 
 
@@ -848,9 +823,8 @@ failures <- trials - Y
         }else
         {
         }
-		}		
+		}
 	}
-
 
 
 ###################################
@@ -859,10 +833,8 @@ failures <- trials - Y
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
-median.logit <- as.numeric(X.standardised %*% median.beta) + median.phi + offset    
-median.prob <- exp(median.logit)  / (1 + exp(median.logit))
-fitted.median <- trials * median.prob
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
+fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
+deviance.fitted <- -2 * sum(Y * log(fitted.median) -  fitted.median - lfactorial(Y))
 p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
 residuals <- Y - fitted.median
@@ -945,10 +917,9 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	rownames(summary.results)[(p+1):(p+2)] <- c("tau2", "rho")
 	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-	summary.results[ , 6] <- round(summary.results[ , 6], 4)
-	}
-	
-	
+	summary.results[ , 6] <- round(summary.results[ , 6], 4)	}
+
+
 
 #### Create the random effects summary
 random.effects <- array(NA, c(n, 5))
@@ -967,8 +938,7 @@ colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
 fitted.temp <- array(NA, c(nrow(samples.beta), n))
     for(i in 1:nrow(samples.alpha))
     {
-    temp.logit <- X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset    
-	 fitted.temp[i, ] <- trials * exp(temp.logit)  / (1 + exp(temp.logit))
+    fitted.temp[i, ] <- exp(X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset)
     }
 fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
 fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
@@ -1011,7 +981,7 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("\n#################\n")
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
-	cat("Likelihood model - Binomial (logistic link function)\n")
+	cat("Likelihood model - Poisson (log link function) \n")
 	cat("Random effects model - Localised CAR binary weights\n")
 	cat("Regression equation - ")
 	print(formula)
@@ -1029,13 +999,13 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " borders in the study region","\n\n", sep="")
+	cat("The dissimilarity metrics have identified ", n.borders, " boundaries in the study region","\n\n", sep="")
 	}else
 	{
 	cat("\n#################\n")
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
-	cat("Likelihood model - Binomial (logistic link function)\n")
+	cat("Likelihood model - Poisson (log link function) \n")
 	cat("Random effects model - Localised CAR binary weights\n")
 	cat("Regression equation - ")
 	print(formula)
@@ -1052,7 +1022,7 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " borders in the study region","\n\n", sep="")
+	cat("The dissimilarity metrics have identified ", n.borders, " boundaries in the study region","\n\n", sep="")
 	}
 
 
@@ -1067,4 +1037,3 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 
 return(results)
 }
-

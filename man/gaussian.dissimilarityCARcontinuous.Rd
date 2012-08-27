@@ -1,22 +1,23 @@
-\name{poisson.localisedbinaryCAR}
-\alias{poisson.localisedbinaryCAR}
+\name{gaussian.dissimilarityCARcontinuous}
+\alias{gaussian.dissimilarityCARcontinuous}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
-Fit the localised conditional autoregressive (CAR) model with binary neighbourhood relations to spatial poisson data
+Fit a localised conditional autoregressive (CAR) model based on dissimilarity metrics with continuous neighbourhood relations to spatial Gaussian data
 }
 
 \description{
-The function fits a Poisson log-normal random effects models to spatial count data, where the random effects are modelled by the localised conditional autoregressive (CAR) model, which is a generalisation of that proposed by Lee and Mitchell (2012). The random effects in neighbouring areas (e.g. those that share a common border) are modelled as correlated or conditionally independent, depending on whether the populations living in the two areas are similar (correlated random effects) or very different (conditionally independent). The model represents the natural log of the mean function for the set of Poisson responses  by a combination of covariates and a set of random effects. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Gaussian random effects models to spatial data, where the random effects are modelled by a localised conditional autoregressive (CAR) model, for further details see the vignette. The strength of the correlation between random effects in neighbouring areas (e.g. those that share a common border) is modelled as a function of how similar or different the two areas in question are. The model represents the mean function for the set of Gaussian responses  by a combination of covariates and a set of random effects. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
 \usage{
-poisson.localisedbinaryCAR(formula, beta = NULL, phi = NULL, tau2 = NULL, 
-rho = NULL, fix.rho = FALSE, alpha = NULL, W, Z, burnin = 0, 
-n.sample = 1000, blocksize.beta = 5, blocksize.phi = 10, 
-prior.mean.beta = NULL, prior.var.beta = NULL, prior.max.tau2 = NULL, 
+gaussian.dissimilarityCARcontinuous(formula, beta = NULL, phi = NULL, nu2 = NULL, 
+tau2 = NULL, rho = NULL, fix.rho = FALSE, alpha = NULL, W, Z, burnin = 0, 
+n.sample = 1000, blocksize.phi = 10, prior.mean.beta = NULL, 
+prior.var.beta = NULL, prior.max.nu2 = NULL, prior.max.tau2 = NULL, 
 prior.max.alpha = NULL)
 }
+
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{formula}{
@@ -27,6 +28,9 @@ A vector of starting values for the regression parameters (including the interce
 }
   \item{phi}{
 A vector of starting values for the random effects. If this argument is not specified the function will randomly generate starting values.
+}
+  \item{nu2}{
+A starting value for the variance parameter of the Gaussian responses. If this argument is not specified the function will randomly generate a starting value.
 }
   \item{tau2}{
 A starting value for the variance parameter of the random effects. If this argument is not specified the function will randomly generate a starting value.
@@ -52,9 +56,6 @@ The number of MCMC samples to discard as the burnin period. Defaults to 0.
   \item{n.sample}{
 The number of MCMC samples to generate. Defaults to 1,000.
 }
-  \item{blocksize.beta}{
-The size of the blocks in which to update the regression parameters in the MCMC algorithm. Defaults to 5.
-}
   \item{blocksize.phi}{
 The size of the blocks in which to update the random effects in the MCMC algorithm. Defaults to 10.
 }
@@ -64,9 +65,12 @@ A vector of prior means for the regression parameters beta (Gaussian priors are 
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
+  \item{prior.max.nu2}{
+The maximum allowable value for the Gaussian data variance nu2 (a Uniform(0,M) prior is assumed). Defaults to M=1000.
+}
   \item{prior.max.tau2}{
 The maximum allowable value for the random effects variance tau2 (a Uniform(0,M) prior is assumed). Defaults to M=1000.
-}
+}  
   \item{prior.max.alpha}{
 A vector of maximum allowable values for the regression parameters that control the correlation structure amongst the random effects (Uniform(0,M) priors are assumed). Default values are specified if this argument is not included. See the vignette for details.
 }
@@ -83,34 +87,28 @@ For further details about how to apply the function see the vignette to the CARB
 \item{formula }{The formula for the covariate and offset part of the model.}
 \item{samples.beta }{A matrix of MCMC samples for the regression parameters beta.}
 \item{samples.phi }{A matrix of MCMC samples for the random effects phi.}
+\item{samples.nu2 }{A matrix of MCMC samples for the data variance nu2.}
 \item{samples.tau2 }{A matrix of MCMC samples for the random effects variance tau2.}
 \item{samples.rho }{A matrix of MCMC samples for the global spatial correlation parameter rho. Only included if fix.rho=FALSE.}
 \item{samples.alpha }{A matrix of MCMC samples for the regression parameters that control the identification of localised spatial structure in the random effects surface.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{W.posterior }{The posterior median for the n by n neighbourhood matrix W, which shows the locations of any boundaries in the risk surface.}
-\item{W.border.prob }{An n by n matrix showing the posterior probability that there is a boundary in the risk surface between each pair of neighbours in the study region.}
 \item{residuals }{A vector of raw residuals from the model.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
 \item{summary.results }{A summary table of the parameters.}
 }
 
-
-
-
-\references{
-Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. Biostatistics, to appear, doi:10.1093/biostatistics/kxr036.
-}
-
 \author{
 Duncan Lee
 }
 
+
 \examples{
-###########################################################
-#### Run the model on simulated data - localised CAR model
-###########################################################
+##################################################
+#### Run the model on simulated data on a lattice
+##################################################
 
 #### Set up a square lattice region
 x.easting <- 1:10
@@ -125,7 +123,7 @@ groups[Grid$Var1>5] <- 2
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
 distance <-array(0, c(n,n))
 W <-array(0, c(n,n))
-	for(i in 1:n)
+  for(i in 1:n)
 	{
 		for(j in 1:n)
 		{
@@ -135,14 +133,10 @@ W <-array(0, c(n,n))
 		}	
 	}
 	
-	
-#### Generate the response data
-E <- rep(40,n)
+#### Generate the covariates and response data
 phi <- mvrnorm(n=1, mu=groups, Sigma=0.2 * exp(-0.1 * distance))
-risk <- exp(-1 + phi)
-fitted <- E * risk
-Y <- rpois(n=n, lambda=fitted)
-
+fitted <- -0.2 + phi
+Y <- rnorm(n=n, mean=fitted, sd=rep(1,n))
 
 #### Generate a dissimilarity metric
 dissimilarity <- cbind(groups) + rnorm(n, sd=0.2)
@@ -151,12 +145,12 @@ method="maximum", diag=TRUE, upper=TRUE)) * W
 
 Z <- list(dissimilarity.matrix=dissimilarity.matrix)
 
-#### Run the localised smoothing model
+#### Run the localised CAR model with continuous weights
 #### Let the function randomly generate starting values for the parameters
 #### Use the default priors specified by the function (for details see the help files)
-formula <- Y ~ offset(log(E))
-\dontrun{model <- poisson.localisedbinaryCAR(formula=formula, rho=0.99, fix.rho=TRUE, 
-W=W, Z=Z, burnin=5000, n.sample=10000)}
-\dontshow{model <- poisson.localisedbinaryCAR(formula=formula, rho=0.99, fix.rho=TRUE, 
-W=W, Z=Z, burnin=20, n.sample=50)}
+formula <- Y ~ 1
+\dontrun{model <- gaussian.dissimilarityCARcontinuous(formula=formula, W=W, Z=Z, burnin=5000, 
+n.sample=10000)}
+\dontshow{model <- gaussian.dissimilarityCARcontinuous(formula=formula, W=W, Z=Z, burnin=20, 
+n.sample=50)}
 }

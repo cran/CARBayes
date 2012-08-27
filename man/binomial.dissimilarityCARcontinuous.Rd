@@ -1,21 +1,20 @@
-\name{binomial.localisedbinaryCAR}
-\alias{binomial.localisedbinaryCAR}
+\name{binomial.dissimilarityCARcontinuous}
+\alias{binomial.dissimilarityCARcontinuous}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
-Fit the localised conditional autoregressive (CAR) model with binary neighbourhood relations to spatial binomial data
+Fit a localised conditional autoregressive (CAR) model based on dissimilarity metrics with continuous neighbourhood relations to spatial binomial data
 }
 
 \description{
-The function fits a Binomial logistic random effects models to spatial data, where the random effects are modelled by a localised conditional autoregressive (CAR) model, which is a generalisation of that proposed by Lee and Mitchell (2012). The random effects in neighbouring areas (e.g. those that share a common border) are modelled as correlated or conditionally independent, depending on whether the populations living in the two areas are similar (correlated random effects) or very different (conditionally independent). The model represents the logit of the mean function for the set of binomial responses  by a combination of covariates and a set of random effects. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Binomial logistic random effects models to spatial data, where the random effects are modelled by a localised conditional autoregressive (CAR) model, for further details see the vignette. The strength of the correlation between random effects in neighbouring areas (e.g. those that share a common border) is modelled as a function of how similar or different the two areas in question are. The model represents the logit of the mean function for the set of binomial responses  by a combination of covariates and a set of random effects. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
-
 \usage{
-binomial.localisedbinaryCAR(formula, beta = NULL, phi = NULL, tau2 = NULL, 
+binomial.dissimilarityCARcontinuous(formula, beta = NULL, phi = NULL, tau2 = NULL, 
 rho = NULL, fix.rho = FALSE, alpha = NULL, trials, W, Z, burnin = 0, 
 n.sample = 1000, blocksize.beta = 5, blocksize.phi = 10, 
-prior.mean.beta = NULL, prior.var.beta = NULL,  prior.max.tau2 = NULL, 
+prior.mean.beta = NULL, prior.var.beta = NULL, prior.max.tau2 = NULL, 
 prior.max.alpha = NULL)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -39,7 +38,7 @@ A starting value for the global spatial correlation parameter rho. If this argum
 Logical, whether the global correlation parameter is fixed or estimated in the MCMC algorithm.
 }
   \item{alpha}{
-A vector of starting values for the regression parameters that control the identification of localised spatial structure in the random effects surface. If this argument is not specified the function will randomly generate starting values.
+A vector of starting values for the regression parameters that control the identification of boundaries in the random effects surface. If this argument is not specified the function will randomly generate starting values.
 }
  \item{trials}{
 A vector the same length as the response containing the total number of trials for each area.
@@ -76,7 +75,6 @@ A vector of maximum allowable values for the regression parameters that control 
 }
 }
 
-
 \details{
 For further details about how to apply the function see the vignette to the CARBayes package.
 }
@@ -93,16 +91,10 @@ For further details about how to apply the function see the vignette to the CARB
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{W.posterior }{The posterior median for the n by n neighbourhood matrix W, which shows the locations of any boundaries in the risk surface.}
-\item{W.border.prob }{An n by n matrix showing the posterior probability that there is a boundary in the risk surface between each pair of neighbours in the study region.}
 \item{residuals }{A vector of raw residuals from the model.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
 \item{summary.results }{A summary table of the parameters.}
-}
-
-
-\references{
-Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. Biostatistics, to appear, doi:10.1093/biostatistics/kxr036.
 }
 
 \author{
@@ -127,7 +119,7 @@ groups[Grid$Var1>5] <- 2
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
 distance <-array(0, c(n,n))
 W <-array(0, c(n,n))
-	for(i in 1:n)
+  for(i in 1:n)
 	{
 		for(j in 1:n)
 		{
@@ -157,8 +149,8 @@ Z <- list(dissimilarity.matrix=dissimilarity.matrix)
 #### Let the function randomly generate starting values for the parameters
 #### Use the default priors specified by the function (for details see the help files)
 formula <- Y ~ 1
-\dontrun{model <- binomial.localisedbinaryCAR(formula=formula, rho=0.99, fix.rho=TRUE, 
-trials=trials, W=W, Z=Z, burnin=5000, n.sample=10000)}
-\dontshow{model <- binomial.localisedbinaryCAR(formula=formula, rho=0.99, fix.rho=TRUE, 
-trials=trials, W=W, Z=Z, burnin=20, n.sample=50)}
+\dontrun{model <- binomial.dissimilarityCARcontinuous(formula=formula, trials=trials, W=W, Z=Z, 
+burnin=5000, n.sample=10000)}
+\dontshow{model <- binomial.dissimilarityCARcontinuous(formula=formula, trials=trials, W=W, Z=Z, 
+burnin=20, n.sample=50)}
 }

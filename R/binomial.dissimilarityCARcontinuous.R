@@ -1,5 +1,5 @@
-poisson.localisedbinaryCAR <-
-function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, W, Z, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
+binomial.dissimilarityCARcontinuous <-
+function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, trials, W, Z, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -69,28 +69,32 @@ q <- length(Z)
 	if(min(as.numeric(lapply(Z,min)))<0) stop("Z contains negative values.", call.=FALSE)
 
 
-## Determine the default values for the maximums for alpha and the threshold values to be significant
+## Determine the default values for the maximums for alpha
 alpha.max <- rep(NA,q)
-alpha.threshold <- rep(NA,q)
 	for(k in 1:q)
 	{
-	Z.crit <- quantile(as.numeric(Z[[k]])[as.numeric(Z[[k]])!=0], 0.5)
-	alpha.max[k] <- -log(0.5) / Z.crit
-	alpha.threshold[k] <- -log(0.5) / max(Z[[k]])
+	alpha.max[k] <- -log(0.01) /max(as.numeric(Z[[k]])[as.numeric(Z[[k]])!=0])
 	}
 
 
 
-#### Response variable
+#### Response variable and trials
 ## Create the response
 Y <- model.response(frame)
     
 ## Check for errors
+    if(sum(is.na(trials))>0) stop("the numbers of trials has missing 'NA' values.", call.=FALSE)
+    if(!is.numeric(trials)) stop("the numbers of trials has non-numeric values.", call.=FALSE)
+int.check <- n-sum(ceiling(trials)==floor(trials))
+    if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
+    if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
+
     if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
 int.check <- n-sum(ceiling(Y)==floor(Y))
     if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
     if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
+    if(sum(Y>trials)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
 
 
 
@@ -108,7 +112,9 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 #### Initial parameter values
 ## Regression parameters beta
-	 if(is.null(beta)) beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
+dat <- cbind(Y, trials-Y)
+
+	 if(is.null(beta)) beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -125,7 +131,7 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(sum(is.na(tau2))>0) stop("tau2 has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(tau2)) stop("tau2 has non-numeric values.", call.=FALSE)
     if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)    
-
+    
 ## Global correlation parameter rho
     if(is.null(rho) & fix.rho==TRUE) stop("rho is fixed yet a value has not been specified.", call.=FALSE)
     if(is.null(rho)) rho <- runif(1)
@@ -133,13 +139,12 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(sum(is.na(rho))>0) stop("rho has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(rho)) stop("rho has non-numeric values.", call.=FALSE)
     if(rho < 0 | rho >=1) stop("rho is outside the interval [0,1).", call.=FALSE)
- 
+    
 ## Covariance parameters alpha
     if(is.null(alpha)) alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
     if(length(alpha)!= q) stop("alpha is the wrong length.", call.=FALSE)
     if(sum(is.na(alpha))>0) stop("alpha has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(alpha)) stop("alpha has non-numeric values.", call.=FALSE)
-
 
 
 #### MCMC quantities
@@ -237,7 +242,7 @@ Z.combined <- array(0, c(n,n))
 	Z.combined <- Z.combined + alpha[r] * Z[[r]]
 	}
 	
-W.temp <- array(as.numeric(exp(-Z.combined)>=0.5), c(n,n)) * W
+W.temp <- exp(-Z.combined) * W
 W.star <- -W.temp
 diag(W.star) <- apply(W.temp, 1, sum)
 Q <- rho * W.star + (1-rho) * I.n
@@ -245,13 +250,17 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 
 
 
+#### Other quantities needed for the MCMC algorithm
+failures <- trials - Y
+
+
+
 ###########################
 #### Run the Bayesian model
 ###########################
-###########################
 	if(fix.rho)
-	{	
-    	for(j in 1:n.sample)
+	{
+		for(j in 1:n.sample)
     	{
     	####################
     	## Sample from beta
@@ -293,11 +302,13 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
         ## Propose a value
         n.current <- length(beg[r]:fin[r])
         proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        fitted.proposal <- exp(as.numeric(X.standardised %*% proposal.beta) + phi + offset)
-        fitted.current <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
+        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + phi + offset
+        logit.current <- as.numeric(X.standardised %*% beta) + phi + offset    
+        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
+        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
 
         ## Calculate the acceptance probability
-        prob1 <- sum(Y * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
+        prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
         prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
         prob <- exp(prob1 + prob2)
 
@@ -360,11 +371,13 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
         block.var <- chol2inv(chol(Q.current))
         block.mean <- - block.var %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
         proposal.phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=phi[beg[r]:fin[r]], Sigma=(proposal.sd.phi * block.var))
-        fitted.proposal <- exp(beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]])
-        fitted.current <- exp(beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]])
+        logit.proposal <- beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]]
+        logit.current <- beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]]    
+        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
+        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
         
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
+        prob1 <- sum(Y[beg[r]:fin[r]] * (log(prob.proposal) - log(prob.current)) + failures[beg[r]:fin[r]] * (log(1-prob.proposal) - log(1-prob.current)))          
         prob2 <- t(phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (phi[beg[r]:fin[r]] - block.mean) - t(proposal.phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (proposal.phi[beg[r]:fin[r]] - block.mean)
         prob <- exp(prob1 + 0.5 * prob2)
 
@@ -416,10 +429,10 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 			Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
 			}
 	
-		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
+		W.temp.proposal <- exp(-Z.combined.proposal) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
-		proposal.Q <- rho * W.star.proposal + (1-rho) * I.n
+		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
 		det.proposal.Q <- as.numeric(determinant(proposal.Q, logarithm=TRUE)$modulus)
 
 		#### Calculate the acceptance probability
@@ -441,13 +454,16 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
       		accept[6] <- accept[6] + 1
       		}
       
- 
+      
+            
+
    
     	#########################
     	## Calculate the deviance
     	#########################
-    	fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
-    	deviance <- -2 * sum(Y * log(fitted) -  fitted - lfactorial(Y))
+    	logit <- as.numeric(X.standardised %*% beta) + phi + offset    
+    	prob <- exp(logit)  / (1 + exp(logit))
+	 	deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
 
 
 
@@ -520,7 +536,7 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 		}
 	}else
 	{
-    	for(j in 1:n.sample)
+		for(j in 1:n.sample)
     	{
     	####################
     	## Sample from beta
@@ -562,11 +578,13 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
         ## Propose a value
         n.current <- length(beg[r]:fin[r])
         proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        fitted.proposal <- exp(as.numeric(X.standardised %*% proposal.beta) + phi + offset)
-        fitted.current <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
+        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + phi + offset
+        logit.current <- as.numeric(X.standardised %*% beta) + phi + offset    
+        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
+        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
 
         ## Calculate the acceptance probability
-        prob1 <- sum(Y * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
+        prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
         prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
         prob <- exp(prob1 + prob2)
 
@@ -629,11 +647,13 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
         block.var <- chol2inv(chol(Q.current))
         block.mean <- - block.var %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
         proposal.phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=phi[beg[r]:fin[r]], Sigma=(proposal.sd.phi * block.var))
-        fitted.proposal <- exp(beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]])
-        fitted.current <- exp(beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]])
+        logit.proposal <- beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]]
+        logit.current <- beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]]    
+        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
+        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
         
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
+        prob1 <- sum(Y[beg[r]:fin[r]] * (log(prob.proposal) - log(prob.current)) + failures[beg[r]:fin[r]] * (log(1-prob.proposal) - log(1-prob.current)))          
         prob2 <- t(phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (phi[beg[r]:fin[r]] - block.mean) - t(proposal.phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (proposal.phi[beg[r]:fin[r]] - block.mean)
         prob <- exp(prob1 + 0.5 * prob2)
 
@@ -663,9 +683,9 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
             {
             tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
             }
-
-
     
+    
+ 
     	##################
     	## Sample from rho
     	##################
@@ -699,8 +719,8 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
             accept[6] <- accept[6] + 1 
             }
 
-    
- 
+
+   
    		######################
 		#### Sample from alpha
 		######################
@@ -720,10 +740,10 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 			Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
 			}
 	
-		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
+		W.temp.proposal <- exp(-Z.combined.proposal) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
-		proposal.Q <- rho * W.star.proposal + (1-rho) * I.n
+		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
 		det.proposal.Q <- as.numeric(determinant(proposal.Q, logarithm=TRUE)$modulus)
 
 		#### Calculate the acceptance probability
@@ -737,7 +757,7 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
       		alpha <- proposal.alpha
       		Q <- proposal.Q
       		det.Q <- det.proposal.Q 
-      	   W.star <- W.star.proposal 
+      		W.star <- W.star.proposal 
       		accept[7] <- accept[7] + 1
       		accept[8] <- accept[8] + 1
       		}else
@@ -745,14 +765,15 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
       		proposal.alpha <- alpha
       		accept[8] <- accept[8] + 1
       		}
-      
- 
-   
+
+
+
     	#########################
     	## Calculate the deviance
     	#########################
-    	fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
-    	deviance <- -2 * sum(Y * log(fitted) -  fitted - lfactorial(Y))
+    	logit <- as.numeric(X.standardised %*% beta) + phi + offset    
+    	prob <- exp(logit)  / (1 + exp(logit))
+	 	deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
 
 
 
@@ -823,7 +844,7 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
         }else
         {
         }
-		}
+		}		
 	}
 
 
@@ -833,8 +854,10 @@ det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
-fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
-deviance.fitted <- -2 * sum(Y * log(fitted.median) -  fitted.median - lfactorial(Y))
+median.logit <- as.numeric(X.standardised %*% median.beta) + median.phi + offset    
+median.prob <- exp(median.logit)  / (1 + exp(median.logit))
+fitted.median <- trials * median.prob
+deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
 p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
 residuals <- Y - fitted.median
@@ -890,6 +913,7 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	rownames(summary.alpha) <- names.Z	
 	}
 
+
 	if(fix.rho)
 	{
 	summary.hyper <- array(NA, c(1 ,5))
@@ -897,12 +921,9 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	summary.hyper[1, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.tau2)))))
 
 	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
-	alpha.min <- c(rep(NA, (p+1)), alpha.threshold)
-	summary.results <- cbind(summary.results, alpha.min)
 	rownames(summary.results)[(p+1)] <- c("tau2")
 	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-	summary.results[ , 6] <- round(summary.results[ , 6], 4)
 	}else
 	{
 	summary.hyper <- array(NA, c(2 ,5))
@@ -912,13 +933,10 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	summary.hyper[2, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.rho)))))
 
 	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
-	alpha.min <- c(rep(NA, (p+2)), alpha.threshold)
-	summary.results <- cbind(summary.results, alpha.min)
 	rownames(summary.results)[(p+1):(p+2)] <- c("tau2", "rho")
 	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-	summary.results[ , 6] <- round(summary.results[ , 6], 4)	}
-
+	}
 
 
 #### Create the random effects summary
@@ -938,7 +956,8 @@ colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
 fitted.temp <- array(NA, c(nrow(samples.beta), n))
     for(i in 1:nrow(samples.alpha))
     {
-    fitted.temp[i, ] <- exp(X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset)
+    temp.logit <- X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset    
+	 fitted.temp[i, ] <- trials * exp(temp.logit)  / (1 + exp(temp.logit))
     }
 fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
 fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
@@ -949,7 +968,6 @@ fitted.values <- round(fitted.values, 4)
 
 #### Create the posterior medians for the neighbourhood matrix W
 W.posterior <- W
-W.border.prob <- array(NA, c(n,n))
 	for(i in 1:n)
 	{
 		for(j in 1:n)
@@ -962,16 +980,14 @@ W.border.prob <- array(NA, c(n,n))
 				z.temp <- c(z.temp, Z[[k]][i,j])
 				}	
 			z.temp <- z.temp[-1]
-			w.temp <- exp(-samples.alpha %*% z.temp)
-			w.posterior <- as.numeric(w.temp>=0.5)
+			w.posterior <- exp(-samples.alpha %*% z.temp)
 			W.posterior[i,j] <- median(w.posterior)
-			W.border.prob[i,j] <- (1 - sum(w.posterior) / length(w.posterior))
 			}else
 			{
 			}	
 		}	
 	}
-n.borders <- sum(abs(W - W.posterior)) / 2
+
 
 
 
@@ -981,8 +997,8 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("\n#################\n")
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
-	cat("Likelihood model - Poisson (log link function) \n")
-	cat("Random effects model - Localised CAR binary weights\n")
+	cat("Likelihood model - Binomial (logistic link function)\n")
+	cat("Random effects model - Localised CAR continuous weights\n")
 	cat("Regression equation - ")
 	print(formula)
 	cat("Dissimilarity metrics - ")
@@ -998,15 +1014,13 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("The global spatial correlation parameter rho is fixed at ", rho,"\n\n", sep="")
 	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
-	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " borders in the study region","\n\n", sep="")
 	}else
 	{
 	cat("\n#################\n")
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
-	cat("Likelihood model - Poisson (log link function) \n")
-	cat("Random effects model - Localised CAR binary weights\n")
+	cat("Likelihood model - Binomial (logistic link function)\n")
+	cat("Random effects model - Localised CAR continuous weights\n")
 	cat("Regression equation - ")
 	print(formula)
 	cat("Dissimilarity metrics - ")
@@ -1021,20 +1035,17 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("\n\n")
 	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
-	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " borders in the study region","\n\n", sep="")
 	}
 
 
 ## Compile and return the results
 	if(fix.rho)
 	{
-	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, W.border.prob=W.border.prob, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 	}else
 	{
-	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, W.border.prob=W.border.prob, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 	}
 
 return(results)
 }
-
