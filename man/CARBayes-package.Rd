@@ -10,14 +10,16 @@ Spatial areal unit modelling
 
 \description{
 This package implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as recently developed localised spatial smoothing models. In addition, Moran's I and Geary's C permutation tests for spatial correlation can be implemented.
+
+The creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256.
 }
 
 \details{
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 1.1\cr
-Date: \tab 2012-08-27\cr
+Version: \tab 1.2\cr
+Date: \tab 2012-10-31\cr
 License: \tab GPL (>= 2)\cr
 }
 

@@ -29,7 +29,9 @@ export(
 )
 
 import(
-  MASS,
   coda,
-  MCMCpack
+  MASS,
+  MCMCpack,
+  spam,
+  truncdist
 )

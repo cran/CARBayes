@@ -13,8 +13,8 @@ if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g 
 #### Design matrix
 ## Create the matrix
 X <- try(suppressWarnings(model.matrix(object=attr(frame, "terms"), data=frame)), silent=TRUE)
-    if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
-    if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
+     if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
+     if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
 
 n <- nrow(X)
 p <- ncol(X)
@@ -28,7 +28,7 @@ diag(cor.X) <- 0
  
  	 if(p>1)
 	 {
-    	if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
+    	     if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
 	 }else
 	 {
 	 }
@@ -105,7 +105,7 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 #### Initial parameter values
 ## Regression parameters beta
-	 if(is.null(beta)) beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
+    if(is.null(beta)) beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -158,6 +158,37 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(blocksize.phi <= 0) stop("blocksize.phi is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.phi)==ceiling(blocksize.phi))) stop("blocksize.phi has non-integer values.", call.=FALSE)
 
+
+## Compute the blocking structure for phi
+     if(blocksize.phi >= n)
+     {
+     n.phi.block <- 1
+     phi.beg <- 1
+     phi.fin <- n  
+     }else
+     {
+     n.standard <- 1 + floor((n-blocksize.phi) / blocksize.phi)
+     remainder <- n - (n.standard * blocksize.phi)
+     
+          if(remainder==0)
+          {
+          phi.beg <- c(1,seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi))
+          n.phi.block <- length(phi.beg)
+          }else if(remainder==1)
+          {
+          phi.beg <- c(1, seq((blocksize.phi), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi-1, seq((blocksize.phi+blocksize.phi-1), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)    
+          }else
+          {
+          phi.beg <- c(1, seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)
+          }
+     }
+
+
 ## Matrices to store samples
 samples.beta <- array(NA, c((n.sample-burnin), p))
 samples.phi <- array(NA, c((n.sample-burnin), n))
@@ -168,15 +199,14 @@ samples.deviance <- array(NA, c((n.sample-burnin), 1))
 
 	if(fix.rho)
 	{
-	accept <- rep(0,2)
 	}else
 	{
 	samples.rho <- array(NA, c((n.sample-burnin), 1))
-	accept <- rep(0,4)
-	proposal.sd.rho <- 0.05
+	proposal.sd.rho <- 0.02
 	}
 
-
+nu2.posterior.shape <- 0.5*n-1
+tau2.posterior.shape <- 0.5*n-1
 
 #### Priors
 ## Put in default priors
@@ -216,7 +246,7 @@ samples.deviance <- array(NA, c((n.sample-burnin), 1))
 
 
 #### Specify the proposal sd for alpha
-proposal.sd.alpha <- 0.05 * prior.max.alpha
+proposal.sd.alpha <- 0.02 * prior.max.alpha
 
 
 #### Checks for the original W matrix
@@ -241,8 +271,10 @@ W.temp <- array(as.numeric(exp(-Z.combined)>=0.5), c(n,n)) * W
 W.star <- -W.temp
 diag(W.star) <- apply(W.temp, 1, sum)
 Q <- rho * W.star + (1-rho) * I.n
-det.Q <- as.numeric(determinant(Q, logarithm=TRUE)$modulus)
-
+spam.Q <- as.spam(Q)
+spam.Q.proposal <- spam.Q
+det.Q <- sum(log(diag(chol.spam(spam.Q))))
+indices.Q <- which(as.numeric(Q)!=0)
 
 
 #### Beta update quantities
@@ -258,414 +290,321 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 	}
 
 
+
 ###########################
 #### Run the Bayesian model
 ###########################
 	if(fix.rho)
 	{
 		for(j in 1:n.sample)
-    	{
-    	####################
-    	## Sample from beta
-    	####################
-    	#### Calculate the full conditional mean and variance
-    	data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
-    	fc.variance.beta <- solve((prior.precision.beta + data.precision.beta / nu2))
-    	fc.mean.beta <- fc.variance.beta %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta)
-    
-    	#### Update beta by Gibbs sampling  
-    	beta <- mvrnorm(n=1, mu=fc.mean.beta, Sigma=fc.variance.beta)
+    	     {
+		####################
+		## Sample from beta
+		####################
+		data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
+		U <- chol((prior.precision.beta + data.precision.beta / nu2))
+		Uinv <- backsolve(U, diag(rep(1,p)))
+		fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
+		beta <- fc.mean.beta + Uinv %*% rnorm(p)
+		     
 
 
-
-    	##################
-    	## Sample from nu2
-    	##################
-    	fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-	 	nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    	nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            while(nu2 > prior.max.nu2)
-            {
-            nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            }
+		##################
+		## Sample from nu2
+		##################
+		fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
+		nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
+		nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+		
 
 
-
-    	####################
-    	## Sample from phi
-    	####################
-    	#### Create the blocking structure
-    		if(blocksize.phi >= n)
-    		{
-    		n.block <- 1
-    		beg <- 1
-    		fin <- n
-    		}else
-    		{
-    		init <- sample(1:blocksize.phi,  1)
-    		n.standard <- floor((n-init) / blocksize.phi)
-    		remainder <- n - (init + n.standard * blocksize.phi)
-        
-        		if(n.standard==0)
-        		{
-        		beg <- c(1,(init+1))
-        		fin <- c(init,n)
-        		}else if(remainder==0)
-        		{
-        		beg <- c(1,seq((init+1), n, blocksize.phi))
-        		fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi))
-        		}else
-        		{
-        		beg <- c(1, seq((init+1), n, blocksize.phi))
-        		fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi), n)
-        		}
-    		n.block <- length(beg)
-    		}
-    
-
-    	#### Update the parameters in blocks
-    	Q.temp <- Q / tau2
-    	data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
-        
-        	for(r in 1:n.block)
-        	{
-        	## Create the prior and data means and variances
-        	prior.precision.phi <- as.matrix(Q.temp[beg[r]:fin[r], beg[r]:fin[r]])
-        	block.length <- nrow(prior.precision.phi)
-        	prior.var.phi <- chol2inv(chol(prior.precision.phi))
-        	prior.mean.phi <- - prior.var.phi %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
-        	data.precision.phi <- diag(rep((1/nu2),(block.length+1)))
-		  	data.precision.phi <- data.precision.phi[1:block.length, 1:block.length]
-
-        	## Create the full conditional
-        	fc.variance.phi <- solve((prior.precision.phi + data.precision.phi))
-        	fc.mean.phi <- fc.variance.phi %*% (prior.precision.phi %*% prior.mean.phi + data.precision.phi %*% data.mean.phi[beg[r]:fin[r]])
-        
-        	## Update phi
-        	phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=fc.mean.phi, Sigma=fc.variance.phi)
-		  	}
-        
-    	phi <- phi - mean(phi)
+		####################
+		## Sample from phi
+		####################
+		Q.temp <- Q / tau2
+		data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
+		data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
+		b <- rnorm(n)
+		
+		     for(r in 1:n.phi.block)
+		     {
+		     ## Create the prior  mean and variance
+		     n.current <- length(phi.beg[r]:phi.fin[r])     
+		     Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
+		     U <- chol(Q.current)
+		     Uinv <- backsolve(U, diag(rep(1,n.current)))
+		     block.mean <- - Uinv %*% (t(Uinv) %*% Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
+		     
+		     ## Create the full conditional
+		     U2 <- chol((Q.current + data.precision.phi[1:n.current, 1:n.current])) 
+		     U2inv <- backsolve(U2, diag(rep(1,n.current)))
+		     fc.mean.phi <- U2inv %*% t(U2inv) %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
+		     
+		     ## Update phi
+		     phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + U2inv %*% b[phi.beg[r]:phi.fin[r]]
+		     }   
+		phi <- phi - mean(phi)
+		
     
     
-
-   		##################
-    	## Sample from tau2
-    	##################
-    	tau2.posterior.scale <- 0.5 * t(phi) %*% Q %*% phi
-    	tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            while(tau2 > prior.max.tau2)
-            {
-            tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            }
-    
+		##################
+		## Sample from tau2
+		##################
+		tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
+		tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
+		
     
  
-   
-   		######################
+		######################
 		#### Sample from alpha
 		######################
 		proposal.alpha <- alpha
-	
-		#### propose a new value
-		proposal.alpha <- rnorm(n=q, mean=alpha, sd=proposal.sd.alpha)
-			while(sum(proposal.alpha > prior.max.alpha | proposal.alpha<0)>0)
-			{
-			proposal.alpha <- rnorm(n=q, mean=alpha, sd=proposal.sd.alpha)
-			}
-	
+		     for(r in 1:q)
+		     {
+		     proposal.alpha[r] <- rtrunc(n=1, spec="norm", a=0, b=prior.max.alpha[r],  mean=alpha[r], sd=proposal.sd.alpha[r])
+		     }
+		
 		#### Calculate Q.proposal
 		Z.combined.proposal <- array(0, c(n,n))
-			for(r in 1:q)
-			{
-			Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
-			}
-	
+		     for(r in 1:q)
+		     {
+		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
+		     }
+		
 		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
 		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
-		det.proposal.Q <- as.numeric(determinant(proposal.Q, logarithm=TRUE)$modulus)
-
+		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
+		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
+		
 		#### Calculate the acceptance probability
-		fc.current <- 0.5 * det.Q - 0.5 * t(phi) %*% Q %*% phi / tau2 
-		fc.proposal <- 0.5 * det.proposal.Q - 0.5 * t(phi) %*% proposal.Q %*% phi / tau2 
-		prob <- exp(fc.proposal - fc.current)
-	
+		logprob.current <- det.Q - 0.5 * sum(phi * (spam.Q %*% phi)) / tau2
+		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
+		prob <- exp(logprob.proposal - logprob.current)
+		
 		#### Accept or reject the proposed value
-			if(prob > runif(1))
-      		{
-      		alpha <- proposal.alpha
-      		Q <- proposal.Q
-      		det.Q <- det.proposal.Q
-      		accept[1] <- accept[1] + 1
-      		accept[2] <- accept[2] + 1
-      		}else
-      		{
-      		proposal.alpha <- alpha
-      		accept[2] <- accept[2] + 1
-      		}
+		     if(prob > runif(1))
+		     {
+		     alpha <- proposal.alpha
+		     Q <- proposal.Q
+		     det.Q <- proposal.det.Q 
+		     spam.Q <- spam.Q.proposal
+		     W.star <- W.star.proposal 
+		     }else
+		     {
+		     }
+          
+		
       
              
-
-    	#########################
-    	## Calculate the deviance
-    	#########################
-    	fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-    	deviance <- -2 * sum(dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log = TRUE))
-
+    	     #########################
+    	     ## Calculate the deviance
+    	     #########################
+    	     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
+    	     deviance <- -2 * sum(dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log = TRUE))
 
 
-    	###################
-    	## Save the results
-    	###################
-        if(j > burnin)
-        {
-        ele <- j - burnin
-        samples.beta[ele, ] <- beta
-        samples.phi[ele, ] <- phi
-        samples.nu2[ele, ] <- nu2
-        samples.tau2[ele, ] <- tau2
-        samples.alpha[ele, ] <- alpha
-        samples.deviance[ele, ] <- deviance
-        }else
-        {
-        }
+
+    	     ###################
+    	     ## Save the results
+    	     ###################
+               if(j > burnin)
+               {
+               ele <- j - burnin
+               samples.beta[ele, ] <- beta
+               samples.phi[ele, ] <- phi
+               samples.nu2[ele, ] <- nu2
+               samples.tau2[ele, ] <- tau2
+               samples.alpha[ele, ] <- alpha
+               samples.deviance[ele, ] <- deviance
+               }else
+               {
+               }
 
     
     
-    	#######################################
-    	#### Print out the number of iterations
-    	#######################################
-    	k <- j/1000
-        if(ceiling(k)==floor(k))
-        {
-        cat("Completed ",j, " samples\n")
-        flush.console()
-        }else
-        {
-        }
+         	#######################################
+    	     #### Print out the number of iterations
+    	     #######################################
+    	     k <- j/1000
+               if(ceiling(k)==floor(k))
+               {
+               cat("Completed ",j, " samples\n")
+               flush.console()
+               }else
+               {
+               }
    		}
 	}else
 	{
 		for(j in 1:n.sample)
-    	{
-    	####################
-    	## Sample from beta
-    	####################
-    	#### Calculate the full conditional mean and variance
-    	data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
-    	fc.variance.beta <- solve((prior.precision.beta + data.precision.beta / nu2))
-    	fc.mean.beta <- fc.variance.beta %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta)
-    
-    	#### Update beta by Gibbs sampling  
-    	beta <- mvrnorm(n=1, mu=fc.mean.beta, Sigma=fc.variance.beta)
+    	     {
+		####################
+		## Sample from beta
+		####################
+		data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
+		U <- chol((prior.precision.beta + data.precision.beta / nu2))
+		Uinv <- backsolve(U, diag(rep(1,p)))
+		fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
+		beta <- fc.mean.beta + Uinv %*% rnorm(p)
+		     
 
 
-
-    	##################
-    	## Sample from nu2
-    	##################
-    	fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-	 	nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    	nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            while(nu2 > prior.max.nu2)
-            {
-            nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            }
+		##################
+		## Sample from nu2
+		##################
+		fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
+		nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
+		nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+		
 
 
-
-    	####################
-    	## Sample from phi
-    	####################
-    	#### Create the blocking structure
-    		if(blocksize.phi >= n)
-    		{
-    		n.block <- 1
-    		beg <- 1
-    		fin <- n
-    		}else
-    		{
-    		init <- sample(1:blocksize.phi,  1)
-    		n.standard <- floor((n-init) / blocksize.phi)
-    		remainder <- n - (init + n.standard * blocksize.phi)
-        
-        		if(n.standard==0)
-        		{
-        		beg <- c(1,(init+1))
-        		fin <- c(init,n)
-        		}else if(remainder==0)
-        		{
-        		beg <- c(1,seq((init+1), n, blocksize.phi))
-        		fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi))
-        		}else
-        		{
-        		beg <- c(1, seq((init+1), n, blocksize.phi))
-        		fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi), n)
-        		}
-    		n.block <- length(beg)
-    		}
+		####################
+		## Sample from phi
+		####################
+		Q.temp <- Q / tau2
+		data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
+		data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
+		b <- rnorm(n)
+		
+		     for(r in 1:n.phi.block)
+		     {
+		     ## Create the prior  mean and variance
+		     n.current <- length(phi.beg[r]:phi.fin[r])     
+		     Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
+		     U <- chol(Q.current)
+		     Uinv <- backsolve(U, diag(rep(1,n.current)))
+		     block.mean <- - Uinv %*% (t(Uinv) %*% Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
+		     
+		     ## Create the full conditional
+		     U2 <- chol((Q.current + data.precision.phi[1:n.current, 1:n.current])) 
+		     U2inv <- backsolve(U2, diag(rep(1,n.current)))
+		     fc.mean.phi <- U2inv %*% t(U2inv) %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
+		     
+		     ## Update phi
+		     phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + U2inv %*% b[phi.beg[r]:phi.fin[r]]
+		     }   
+		phi <- phi - mean(phi)
+		
     
 
-    	#### Update the parameters in blocks
-    	Q.temp <- Q / tau2
-    	data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
-        
-        	for(r in 1:n.block)
-        	{
-        	## Create the prior and data means and variances
-        	prior.precision.phi <- as.matrix(Q.temp[beg[r]:fin[r], beg[r]:fin[r]])
-        	block.length <- nrow(prior.precision.phi)
-        	prior.var.phi <- chol2inv(chol(prior.precision.phi))
-        	prior.mean.phi <- - prior.var.phi %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
-        	data.precision.phi <- diag(rep((1/nu2),(block.length+1)))
-		  	data.precision.phi <- data.precision.phi[1:block.length, 1:block.length]
-
-        	## Create the full conditional
-        	fc.variance.phi <- solve((prior.precision.phi + data.precision.phi))
-        	fc.mean.phi <- fc.variance.phi %*% (prior.precision.phi %*% prior.mean.phi + data.precision.phi %*% data.mean.phi[beg[r]:fin[r]])
-        
-        	## Update phi
-        	phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=fc.mean.phi, Sigma=fc.variance.phi)
-		  	}
-        
-    	phi <- phi - mean(phi)
-    
-    
-
-   		##################
-    	## Sample from tau2
-    	##################
-    	tau2.posterior.scale <- 0.5 * t(phi) %*% Q %*% phi
-    	tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            while(tau2 > prior.max.tau2)
-            {
-            tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            }
-    
+		##################
+		## Sample from tau2
+		##################
+		tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
+		tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
+		
     
  
-    	##################
-    	## Sample from rho
-    	##################
-    	#### Propose a value
-    	proposal.rho <- rnorm(n=1, mean=rho, sd=proposal.sd.rho)
-            while(proposal.rho >= 1 | proposal.rho < 0)
-            {
-            proposal.rho <- rnorm(n=1, mean=rho, sd=proposal.sd.rho)
-            }      
-   
-	 	#### Calculate Q.proposal
-	 	proposal.Q <- proposal.rho * W.star + (1-proposal.rho) * I.n
-	 	proposal.det.Q <- as.numeric(determinant(proposal.Q, logarithm=TRUE)$modulus)
-
-
-    	#### Calculate the acceptance probability
-    	logprob.current <- 0.5 * det.Q - tau2.posterior.scale / tau2
-    	logprob.proposal <- 0.5 * proposal.det.Q - 0.5 * t(phi) %*% proposal.Q %*% phi / tau2
-    	prob <- exp(logprob.proposal - logprob.current)
-    
-    	#### Accept or reject the proposal
-            if(prob > runif(1))
-            {
-            rho <- proposal.rho
-            Q <- proposal.Q
-            det.Q <- proposal.det.Q        
-            accept[1] <- accept[1] + 1  
-            accept[2] <- accept[2] + 1 
-            }else
-            {
-            accept[2] <- accept[2] + 1 
-            }
-
+		##################
+		## Sample from rho
+		##################
+		#### Propose a value
+		proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1,  mean=rho, sd=proposal.sd.rho)    
+		
+		#### Calculate the acceptance probability
+		proposal.Q <- proposal.rho * W.star + (1-proposal.rho) * I.n
+		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
+		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
+		logprob.current <- det.Q - tau2.posterior.scale / tau2
+		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
+		prob <- exp(logprob.proposal - logprob.current)
+		
+		#### Accept or reject the proposal
+		     if(prob > runif(1))
+		     {
+		     rho <- proposal.rho
+		     Q <- proposal.Q
+		     spam.Q <- spam.Q.proposal
+		     det.Q <- proposal.det.Q        
+		     }else
+		     {
+		     }
+		
 
    
-   		######################
+		######################
 		#### Sample from alpha
 		######################
 		proposal.alpha <- alpha
-	
-		#### propose a new value
-		proposal.alpha <- rnorm(n=q, mean=alpha, sd=proposal.sd.alpha)
-			while(sum(proposal.alpha > prior.max.alpha | proposal.alpha<0)>0)
-			{
-			proposal.alpha <- rnorm(n=q, mean=alpha, sd=proposal.sd.alpha)
-			}
-	
+		     for(r in 1:q)
+		     {
+		     proposal.alpha[r] <- rtrunc(n=1, spec="norm", a=0, b=prior.max.alpha[r],  mean=alpha[r], sd=proposal.sd.alpha[r])
+		     }
+		
 		#### Calculate Q.proposal
 		Z.combined.proposal <- array(0, c(n,n))
-			for(r in 1:q)
-			{
-			Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
-			}
-	
+		     for(r in 1:q)
+		     {
+		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
+		     }
+		
 		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
 		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
-		det.proposal.Q <- as.numeric(determinant(proposal.Q, logarithm=TRUE)$modulus)
-
+		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
+		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
+		
 		#### Calculate the acceptance probability
-		fc.current <- 0.5 * det.Q - 0.5 * t(phi) %*% Q %*% phi / tau2 
-		fc.proposal <- 0.5 * det.proposal.Q - 0.5 * t(phi) %*% proposal.Q %*% phi / tau2 
-		prob <- exp(fc.proposal - fc.current)
-	
+		logprob.current <- det.Q - 0.5 * sum(phi * (spam.Q %*% phi)) / tau2
+		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
+		prob <- exp(logprob.proposal - logprob.current)
+		
 		#### Accept or reject the proposed value
-			if(prob > runif(1))
-      		{
-      		alpha <- proposal.alpha
-      		Q <- proposal.Q
-      		det.Q <- det.proposal.Q
-      		W.star <- W.star.proposal 
-      		accept[3] <- accept[3] + 1
-      		accept[4] <- accept[4] + 1
-      		}else
-      		{
-      		proposal.alpha <- alpha
-      		accept[4] <- accept[4] + 1
-      		}
+		     if(prob > runif(1))
+		     {
+		     alpha <- proposal.alpha
+		     Q <- proposal.Q
+		     det.Q <- proposal.det.Q 
+		     spam.Q <- spam.Q.proposal
+		     W.star <- W.star.proposal 
+		     }else
+		     {
+		     }
       
+		
              
 
-    	#########################
-    	## Calculate the deviance
-    	#########################
-    	fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-    	deviance <- -2 * sum(dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log = TRUE))
+    	     #########################
+    	     ## Calculate the deviance
+    	     #########################
+    	     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
+    	     deviance <- -2 * sum(dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log = TRUE))
 
 
 
-    	###################
-    	## Save the results
-    	###################
-        if(j > burnin)
-        {
-        ele <- j - burnin
-        samples.beta[ele, ] <- beta
-        samples.phi[ele, ] <- phi
-        samples.nu2[ele, ] <- nu2
-        samples.tau2[ele, ] <- tau2
-        samples.rho[ele, ] <- rho
-        samples.alpha[ele, ] <- alpha
-        samples.deviance[ele, ] <- deviance
-        }else
-        {
-        }
+    	     ###################
+    	     ## Save the results
+    	     ###################
+               if(j > burnin)
+               {
+               ele <- j - burnin
+               samples.beta[ele, ] <- beta
+               samples.phi[ele, ] <- phi
+               samples.nu2[ele, ] <- nu2
+               samples.tau2[ele, ] <- tau2
+               samples.rho[ele, ] <- rho
+               samples.alpha[ele, ] <- alpha
+               samples.deviance[ele, ] <- deviance
+               }else
+               {
+               }
 
     
     
-    	#######################################
-    	#### Print out the number of iterations
-    	#######################################
-    	k <- j/1000
-        if(ceiling(k)==floor(k))
-        {
-        cat("Completed ",j, " samples\n")
-        flush.console()
-        }else
-        {
-        }
+    	     #######################################
+    	     #### Print out the number of iterations
+    	     #######################################
+    	     k <- j/1000
+               if(ceiling(k)==floor(k))
+               {
+               cat("Completed ",j, " samples\n")
+               flush.console()
+               }else
+               {
+               }
    		}
 	}	
 		
@@ -801,7 +740,7 @@ fitted.values <- round(fitted.values, 4)
 
 
 #### Create the posterior medians for the neighbourhood matrix W
-W.posterior <- W
+W.posterior <- array(NA, c(n,n))
 W.border.prob <- array(NA, c(n,n))
 	for(i in 1:n)
 	{
@@ -817,14 +756,13 @@ W.border.prob <- array(NA, c(n,n))
 			z.temp <- z.temp[-1]
 			w.temp <- exp(-samples.alpha %*% z.temp)
 			w.posterior <- as.numeric(w.temp>=0.5)
-			W.posterior[i,j] <- median(w.posterior)
+			W.posterior[i,j] <- ceiling(median(w.posterior))
 			W.border.prob[i,j] <- (1 - sum(w.posterior) / length(w.posterior))
 			}else
 			{
 			}	
 		}	
 	}
-n.borders <- sum(abs(W - W.posterior)) / 2
 
 
 
@@ -852,7 +790,6 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("Acceptance rate for the random effects is ", 100, "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " boundaries in the study region","\n\n", sep="")
 	}else
 	{
 	cat("\n#################\n")
@@ -875,8 +812,7 @@ n.borders <- sum(abs(W - W.posterior)) / 2
 	cat("Acceptance rate for the random effects is ", 100, "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 	cat("\n")
-	cat("The dissimilarity metrics have identified ", n.borders, " boundaries in the study region","\n\n", sep="")	}
-
+     }
 
 ## Compile and return the results
 	if(fix.rho)
