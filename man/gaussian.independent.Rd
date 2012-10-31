@@ -12,8 +12,8 @@ The function fits a Gaussian random effects models to spatial data, where the ra
 
 \usage{
 gaussian.independent(formula, beta = NULL, theta = NULL, nu2 = NULL, 
-sigma2 = NULL,  burnin = 0, n.sample = 1000, blocksize.theta = 10, 
-prior.mean.beta = NULL,  prior.var.beta = NULL, prior.max.nu2 = NULL, 
+sigma2 = NULL,  burnin = 0, n.sample = 1000, prior.mean.beta = NULL,  
+prior.var.beta = NULL, prior.max.nu2 = NULL, 
 prior.max.sigma2 = NULL)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -39,9 +39,6 @@ The number of MCMC samples to discard as the burnin period. Defaults to 0.
 }
   \item{n.sample}{
 The number of MCMC samples to generate. Defaults to 1,000.
-}
-  \item{blocksize.theta}{
-The size of the blocks in which to update the random effects in the MCMC algorithm. Defaults to 10.
 }
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.

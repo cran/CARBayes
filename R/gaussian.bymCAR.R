@@ -13,8 +13,8 @@ if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g 
 #### Design matrix
 ## Create the matrix
 X <- try(suppressWarnings(model.matrix(object=attr(frame, "terms"), data=frame)), silent=TRUE)
-    if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
-    if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
+     if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
+     if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
 
 n <- nrow(X)
 p <- ncol(X)
@@ -28,7 +28,7 @@ diag(cor.X) <- 0
 
 	 if(p>1)
 	 {
-    	if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
+    	 if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
 	 }else
 	 {
 	 }
@@ -80,7 +80,7 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 #### Initial parameter values
 ## Regression parameters beta
-	 if(is.null(beta)) beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
+    if(is.null(beta)) beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -135,6 +135,37 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(blocksize.theta <= 0) stop("blocksize.theta is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.theta)==ceiling(blocksize.theta))) stop("blocksize.theta has non-integer values.", call.=FALSE)
 
+
+## Compute the blocking structure for phi
+     if(blocksize.phi >= n)
+     {
+     n.phi.block <- 1
+     phi.beg <- 1
+     phi.fin <- n  
+     }else
+     {
+     n.standard <- 1 + floor((n-blocksize.phi) / blocksize.phi)
+     remainder <- n - (n.standard * blocksize.phi)
+     
+          if(remainder==0)
+          {
+          phi.beg <- c(1,seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi))
+          n.phi.block <- length(phi.beg)
+          }else if(remainder==1)
+          {
+          phi.beg <- c(1, seq((blocksize.phi), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi-1, seq((blocksize.phi+blocksize.phi-1), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)    
+          }else
+          {
+          phi.beg <- c(1, seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)
+          }
+     }
+
+
 ## Matrices to store samples
 samples.beta <- array(NA, c((n.sample-burnin), p))
 samples.phi <- array(NA, c((n.sample-burnin), n))
@@ -143,6 +174,11 @@ samples.tau2 <- array(NA, c((n.sample-burnin), 1))
 samples.theta <- array(NA, c((n.sample-burnin), n))
 samples.sigma2 <- array(NA, c((n.sample-burnin), 1))
 samples.deviance <- array(NA, c((n.sample-burnin), 1))
+
+## Metropolis quantities
+nu2.posterior.shape <- 0.5*n-1
+tau2.posterior.shape <- 0.5*n-1
+sigma2.posterior.shape <- 0.5 * n - 1
 
 
 #### Priors
@@ -194,6 +230,17 @@ n.neighbours <- as.numeric(apply(W, 1, sum))
 Q <- diag(n.neighbours)  - W
 
 
+## quantities required in updating phi              
+block.mean.part <- as.list(rep(0,n.phi.block))
+
+     for(r in 1:n.phi.block)
+     {
+     Q.current <- Q[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
+     block.var <- chol2inv(chol(Q.current))
+     block.mean.part[[r]] <- - block.var %*% Q[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])]
+     }
+
+
 #### Beta update quantities
 data.precision.beta <- t(X.standardised) %*% X.standardised
 data.var.beta <- solve(data.precision.beta)
@@ -212,16 +259,14 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 ###########################
     for(j in 1:n.sample)
     {
-	 ####################
+    ####################
     ## Sample from beta
     ####################
-    #### Calculate the full conditional mean and variance
     data.mean.beta <- data.temp.beta %*% (Y - phi - theta - offset)
-    fc.variance.beta <- solve((prior.precision.beta + data.precision.beta / nu2))
-    fc.mean.beta <- fc.variance.beta %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta)
-    
-    #### Update beta by Gibbs sampling  
-    beta <- mvrnorm(n=1, mu=fc.mean.beta, Sigma=fc.variance.beta)
+    U <- chol((prior.precision.beta + data.precision.beta / nu2))
+    Uinv <- backsolve(U, diag(rep(1,p)))
+    fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
+    beta <- fc.mean.beta + Uinv %*% rnorm(p)
     
     
     
@@ -229,123 +274,45 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ## Sample from nu2
     ##################
     fitted.current <-  as.numeric(X.standardised %*% beta) + phi + theta + offset
-	 nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            while(nu2 > prior.max.nu2)
-            {
-            nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            }
-
+    nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
+    nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+    
 
 
     ####################
     ## Sample from phi
     ####################
-    #### Create the blocking structure
-    if(blocksize.phi >= n)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- n
-    }else
-    {
-    init <- sample(1:blocksize.phi,  1)
-    n.standard <- floor((n-init) / blocksize.phi)
-    remainder <- n - (init + n.standard * blocksize.phi)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,n)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), n, blocksize.phi))
-        fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi))
-        }else
-        {
-        beg <- c(1, seq((init+1), n, blocksize.phi))
-        fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi), n)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
     Q.temp <- Q / tau2
     data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - theta - offset    
-        
-        for(r in 1:n.block)
-        {
-        ## Create the prior and data means and variances
-        prior.precision.phi <- as.matrix(Q.temp[beg[r]:fin[r], beg[r]:fin[r]])
-        block.length <- nrow(prior.precision.phi)
-        prior.var.phi <- chol2inv(chol(prior.precision.phi))
-        prior.mean.phi <- - prior.var.phi %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
-        data.precision.phi <- diag(rep((1/nu2),(block.length+1)))
-		  data.precision.phi <- data.precision.phi[1:block.length, 1:block.length]
-
-        ## Create the full conditional
-        fc.variance.phi <- solve((prior.precision.phi + data.precision.phi))
-        fc.mean.phi <- fc.variance.phi %*% (prior.precision.phi %*% prior.mean.phi + data.precision.phi %*% data.mean.phi[beg[r]:fin[r]])
-        
-        ## Update phi
-        phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=fc.mean.phi, Sigma=fc.variance.phi)
-		  }
-                
-    phi <- phi - mean(phi)
-            
+    data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
+    b <- rnorm(n)
+    
+         for(r in 1:n.phi.block)
+         {
+         ## Create the prior  mean and variance
+         n.current <- length(phi.beg[r]:phi.fin[r])
+         Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
+         block.mean <- block.mean.part[[r]] %*% phi[-(phi.beg[r]:phi.fin[r])]
+         
+         ## Create the full conditional
+         U <- chol(Q.current + data.precision.phi[1:n.current, 1:n.current])
+         Uinv <- backsolve(U, diag(rep(1,n.current)))
+         fc.mean.phi <- (Uinv %*% t(Uinv)) %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
+         
+         ## Update phi
+         phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + Uinv %*% b[phi.beg[r]:phi.fin[r]]
+         }   
+    phi <- phi - mean(phi)            
     
 
+    
     ####################
     ## Sample from theta
     ####################
-    #### Create the blocking structure
-    if(blocksize.theta >= n)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- n
-    }else
-    {
-    init <- sample(1:blocksize.theta,  1)
-    n.standard <- floor((n-init) / blocksize.theta)
-    remainder <- n - (init + n.standard * blocksize.theta)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,n)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta))
-        }else
-        {
-        beg <- c(1, seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta), n)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
     data.mean.theta <- Y - as.numeric(X.standardised %*% beta) - phi - offset    
-        
-        for(r in 1:n.block)
-        {
-        ## Create the full conditional means and variances
-        block.length <- length(beg[r]:fin[r])
-        fc.variance.scalar <- 1/((1/nu2) + (1/sigma2))
-        fc.variance.theta <- diag(rep(fc.variance.scalar,(block.length+1)))
-		  fc.variance.theta <- fc.variance.theta[1:block.length, 1:block.length]
-		  data.precision.theta <- diag(rep((1/nu2),(block.length+1)))
-		  data.precision.theta <- data.precision.theta[1:block.length, 1:block.length]
-		  fc.mean.theta <- fc.variance.theta %*% (data.precision.theta %*% data.mean.theta[beg[r]:fin[r]])
-        
-        ## Update theta
-        theta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=fc.mean.theta, Sigma=fc.variance.theta)
-		  }
-		  
+    fc.variance.scalar <- 1/((1/nu2) + (1/sigma2))
+    fc.mean <- fc.variance.scalar * (data.mean.theta / nu2)
+    theta <- rnorm(n=n, mean=fc.mean, sd=sqrt(fc.variance.scalar))
     theta <- theta - mean(theta)
 
 
@@ -353,23 +320,16 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ###################
     ## Sample from tau2
     ###################
-    tau2.posterior.scale <- 0.5 * t(phi) %*% Q %*% phi
-    tau2 <- rinvgamma(n=1, shape=(0.5*(n-3)), scale=tau2.posterior.scale)
-            while(tau2 > prior.max.tau2)
-            {
-            tau2 <- rinvgamma(n=1, shape=(0.5*(n-3)), scale=tau2.posterior.scale)
-            }
+    tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
+    tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
     
     
     
     #####################
     ## Sample from sigma2
     #####################
-    sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            while(sigma2 > prior.max.sigma2)
-            {
-            sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            }
+    sigma2.posterior.scale <- 0.5*sum(theta^2)
+    sigma2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.sigma2), b=Inf,  shape=sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
     
     
     

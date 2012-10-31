@@ -1,5 +1,5 @@
 gaussian.independent <-
-function(formula, beta=NULL, theta=NULL, nu2=NULL, sigma2=NULL, burnin=0, n.sample=1000, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.sigma2=NULL)
+function(formula, beta=NULL, theta=NULL, nu2=NULL, sigma2=NULL, burnin=0, n.sample=1000, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.sigma2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -13,8 +13,8 @@ if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g 
 #### Design matrix
 ## Create the matrix
 X <- try(suppressWarnings(model.matrix(object=attr(frame, "terms"), data=frame)), silent=TRUE)
-    if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
-    if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
+     if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
+     if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
 
 n <- nrow(X)
 p <- ncol(X)
@@ -28,7 +28,7 @@ diag(cor.X) <- 0
 
 	 if(p>1)
 	 {
-    	if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
+    	 if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
 	 }else
 	 {
 	 }
@@ -114,9 +114,6 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
 
-    if(!is.numeric(blocksize.theta)) stop("blocksize.theta is not a number", call.=FALSE)
-    if(blocksize.theta <= 0) stop("blocksize.theta is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.theta)==ceiling(blocksize.theta))) stop("blocksize.theta has non-integer values.", call.=FALSE)
 
 ## Matrices to store samples
 samples.beta <- array(NA, c((n.sample-burnin), p))
@@ -125,7 +122,9 @@ samples.nu2 <- array(NA, c((n.sample-burnin), 1))
 samples.sigma2 <- array(NA, c((n.sample-burnin), 1))
 samples.deviance <- array(NA, c((n.sample-burnin), 1))
 
-
+## Metropolis quantities
+nu2.posterior.shape <- 0.5*n-1
+sigma2.posterior.shape <- 0.5*n-1
 
 #### Priors
 ## Put in default priors
@@ -179,79 +178,30 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ####################
     ## Sample from beta
     ####################
-    #### Calculate the full conditional mean and variance
     data.mean.beta <- data.temp.beta %*% (Y - theta - offset)
-    fc.variance.beta <- solve((prior.precision.beta + data.precision.beta / nu2))
-    fc.mean.beta <- fc.variance.beta %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta)
+    U <- chol((prior.precision.beta + data.precision.beta / nu2))
+    Uinv <- backsolve(U, diag(rep(1,p)))
+    fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
+    beta <- fc.mean.beta + Uinv %*% rnorm(p)    
     
-    #### Update beta by Gibbs sampling  
-    beta <- mvrnorm(n=1, mu=fc.mean.beta, Sigma=fc.variance.beta)
-    
-    
+
     
     ##################
     ## Sample from nu2
     ##################
     fitted.current <-  as.numeric(X.standardised %*% beta) + theta + offset
-	 nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            while(nu2 > prior.max.nu2)
-            {
-            nu2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=nu2.posterior.scale)
-            }
-
+    nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
+    nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+    
 
 
     ####################
     ## Sample from theta
     ####################
-    #### Create the blocking structure
-    if(blocksize.theta >= n)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- n
-    }else
-    {
-    init <- sample(1:blocksize.theta,  1)
-    n.standard <- floor((n-init) / blocksize.theta)
-    remainder <- n - (init + n.standard * blocksize.theta)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,n)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta))
-        }else
-        {
-        beg <- c(1, seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta), n)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
     data.mean.theta <- Y - as.numeric(X.standardised %*% beta) - offset    
-           
-        for(r in 1:n.block)
-        {
-        ## Create the full conditional means and variances
-        block.length <- length(beg[r]:fin[r])
-        fc.variance.scalar <- 1/((1/nu2) + (1/sigma2))
-        fc.variance.theta <- diag(rep(fc.variance.scalar,(block.length+1)))
-		  fc.variance.theta <- fc.variance.theta[1:block.length, 1:block.length]
-		  data.precision.theta <- diag(rep((1/nu2),(block.length+1)))
-		  data.precision.theta <- data.precision.theta[1:block.length, 1:block.length]
-		  fc.mean.theta <- fc.variance.theta %*% (data.precision.theta %*% data.mean.theta[beg[r]:fin[r]])
-        
-        ## Update theta
-        theta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=fc.mean.theta, Sigma=fc.variance.theta)
-		  }
-		  
+    fc.variance.scalar <- 1/((1/nu2) + (1/sigma2))
+    fc.mean <- fc.variance.scalar * (data.mean.theta / nu2)
+    theta <- rnorm(n=n, mean=fc.mean, sd=sqrt(fc.variance.scalar))
     theta <- theta - mean(theta)
     
     
@@ -259,14 +209,11 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ####################
     ## Sample from sigma2
     ####################
-    sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            while(sigma2 > prior.max.sigma2)
-            {
-            sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            }
+    sigma2.posterior.scale <- 0.5*sum(theta^2)
+    sigma2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.sigma2), b=Inf,  shape=sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
+    
     
             
-    
     #########################
     ## Calculate the deviance
     #########################

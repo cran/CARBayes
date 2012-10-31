@@ -90,7 +90,7 @@ For further details about how to apply the function see the vignette to the CARB
 \item{samples.alpha }{A matrix of MCMC samples for the regression parameters that control the identification of localised spatial structure in the random effects surface.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{W.posterior }{The posterior median for the n by n neighbourhood matrix W, which shows the locations of any boundaries in the risk surface.}
+\item{W.posterior }{A matrix of posterior medians for each element wkj of the n by n neighbourhood matrix W. Elements of this matrix which correspond to two non-neighbouring areas have NA values.}
 \item{residuals }{A vector of raw residuals from the model.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}

@@ -13,8 +13,8 @@ if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g 
 #### Design matrix
 ## Create the matrix
 X <- try(suppressWarnings(model.matrix(object=attr(frame, "terms"), data=frame)), silent=TRUE)
-    if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
-    if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
+     if(class(X)=="try-error") stop("the covariate matrix contains inappropriate values.", call.=FALSE)
+     if(sum(is.na(X))>0) stop("the covariate matrix contains missing 'NA' values.", call.=FALSE)
 
 n <- nrow(X)
 p <- ncol(X)
@@ -28,7 +28,7 @@ diag(cor.X) <- 0
 
 	 if(p>1)
 	 {
-    	if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
+    	 if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
 	 }else
 	 {
 	 }
@@ -92,7 +92,7 @@ offset <- try(model.offset(frame), silent=TRUE)
 ## Regression parameters beta
 dat <- cbind(Y, trials-Y)
 
-	 if(is.null(beta)) beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
+    if(is.null(beta)) beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -122,9 +122,65 @@ dat <- cbind(Y, trials-Y)
     if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
     if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.beta)==ceiling(blocksize.beta))) stop("blocksize.beta has non-integer values.", call.=FALSE)
-     if(!is.numeric(blocksize.theta)) stop("blocksize.theta is not a number", call.=FALSE)
+    if(!is.numeric(blocksize.theta)) stop("blocksize.theta is not a number", call.=FALSE)
     if(blocksize.theta <= 0) stop("blocksize.theta is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.theta)==ceiling(blocksize.theta))) stop("blocksize.theta has non-integer values.", call.=FALSE)
+
+
+## Compute the blocking structure for beta
+     if(blocksize.beta >= p)
+     {
+     n.beta.block <- 1
+     beta.beg <- 1
+     beta.fin <- p
+     }else
+     {
+     n.standard <- 1 + floor((p-blocksize.beta) / blocksize.beta)
+     remainder <- p - n.standard * blocksize.beta
+     
+          if(remainder==0)
+          {
+          beta.beg <- c(1,seq((blocksize.beta+1), p, blocksize.beta))
+          beta.fin <- c(blocksize.beta, seq((blocksize.beta+blocksize.beta), p, blocksize.beta))
+          n.beta.block <- length(beta.beg)
+          }else
+          {
+          beta.beg <- c(1, seq((blocksize.beta+1), p, blocksize.beta))
+          beta.fin <- c(blocksize.beta, seq((blocksize.beta+blocksize.beta), p, blocksize.beta), p)
+          n.beta.block <- length(beta.beg)
+          }
+     }         
+
+
+## Compute the blocking structure for theta
+     if(blocksize.theta >= n)
+     {
+     n.theta.block <- 1
+     theta.beg <- 1
+     theta.fin <- n  
+     }else
+     {
+     n.standard <- 1 + floor((n-blocksize.theta) / blocksize.theta)
+     remainder <- n - (n.standard * blocksize.theta)
+     
+          if(remainder==0)
+          {
+          theta.beg <- c(1,seq((blocksize.theta+1), n, blocksize.theta))
+          theta.fin <- c(blocksize.theta, seq((blocksize.theta+blocksize.theta), n, blocksize.theta))
+          n.theta.block <- length(theta.beg)
+          }else if(remainder==1)
+          {
+          theta.beg <- c(1, seq((blocksize.theta), n, blocksize.theta))
+          theta.fin <- c(blocksize.theta-1, seq((blocksize.theta+blocksize.theta-1), n, blocksize.theta), n)
+          n.theta.block <- length(theta.beg)    
+          }else
+          {
+          theta.beg <- c(1, seq((blocksize.theta+1), n, blocksize.theta))
+          theta.fin <- c(blocksize.theta, seq((blocksize.theta+blocksize.theta), n, blocksize.theta), n)
+          n.theta.block <- length(theta.beg)
+          }
+     }
+
 
 ## Matrices to store samples
 samples.beta <- array(NA, c((n.sample-burnin), p))
@@ -138,6 +194,8 @@ accept <- accept.all
 proposal.sd.beta <- 0.01
 proposal.sd.theta <- 0.01
 proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
+chol.proposal.corr.beta <- chol(proposal.corr.beta) 
+sigma2.posterior.shape <- 0.5 * n - 1
 
 
 #### Priors
@@ -169,6 +227,7 @@ proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
 failures <- trials - Y
 
 
+
 ###########################
 #### Run the Bayesian model
 ###########################
@@ -177,131 +236,64 @@ failures <- trials - Y
     ####################
     ## Sample from beta
     ####################
-    #### Create the blocking structure
-    if(blocksize.beta >= p)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- p
-    }else
-    {
-    init <- sample(1:blocksize.beta,  1)
-    n.standard <- floor((p-init) / blocksize.beta)
-    remainder <- p - (init + n.standard * blocksize.beta)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,p)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), p, blocksize.beta))
-        fin <- c(init, seq((init+blocksize.beta), p, blocksize.beta))
-        }else
-        {
-        beg <- c(1, seq((init+1), p, blocksize.beta))
-        fin <- c(init, seq((init+blocksize.beta), p, blocksize.beta), p)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
+    proposal <- beta + (sqrt(proposal.sd.beta)* t(chol.proposal.corr.beta)) %*% rnorm(p)
     proposal.beta <- beta    
-        
-        for(r in 1:n.block)
+    theta.offset <- theta + offset
+    
+        for(r in 1:n.beta.block)
         {
         ## Propose a value
-        n.current <- length(beg[r]:fin[r])
-        proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + theta + offset
-        logit.current <- as.numeric(X.standardised %*% beta) + theta + offset    
+        proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
+        logit.proposal <- as.numeric(X.standardised %*% proposal.beta) + theta.offset
+        logit.current <- as.numeric(X.standardised %*% beta) + theta.offset    
         prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
         prob.current <- exp(logit.current)  / (1 + exp(logit.current))
-           
+             
         ## Calculate the acceptance probability
         prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
-        prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
+        prob2 <- sum(((beta[beta.beg[r]:beta.fin[r]] - prior.mean.beta[beta.beg[r]:beta.fin[r]])^2 - (proposal.beta[beta.beg[r]:beta.fin[r]] - prior.mean.beta[beta.beg[r]:beta.fin[r]])^2) / (2 * prior.var.beta[beta.beg[r]:beta.fin[r]]))
         prob <- exp(prob1 + prob2)
 
         ## Accept or reject the value
             if(prob > runif(1))
             {
-            beta <- proposal.beta
+            beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
             accept[1] <- accept[1] + 1  
-            accept[2] <- accept[2] + 1 
             }else
             {
-            proposal.beta <- beta
-            accept[2] <- accept[2] + 1 
+            proposal.beta[beta.beg[r]:beta.fin[r]] <- beta[beta.beg[r]:beta.fin[r]]
             }
         }
-
+    accept[2] <- accept[2] + n.beta.block
 
 
     ####################
     ## Sample from theta
     ####################
-    #### Create the blocking structure
-    if(blocksize.theta >= n)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- n
-    }else
-    {
-    init <- sample(1:blocksize.theta,  1)
-    n.standard <- floor((n-init) / blocksize.theta)
-    remainder <- n - (init + n.standard * blocksize.theta)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,n)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta))
-        }else
-        {
-        beg <- c(1, seq((init+1), n, blocksize.theta))
-        fin <- c(init, seq((init+blocksize.theta), n, blocksize.theta), n)
-        }
-    n.block <- length(beg)
-    }
+    proposal.theta <- rnorm(n, mean=theta, sd=proposal.sd.theta)
+    beta.offset <- as.numeric(X.standardised %*% beta) + offset        
+    logit.proposal <- beta.offset + proposal.theta
+    logit.current <- beta.offset + theta    
+    prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
+    prob.current <- exp(logit.current)  / (1 + exp(logit.current))
     
-
-    #### Update the parameters in blocks
-    proposal.theta <- theta    
-    beta.offset <- X.standardised %*% beta + offset
-        
-        for(r in 1:n.block)
+        for(r in 1:n.theta.block)
         {
-        ## Propose a value
-        n.current <- length(beg[r]:fin[r])
-        proposal.theta[beg[r]:fin[r]] <- rnorm(n=n.current, mean=theta[beg[r]:fin[r]], sd=rep(proposal.sd.theta, n.current))
-        logit.proposal <- beta.offset[beg[r]:fin[r]] + proposal.theta[beg[r]:fin[r]]
-        logit.current <- beta.offset[beg[r]:fin[r]] + theta[beg[r]:fin[r]]    
-        prob.proposal <- exp(logit.proposal)  / (1 + exp(logit.proposal))
-        prob.current <- exp(logit.current)  / (1 + exp(logit.current))
-
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(prob.proposal) - log(prob.current)) + failures[beg[r]:fin[r]] * (log(1-prob.proposal) - log(1-prob.current)))          
-	     prob2 <- sum(theta[beg[r]:fin[r]]^2  - proposal.theta[beg[r]:fin[r]]^2) / (2 * sigma2)
-        prob <- exp(prob1 + prob2)
+        prob1 <- sum(Y[theta.beg[r]:theta.fin[r]] * (log(prob.proposal[theta.beg[r]:theta.fin[r]]) - log(prob.current[theta.beg[r]:theta.fin[r]])) + failures[theta.beg[r]:theta.fin[r]] * (log(1-prob.proposal[theta.beg[r]:theta.fin[r]]) - log(1-prob.current[theta.beg[r]:theta.fin[r]])))          
+	   prob2 <- sum(theta[theta.beg[r]:theta.fin[r]]^2  - proposal.theta[theta.beg[r]:theta.fin[r]]^2) / sigma2
+        prob <- exp(prob1 + 0.5 * prob2)
 
         ## Accept or reject the value
             if(prob > runif(1))
             {
-            theta[beg[r]:fin[r]] <- proposal.theta[beg[r]:fin[r]]
+            theta[theta.beg[r]:theta.fin[r]] <- proposal.theta[theta.beg[r]:theta.fin[r]]
             accept[3] <- accept[3] + 1  
-            accept[4] <- accept[4] + 1 
             }else
             {
-            proposal.theta[beg[r]:fin[r]] <- theta[beg[r]:fin[r]]
-            accept[4] <- accept[4] + 1 
             }
         }
+    accept[4] <- accept[4] + n.theta.block
     theta <- theta - mean(theta)
     
     
@@ -309,11 +301,8 @@ failures <- trials - Y
     ####################
     ## Sample from sigma2
     ####################
-    sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            while(sigma2 > prior.max.sigma2)
-            {
-            sigma2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=(0.5*sum(theta^2)))
-            }
+    sigma2.posterior.scale <- 0.5*sum(theta^2)
+    sigma2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.sigma2), b=Inf,  shape=sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
     
             
     
@@ -322,7 +311,7 @@ failures <- trials - Y
     #########################
     logit <- as.numeric(X.standardised %*% beta) + theta + offset    
     prob <- exp(logit)  / (1 + exp(logit))
-	 deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
+    deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
 
 
 

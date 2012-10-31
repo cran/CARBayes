@@ -28,7 +28,7 @@ diag(cor.X) <- 0
  
  	 if(p>1)
 	 {
-    	if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
+    	 if(sort(apply(X, 2, sd))[2]==0) stop("the covariate matrix has two intercept terms.", call.=FALSE)
 	 }else
 	 {
 	 }
@@ -83,7 +83,7 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 #### Initial parameter values
 ## Regression parameters beta
-	 if(is.null(beta)) beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
+    if(is.null(beta)) beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
     if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
     if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
@@ -121,9 +121,65 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
     if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.beta)==ceiling(blocksize.beta))) stop("blocksize.beta has non-integer values.", call.=FALSE)
-     if(!is.numeric(blocksize.phi)) stop("blocksize.phi is not a number", call.=FALSE)
+    if(!is.numeric(blocksize.phi)) stop("blocksize.phi is not a number", call.=FALSE)
     if(blocksize.phi <= 0) stop("blocksize.phi is less than or equal to zero", call.=FALSE)
     if(!(floor(blocksize.phi)==ceiling(blocksize.phi))) stop("blocksize.phi has non-integer values.", call.=FALSE)
+
+
+## Compute the blocking structure for beta
+     if(blocksize.beta >= p)
+     {
+     n.beta.block <- 1
+     beta.beg <- 1
+     beta.fin <- p
+     }else
+     {
+     n.standard <- 1 + floor((p-blocksize.beta) / blocksize.beta)
+     remainder <- p - n.standard * blocksize.beta
+     
+          if(remainder==0)
+          {
+          beta.beg <- c(1,seq((blocksize.beta+1), p, blocksize.beta))
+          beta.fin <- c(blocksize.beta, seq((blocksize.beta+blocksize.beta), p, blocksize.beta))
+          n.beta.block <- length(beta.beg)
+          }else
+          {
+          beta.beg <- c(1, seq((blocksize.beta+1), p, blocksize.beta))
+          beta.fin <- c(blocksize.beta, seq((blocksize.beta+blocksize.beta), p, blocksize.beta), p)
+          n.beta.block <- length(beta.beg)
+          }
+     }         
+
+
+## Compute the blocking structure for phi
+     if(blocksize.phi >= n)
+     {
+     n.phi.block <- 1
+     phi.beg <- 1
+     phi.fin <- n  
+     }else
+     {
+     n.standard <- 1 + floor((n-blocksize.phi) / blocksize.phi)
+     remainder <- n - (n.standard * blocksize.phi)
+     
+          if(remainder==0)
+          {
+          phi.beg <- c(1,seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi))
+          n.phi.block <- length(phi.beg)
+          }else if(remainder==1)
+          {
+          phi.beg <- c(1, seq((blocksize.phi), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi-1, seq((blocksize.phi+blocksize.phi-1), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)    
+          }else
+          {
+          phi.beg <- c(1, seq((blocksize.phi+1), n, blocksize.phi))
+          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi), n)
+          n.phi.block <- length(phi.beg)
+          }
+     }
+
 
 ## Matrices to store samples
 samples.beta <- array(NA, c((n.sample-burnin), p))
@@ -132,13 +188,16 @@ samples.tau2 <- array(NA, c((n.sample-burnin), 1))
 samples.rho <- array(NA, c((n.sample-burnin), 1))
 samples.deviance <- array(NA, c((n.sample-burnin), 1))
 
+
 ## Metropolis quantities
-accept.all <- rep(0,6)
+accept.all <- rep(0,4)
 accept <- accept.all
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
-proposal.sd.rho <- 0.05
+proposal.sd.rho <- 0.02
 proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
+chol.proposal.corr.beta <- chol(proposal.corr.beta) 
+tau2.posterior.shape <- 0.5 * n - 1
 
 
 #### Priors
@@ -176,7 +235,10 @@ proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
 
 n.neighbours <- as.numeric(apply(W, 1, sum))
 Q <- diag(n.neighbours) - rho * W
-det.Q <- 0.5 * as.numeric(determinant(Q, logarithm=TRUE))[1]
+spam.Q <- as.spam(Q)
+spam.Q.proposal <- spam.Q
+det.Q <- sum(log(diag(chol.spam(spam.Q))))
+indices.Q <- which(as.numeric(Q)!=0)
 
 
 ###########################
@@ -187,131 +249,65 @@ det.Q <- 0.5 * as.numeric(determinant(Q, logarithm=TRUE))[1]
     ####################
     ## Sample from beta
     ####################
-    #### Create the blocking structure
-    if(blocksize.beta >= p)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- p
-    }else
-    {
-    init <- sample(1:blocksize.beta,  1)
-    n.standard <- floor((p-init) / blocksize.beta)
-    remainder <- p - (init + n.standard * blocksize.beta)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,p)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), p, blocksize.beta))
-        fin <- c(init, seq((init+blocksize.beta), p, blocksize.beta))
-        }else
-        {
-        beg <- c(1, seq((init+1), p, blocksize.beta))
-        fin <- c(init, seq((init+blocksize.beta), p, blocksize.beta), p)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
+    proposal <- beta + (sqrt(proposal.sd.beta)* t(chol.proposal.corr.beta)) %*% rnorm(p)
     proposal.beta <- beta    
-        
-        for(r in 1:n.block)
-        {
-        ## Propose a value
-        n.current <- length(beg[r]:fin[r])
-        proposal.beta[beg[r]:fin[r]] <- mvrnorm(n=1, mu=beta[beg[r]:fin[r]], Sigma=(proposal.sd.beta * proposal.corr.beta[beg[r]:fin[r], beg[r]:fin[r]]))
-        fitted.proposal <- exp(as.numeric(X.standardised %*% proposal.beta) + phi + offset)
-        fitted.current <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
+    phi.offset <- exp(phi + offset)
+    
+         for(r in 1:n.beta.block)
+         {
+         ## Calculate the acceptance probability          
+         proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
+         lp.proposal <- as.numeric(X.standardised %*% proposal.beta)
+         lp.current <- as.numeric(X.standardised %*% beta)
+         prob1 <- sum(Y * (lp.proposal - lp.current) + phi.offset * (exp(lp.current) - exp(lp.proposal)))
+         prob2 <- sum(((beta[beta.beg[r]:beta.fin[r]] - prior.mean.beta[beta.beg[r]:beta.fin[r]])^2 - (proposal.beta[beta.beg[r]:beta.fin[r]] - prior.mean.beta[beta.beg[r]:beta.fin[r]])^2) / prior.var.beta[beta.beg[r]:beta.fin[r]])
+         prob <- exp(prob1 + 0.5 * prob2)
+         
+         ## Accept or reject the value
+              if(prob > runif(1))
+              {
+              beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
+              accept[1] <- accept[1] + 1  
+             }else
+             {
+              proposal.beta[beta.beg[r]:beta.fin[r]] <- beta[beta.beg[r]:beta.fin[r]]
+             }
+         }
+    accept[2] <- accept[2] + n.beta.block
 
-        ## Calculate the acceptance probability
-        prob1 <- sum(Y * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
-        prob2 <- sum(((beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2 - (proposal.beta[beg[r]:fin[r]] - prior.mean.beta[beg[r]:fin[r]])^2) / (2 * prior.var.beta[beg[r]:fin[r]]))
-        prob <- exp(prob1 + prob2)
-
-        ## Accept or reject the value
-            if(prob > runif(1))
-            {
-            beta <- proposal.beta
-            accept[1] <- accept[1] + 1  
-            accept[2] <- accept[2] + 1 
-            }else
-            {
-            proposal.beta <- beta
-            accept[2] <- accept[2] + 1 
-            }
-        }
-
-
-
+    
+    
     ####################
     ## Sample from phi
     ####################
-    #### Create the blocking structure
-    if(blocksize.phi >= n)
-    {
-    n.block <- 1
-    beg <- 1
-    fin <- n
-    }else
-    {
-    init <- sample(1:blocksize.phi,  1)
-    n.standard <- floor((n-init) / blocksize.phi)
-    remainder <- n - (init + n.standard * blocksize.phi)
-        
-        if(n.standard==0)
-        {
-        beg <- c(1,(init+1))
-        fin <- c(init,n)
-        }else if(remainder==0)
-        {
-        beg <- c(1,seq((init+1), n, blocksize.phi))
-        fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi))
-        }else
-        {
-        beg <- c(1, seq((init+1), n, blocksize.phi))
-        fin <- c(init, seq((init+blocksize.phi), n, blocksize.phi), n)
-        }
-    n.block <- length(beg)
-    }
-    
-
-    #### Update the parameters in blocks
     Q.temp <- Q / tau2
-    beta.offset <- as.numeric(X.standardised %*% beta) + offset
-    proposal.phi <- phi    
-        
-        for(r in 1:n.block)
+    beta.offset <- exp(as.numeric(X.standardised %*% beta) + offset)        
+    b <- rnorm(n)
+    
+        for(r in 1:n.phi.block)
         {
         ## Propose a value
-        Q.current <- Q.temp[beg[r]:fin[r], beg[r]:fin[r]]
-        block.var <- chol2inv(chol(Q.current))
-        block.mean <- - block.var %*% Q.temp[beg[r]:fin[r], -(beg[r]:fin[r])] %*% phi[-(beg[r]:fin[r])]
-        proposal.phi[beg[r]:fin[r]] <- mvrnorm(n=1, mu=phi[beg[r]:fin[r]], Sigma=(proposal.sd.phi * block.var))
-        fitted.proposal <- exp(beta.offset[beg[r]:fin[r]] + proposal.phi[beg[r]:fin[r]])
-        fitted.current <- exp(beta.offset[beg[r]:fin[r]] + phi[beg[r]:fin[r]])
+        Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
+        U <- chol(Q.current)
+        Uinv <- backsolve(U, diag(rep(1,length(phi.beg[r]:phi.fin[r]))))
+        block.mean <- - Uinv %*% (t(Uinv) %*% Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
+        proposal.phi <- phi[phi.beg[r]:phi.fin[r]] + (sqrt(proposal.sd.phi) * Uinv) %*% b[phi.beg[r]:phi.fin[r]]
         
         ## Calculate the acceptance probability
-        prob1 <- sum(Y[beg[r]:fin[r]] * (log(fitted.proposal) - log(fitted.current)) + fitted.current - fitted.proposal)
-        prob2 <- t(phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (phi[beg[r]:fin[r]] - block.mean) - t(proposal.phi[beg[r]:fin[r]] - block.mean) %*% Q.current %*% (proposal.phi[beg[r]:fin[r]] - block.mean)
+        prob1 <- sum(Y[phi.beg[r]:phi.fin[r]] * (proposal.phi - phi[phi.beg[r]:phi.fin[r]]) + beta.offset[phi.beg[r]:phi.fin[r]] * (exp(phi[phi.beg[r]:phi.fin[r]]) - exp(proposal.phi)))
+        prob2 <- t(phi[phi.beg[r]:phi.fin[r]] - block.mean) %*% Q.current %*% (phi[phi.beg[r]:phi.fin[r]] - block.mean) - t(proposal.phi - block.mean) %*% Q.current %*% (proposal.phi - block.mean)
         prob <- exp(prob1 + 0.5 * prob2)
 
         ## Accept or reject the value
             if(prob > runif(1))
             {
-            phi[beg[r]:fin[r]] <- proposal.phi[beg[r]:fin[r]]
-            accept[3] <- accept[3] + 1  
-            accept[4] <- accept[4] + 1 
+            phi[phi.beg[r]:phi.fin[r]] <- proposal.phi
+            accept[3] <- accept[3] + 1
             }else
-            {
-            proposal.phi[beg[r]:fin[r]] <- phi[beg[r]:fin[r]]
-            accept[4] <- accept[4] + 1 
+            { 
             }
         }
-        
+    accept[4] <- accept[4] + n.phi.block
     phi <- phi - mean(phi)
     
     
@@ -319,12 +315,8 @@ det.Q <- 0.5 * as.numeric(determinant(Q, logarithm=TRUE))[1]
     ##################
     ## Sample from tau2
     ##################
-    tau2.posterior.scale <- 0.5 * t(phi) %*% Q %*% phi
-    tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            while(tau2 > prior.max.tau2)
-            {
-            tau2 <- rinvgamma(n=1, shape=(0.5*n-1), scale=tau2.posterior.scale)
-            }
+    tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
+    tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
     
     
     
@@ -332,33 +324,29 @@ det.Q <- 0.5 * as.numeric(determinant(Q, logarithm=TRUE))[1]
     ## Sample from rho
     ##################
     #### Propose a value
-    proposal.rho <- rnorm(n=1, mean=rho, sd=proposal.sd.rho)
-            while(proposal.rho >= 1 | proposal.rho < 0)
-            {
-            proposal.rho <- rnorm(n=1, mean=rho, sd=proposal.sd.rho)
-            }      
-   
+    proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1,  mean=rho, sd=proposal.sd.rho)    
+    
     #### Calculate the acceptance probability
     proposal.Q <- diag(n.neighbours) - proposal.rho * W
-    proposal.det.Q <- 0.5 * as.numeric(determinant(proposal.Q, logarithm=TRUE))[1]
+    spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
+    proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
     logprob.current <- det.Q - tau2.posterior.scale / tau2
-    logprob.proposal <- proposal.det.Q - 0.5 * t(phi) %*% proposal.Q %*% phi / tau2
+    logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
     prob <- exp(logprob.proposal - logprob.current)
-    
-    #### Accept or reject the proposal
-            if(prob > runif(1))
-            {
-            rho <- proposal.rho
-            Q <- proposal.Q
-            det.Q <- proposal.det.Q         
-            accept[5] <- accept[5] + 1  
-            accept[6] <- accept[6] + 1 
-            }else
-            {
-            accept[6] <- accept[6] + 1 
-            }
 
-   
+    #### Accept or reject the proposal
+         if(prob > runif(1))
+         {
+         rho <- proposal.rho
+         Q <- proposal.Q
+         spam.Q <- spam.Q.proposal
+         det.Q <- proposal.det.Q        
+         }else
+         {
+         }
+    
+    
+    
     #########################
     ## Calculate the deviance
     #########################
@@ -393,7 +381,7 @@ det.Q <- 0.5 * as.numeric(determinant(Q, logarithm=TRUE))[1]
         accept.beta <- 100 * accept[1] / accept[2]
         accept.phi <- 100 * accept[3] / accept[4]
         accept.all <- accept.all + accept
-        accept <- c(0,0,0,0,0,0)
+        accept <- c(0,0,0,0)
             
         #### beta tuning parameter
             if(accept.beta > 40)
