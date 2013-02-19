@@ -12,7 +12,7 @@ The function fits a Gaussian random effects models to spatial data, where the ra
 
 \usage{
 gaussian.lerouxCAR(formula, beta = NULL, phi = NULL, nu2 = NULL, tau2 = NULL, 
-rho = NULL, W, burnin = 0, n.sample = 1000, blocksize.phi = 10, 
+rho = NULL, W, burnin = 0, n.sample = 1000, thin=1, blocksize.phi = 10, 
 prior.mean.beta = NULL, prior.var.beta = NULL, prior.max.nu2 = NULL, 
 prior.max.tau2 = NULL)
 }
@@ -45,6 +45,9 @@ The number of MCMC samples to discard as the burnin period. Defaults to 0.
   \item{n.sample}{
 The number of MCMC samples to generate. Defaults to 1,000.
 }
+  \item{thin}{
+The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1.
+}
   \item{blocksize.phi}{
 The size of the blocks in which to update the random effects in the MCMC algorithm. Defaults to 10.
 }
@@ -63,7 +66,7 @@ The maximum allowable value for the random effects variance tau2 (a Uniform(0,M)
 }
 
 \details{
-For further details about how to apply the function see the vignette to the CARBayes package.
+For further details about how to apply the function see the examples below and in the main CARBayes helpfile.
 }
 
 
@@ -75,7 +78,7 @@ For further details about how to apply the function see the vignette to the CARB
 \item{samples.tau2 }{A matrix of MCMC samples for the random effects variance tau2.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{residuals }{A vector of raw residuals from the model.}
+\item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
 \item{summary.results }{A summary table of the parameters.}

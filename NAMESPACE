@@ -4,28 +4,21 @@ export(
 	poisson.lerouxCAR, 
 	poisson.properCAR, 
 	poisson.bymCAR, 
-	poisson.dissimilarityCARbinary, 
-	poisson.dissimilarityCARcontinuous, 
-	poisson.priorWCAR, 
+	poisson.dissimilarityCAR, 
 	gaussian.independent, 
 	gaussian.iarCAR, 
 	gaussian.lerouxCAR, 
 	gaussian.properCAR, 
 	gaussian.bymCAR, 
-	gaussian.dissimilarityCARbinary, 
-	gaussian.dissimilarityCARcontinuous, 
-	gaussian.priorWCAR, 
+	gaussian.dissimilarityCAR, 
 	binomial.independent, 
 	binomial.iarCAR, 
 	binomial.lerouxCAR, 
 	binomial.properCAR, 
 	binomial.bymCAR, 
-	binomial.dissimilarityCARbinary, 
-	binomial.dissimilarityCARcontinuous, 
-	binomial.priorWCAR, 
-	geary.permutation,
-	moran.permutation,
-	W.prior.elicit
+	binomial.dissimilarityCAR, 
+	combine.data.shapefile,
+	highlight.borders
 )
 
 import(
@@ -33,5 +26,8 @@ import(
   MASS,
   MCMCpack,
   spam,
-  truncdist
+  truncdist,
+  evd,
+  stats4,
+  lattice
 )

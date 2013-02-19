@@ -1,5 +1,5 @@
 gaussian.iarCAR <-
-function(formula, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, W, burnin=0, n.sample=1000, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL)
+function(formula, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -113,6 +113,8 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
     if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
 
     if(!is.numeric(blocksize.phi)) stop("blocksize.phi is not a number", call.=FALSE)
     if(blocksize.phi <= 0) stop("blocksize.phi is less than or equal to zero", call.=FALSE)
@@ -150,11 +152,12 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 
 ## Matrices to store samples
-samples.beta <- array(NA, c((n.sample-burnin), p))
-samples.phi <- array(NA, c((n.sample-burnin), n))
-samples.nu2 <- array(NA, c((n.sample-burnin), 1))
-samples.tau2 <- array(NA, c((n.sample-burnin), 1))
-samples.deviance <- array(NA, c((n.sample-burnin), 1))
+n.keep <- floor((n.sample - burnin)/thin)
+samples.beta <- array(NA, c(n.keep, p))
+samples.phi <- array(NA, c(n.keep, n))
+samples.nu2 <- array(NA, c(n.keep, 1))
+samples.tau2 <- array(NA, c(n.keep, 1))
+samples.deviance <- array(NA, c(n.keep, 1))
 
 ## Metropolis quantities
 nu2.posterior.shape <- 0.5*n-1
@@ -198,7 +201,8 @@ tau2.posterior.shape <- 0.5*n-1
     if(ncol(W)!= n) stop("W has the wrong number of columns.", call.=FALSE)
     if(sum(is.na(W))>0) stop("W has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
-    if(!sum(names(table(W))==c(0,1))==2) stop("W has non-binary (zero and one) values.", call.=FALSE)
+    if(min(W)<0) stop("W has negative elements.", call.=FALSE)
+    if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
 
 n.neighbours <- as.numeric(apply(W, 1, sum))
 Q <- diag(n.neighbours)  - W
@@ -299,9 +303,9 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ###################
     ## Save the results
     ###################
-        if(j > burnin)
+        if(j > burnin & (j-burnin)%%thin==0)
         {
-        ele <- j - burnin
+        ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
         samples.phi[ele, ] <- phi
         samples.nu2[ele, ] <- nu2
@@ -340,46 +344,51 @@ nu2.median <- median(samples.nu2)
 deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE))
 p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
-residuals <- Y - fitted.median
 
 
 
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
-    for(r in 1:p)
+number.cts <- sum(X.indicator==1)     
+if(number.cts>0)
+{
+  for(r in 1:p)
+  {
+    if(X.indicator[r]==1)
     {
-        if(X.indicator[r]==1)
-        {
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
-        }else if(X.indicator[r]==2 & p>1)
-        {
-        X.transformed <- which(X.indicator==1)
-        samples.temp <- as.matrix(samples.beta[ ,X.transformed])
-            for(s in 1:length(X.transformed))
-            {
-            samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
-            }
-        intercept.adjustment <- apply(samples.temp, 1,sum) 
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
-        }else
-        {
-        }
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
+    }else if(X.indicator[r]==2 & p>1)
+    {
+      X.transformed <- which(X.indicator==1)
+      samples.temp <- as.matrix(samples.beta[ ,X.transformed])
+      for(s in 1:length(X.transformed))
+      {
+        samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
+      }
+      intercept.adjustment <- apply(samples.temp, 1,sum) 
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
+    }else
+    {
     }
+  }
+}else
+{
+}
 
 
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep((n.sample-burnin), p), as.numeric(100 * (1-rejectionRate(samples.beta.orig))))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(100, p))
 rownames(summary.beta) <- colnames(X)
 colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 
 summary.hyper <- array(NA, c(2 ,5))
 summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
-summary.hyper[1, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.nu2)))))
+summary.hyper[1, 4:5] <- c(n.keep, 100)
 summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper[2, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.tau2)))))
+summary.hyper[2, 4:5] <- c(n.keep, 100)
 
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[(nrow(summary.results)-1):nrow(summary.results)] <- c("nu2", "tau2")
@@ -400,18 +409,26 @@ random.effects <- round(random.effects, 4)
 
 #### Create the Fitted values
 fitted.values <- array(NA, c(n, 5))
+residuals <- array(NA, c(n, 5))
 colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
+colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
 fitted.temp <- array(NA, c(nrow(samples.beta), n))
-
+residuals.temp <- array(NA, c(nrow(samples.beta), n))    
     for(i in 1:nrow(samples.beta))
     {
-    fitted.temp[i, ] <- X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset
+    temp <- X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset
+    fitted.temp[i, ] <- temp
+    residuals.temp[i, ] <- Y - temp    
     }
 fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
 fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
 fitted.values[ ,3:5] <- t(apply(fitted.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 fitted.values <- round(fitted.values, 4)
-
+residuals[ ,1] <- apply(residuals.temp, 2, mean)
+residuals[ ,2] <- apply(residuals.temp, 2, sd)
+residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
+residuals <- round(residuals, 4)
+     
 
 
 #### Print a summary of the results to the screen
@@ -438,3 +455,4 @@ cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.nu2=mcmc(samples.nu2), samples.tau2=mcmc(samples.tau2), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 return(results)
 }
+
