@@ -1,5 +1,5 @@
-binomial.dissimilarityCARcontinuous <-
-function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, trials, W, Z, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
+binomial.dissimilarityCAR <-
+function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, trials, W, Z, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -69,11 +69,14 @@ q <- length(Z)
 	if(min(as.numeric(lapply(Z,min)))<0) stop("Z contains negative values.", call.=FALSE)
 
 
-## Determine the default values for the maximums for alpha
+## Determine the default values for the maximums for alpha and the threshold values to be significant
 alpha.max <- rep(NA,q)
+alpha.threshold <- rep(NA,q)
 	for(k in 1:q)
 	{
-	alpha.max[k] <- -log(0.01) /max(as.numeric(Z[[k]])[as.numeric(Z[[k]])!=0])
+	Z.crit <- quantile(as.numeric(Z[[k]])[as.numeric(Z[[k]])!=0], 0.5)
+	alpha.max[k] <- -log(0.5) / Z.crit
+	alpha.threshold[k] <- -log(0.5) / max(Z[[k]])
 	}
 
 
@@ -130,8 +133,8 @@ dat <- cbind(Y, trials-Y)
     if(length(tau2)!= 1) stop("tau2 is the wrong length.", call.=FALSE)
     if(sum(is.na(tau2))>0) stop("tau2 has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(tau2)) stop("tau2 has non-numeric values.", call.=FALSE)
-    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)    
-    
+    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)   
+     
 ## Global correlation parameter rho
     if(is.null(rho) & fix.rho==TRUE) stop("rho is fixed yet a value has not been specified.", call.=FALSE)
     if(is.null(rho)) rho <- runif(1)
@@ -147,6 +150,7 @@ dat <- cbind(Y, trials-Y)
     if(!is.numeric(alpha)) stop("alpha has non-numeric values.", call.=FALSE)
 
 
+
 #### MCMC quantities
 ## Checks
     if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
@@ -154,6 +158,8 @@ dat <- cbind(Y, trials-Y)
     if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
     if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
 
     if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
     if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
@@ -219,21 +225,23 @@ dat <- cbind(Y, trials-Y)
 
 
 ## Matrices to store samples
-samples.beta <- array(NA, c((n.sample-burnin), p))
-samples.phi <- array(NA, c((n.sample-burnin), n))
-samples.tau2 <- array(NA, c((n.sample-burnin), 1))
-samples.alpha <- array(NA, c((n.sample-burnin), q))
-samples.deviance <- array(NA, c((n.sample-burnin), 1))
+n.keep <- floor((n.sample - burnin)/thin)
+samples.beta <- array(NA, c(n.keep, p))
+samples.phi <- array(NA, c(n.keep, n))
+samples.tau2 <- array(NA, c(n.keep, 1))
+samples.alpha <- array(NA, c(n.keep, q))
+samples.deviance <- array(NA, c(n.keep, 1))
+
 
 ## Metropolis quantities
 	if(fix.rho)
 	{
-	accept <- rep(0,4)
+	accept <- rep(0,6)
 	accept.all <- accept
 	}else
 	{
-	samples.rho <- array(NA, c((n.sample-burnin), 1))
-	accept <- rep(0,4)
+	samples.rho <- array(NA, c(n.keep, 1))
+	accept <- rep(0,8)
 	accept.all <- accept
 	proposal.sd.rho <- 0.02
 	}
@@ -300,7 +308,7 @@ Z.combined <- array(0, c(n,n))
 	Z.combined <- Z.combined + alpha[r] * Z[[r]]
 	}
 	
-W.temp <- exp(-Z.combined) * W
+W.temp <- array(as.numeric(exp(-Z.combined)>=0.5), c(n,n)) * W
 W.star <- -W.temp
 diag(W.star) <- apply(W.temp, 1, sum)
 Q <- rho * W.star + (1-rho) * I.n
@@ -355,10 +363,9 @@ failures <- trials - Y
 		          }
 		     }
 		     
-		accept[2] <- accept[2] + n.beta.block    		     
-
-
-          
+		accept[2] <- accept[2] + n.beta.block    
+		     
+               
 		####################
 		## Sample from phi
 		####################
@@ -396,6 +403,7 @@ failures <- trials - Y
 		accept[4] <- accept[4] + n.phi.block
 		phi <- phi - mean(phi)
 		
+    
 
 		##################
 		## Sample from tau2
@@ -421,7 +429,7 @@ failures <- trials - Y
 		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
 		     }
 		
-		W.temp.proposal <- exp(-Z.combined.proposal) * W
+		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
 		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
@@ -440,15 +448,15 @@ failures <- trials - Y
 		     Q <- proposal.Q
 		     det.Q <- proposal.det.Q 
 		     spam.Q <- spam.Q.proposal
-		     W.star <- W.star.proposal 
-
+		     W.star <- W.star.proposal
+         accept[5] <- accept[5] + 1
 		     }else
 		     {
-		     }          
+		     }
+		accept[6] <- accept[6] + 1   
 		
+      
             
-
-   
     	     #########################
     	     ## Calculate the deviance
     	     #########################
@@ -461,9 +469,9 @@ failures <- trials - Y
     	     ###################
     	     ## Save the results
     	     ###################
-               if(j > burnin)
+               if(j > burnin & (j-burnin)%%thin==0)
                {
-               ele <- j - burnin
+               ele <- (j - burnin) / thin
                samples.beta[ele, ] <- beta
                samples.phi[ele, ] <- phi
                samples.tau2[ele, ] <- tau2
@@ -484,13 +492,13 @@ failures <- trials - Y
                accept.beta <- 100 * accept[1] / accept[2]
                accept.phi <- 100 * accept[3] / accept[4]
                accept.all <- accept.all + accept
-               accept <- c(0,0,0,0)
+               accept <- c(0,0,0,0,0,0)
             
                #### beta tuning parameter
-                    if(accept.beta > 40)
+                    if(accept.beta > 70)
                     {
                     proposal.sd.beta <- 2 * proposal.sd.beta
-                    }else if(accept.beta < 30)              
+                    }else if(accept.beta < 50)              
                     {
                     proposal.sd.beta <- 0.5 * proposal.sd.beta
                     }else
@@ -507,7 +515,7 @@ failures <- trials - Y
                     }else
                     {
                     }
-               }else
+                    }else
                {   
                }
 
@@ -563,7 +571,7 @@ failures <- trials - Y
 		     
 		accept[2] <- accept[2] + n.beta.block    
 		     
-		     
+
 
 		####################
 		## Sample from phi
@@ -602,8 +610,8 @@ failures <- trials - Y
 		accept[4] <- accept[4] + n.phi.block
 		phi <- phi - mean(phi)
 		
-    
 
+          
 		##################
 		## Sample from tau2
 		##################
@@ -632,10 +640,12 @@ failures <- trials - Y
 		     rho <- proposal.rho
 		     Q <- proposal.Q
 		     spam.Q <- spam.Q.proposal
-		     det.Q <- proposal.det.Q        
+		     det.Q <- proposal.det.Q    
+		     accept[7] <- accept[7] + 1 
 		     }else
 		     {
 		     }
+		accept[8] <- accept[8] + 1   
 		
 
    
@@ -655,7 +665,7 @@ failures <- trials - Y
 		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
 		     }
 		
-		W.temp.proposal <- exp(-Z.combined.proposal) * W
+		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
 		W.star.proposal <- -W.temp.proposal
 		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
 		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
@@ -674,13 +684,15 @@ failures <- trials - Y
 		     Q <- proposal.Q
 		     det.Q <- proposal.det.Q 
 		     spam.Q <- spam.Q.proposal
-		     W.star <- W.star.proposal 
+		     W.star <- W.star.proposal
+		     accept[5] <- accept[5] + 1   
 		     }else
 		     {
-		     }       
+		     }        
+		accept[6] <- accept[6] + 1   
 		
 
-
+   
     	     #########################
     	     ## Calculate the deviance
     	     #########################
@@ -693,9 +705,9 @@ failures <- trials - Y
     	     ###################
     	     ## Save the results
     	     ###################
-               if(j > burnin)
+               if(j > burnin & (j-burnin)%%thin==0)
                {
-               ele <- j - burnin
+               ele <- (j - burnin) / thin
                samples.beta[ele, ] <- beta
                samples.phi[ele, ] <- phi
                samples.tau2[ele, ] <- tau2
@@ -716,14 +728,15 @@ failures <- trials - Y
                #### Determine the acceptance probabilities
                accept.beta <- 100 * accept[1] / accept[2]
                accept.phi <- 100 * accept[3] / accept[4]
+               accept.rho <- 100 * accept[7] / accept[8]
                accept.all <- accept.all + accept
-               accept <- c(0,0,0,0)
+               accept <- c(0,0,0,0,0,0,0,0)
             
                #### beta tuning parameter
-                    if(accept.beta > 40)
+                    if(accept.beta > 70)
                     {
                     proposal.sd.beta <- 2 * proposal.sd.beta
-                    }else if(accept.beta < 30)              
+                    }else if(accept.beta < 50)              
                     {
                     proposal.sd.beta <- 0.5 * proposal.sd.beta
                     }else
@@ -737,6 +750,17 @@ failures <- trials - Y
                     }else if(accept.phi < 30)              
                     {
                     proposal.sd.phi <- 0.5 * proposal.sd.phi
+                    }else
+                    {
+                    }
+                                   
+               #### rho tuning parameter
+                    if(accept.rho > 70)
+                    {
+                    proposal.sd.rho <- min(2 * proposal.sd.rho, 10)
+                    }else if(accept.rho < 50)              
+                    {
+                    proposal.sd.rho <- 0.5 * proposal.sd.rho
                     }else
                     {
                     }
@@ -761,9 +785,17 @@ failures <- trials - Y
 	}
 
 
+
 ###################################
 #### Summarise and save the results 
 ###################################
+## Acceptance rates
+accept.beta <- 100 * accept.all[1] / accept.all[2]
+accept.phi <- 100 * accept.all[3] / accept.all[4]
+accept.alpha <- 100 * accept.all[5] / accept.all[6]
+accept.tau2 <- 100
+
+
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
@@ -773,44 +805,49 @@ fitted.median <- trials * median.prob
 deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
 p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
-residuals <- Y - fitted.median
 
 
 
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
-    for(r in 1:p)
+number.cts <- sum(X.indicator==1)     
+if(number.cts>0)
+{
+  for(r in 1:p)
+  {
+    if(X.indicator[r]==1)
     {
-        if(X.indicator[r]==1)
-        {
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
-        }else if(X.indicator[r]==2 & p>1)
-        {
-        X.transformed <- which(X.indicator==1)
-        samples.temp <- as.matrix(samples.beta[ ,X.transformed])
-            for(s in 1:length(X.transformed))
-            {
-            samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
-            }
-        intercept.adjustment <- apply(samples.temp, 1,sum) 
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
-        }else
-        {
-        }
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
+    }else if(X.indicator[r]==2 & p>1)
+    {
+      X.transformed <- which(X.indicator==1)
+      samples.temp <- as.matrix(samples.beta[ ,X.transformed])
+      for(s in 1:length(X.transformed))
+      {
+        samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
+      }
+      intercept.adjustment <- apply(samples.temp, 1,sum) 
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
+    }else
+    {
     }
+  }
+}else
+{
+}
 
 
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep((n.sample-burnin), p), as.numeric(100 * (1-rejectionRate(samples.beta.orig))))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p))
 rownames(summary.beta) <- colnames(X)
 colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 
 samples.alpha <- mcmc(samples.alpha)
 summary.alpha <- t(apply(samples.alpha, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.alpha <- cbind(summary.alpha, rep((n.sample-burnin), q), as.numeric(100 * (1-rejectionRate(samples.alpha))))
+summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q))
 colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 
 	if(!is.null(names(Z)))
@@ -826,31 +863,38 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	rownames(summary.alpha) <- names.Z	
 	}
 
-
 	if(fix.rho)
 	{
 	summary.hyper <- array(NA, c(1 ,5))
 	summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-	summary.hyper[1, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.tau2)))))
+	summary.hyper[1, 4:5] <- c(n.keep, accept.tau2)
 
 	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
+	alpha.min <- c(rep(NA, (p+1)), alpha.threshold)
+	summary.results <- cbind(summary.results, alpha.min)
 	rownames(summary.results)[(p+1)] <- c("tau2")
 	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+	summary.results[ , 6] <- round(summary.results[ , 6], 4)
 	}else
 	{
+  accept.rho <- 100 * accept.all[7] / accept.all[8]  
 	summary.hyper <- array(NA, c(2 ,5))
 	summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-	summary.hyper[1, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.tau2)))))
+	summary.hyper[1, 4:5] <- c(n.keep, accept.tau2)
 	summary.hyper[2, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-	summary.hyper[2, 4:5] <- c((n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.rho)))))
+	summary.hyper[2, 4:5] <- c(n.keep, accept.rho)
 
 	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
+	alpha.min <- c(rep(NA, (p+2)), alpha.threshold)
+	summary.results <- cbind(summary.results, alpha.min)
 	rownames(summary.results)[(p+1):(p+2)] <- c("tau2", "rho")
 	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+	summary.results[ , 6] <- round(summary.results[ , 6], 4)
 	}
-
+	
+	
 
 #### Create the random effects summary
 random.effects <- array(NA, c(n, 5))
@@ -865,22 +909,32 @@ random.effects <- round(random.effects, 4)
 
 #### Create the Fitted values
 fitted.values <- array(NA, c(n, 5))
+residuals <- array(NA, c(n, 5))
 colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
+colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
 fitted.temp <- array(NA, c(nrow(samples.beta), n))
+residuals.temp <- array(NA, c(nrow(samples.beta), n)) 
     for(i in 1:nrow(samples.alpha))
     {
     temp.logit <- X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset    
-	 fitted.temp[i, ] <- trials * exp(temp.logit)  / (1 + exp(temp.logit))
+    temp <- trials * exp(temp.logit)  / (1 + exp(temp.logit))
+    fitted.temp[i, ] <- temp
+    residuals.temp[i, ] <- Y - temp    
     }
 fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
 fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
 fitted.values[ ,3:5] <- t(apply(fitted.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 fitted.values <- round(fitted.values, 4)
+residuals[ ,1] <- apply(residuals.temp, 2, mean)
+residuals[ ,2] <- apply(residuals.temp, 2, sd)
+residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
+residuals <- round(residuals, 4)
 
 
 
 #### Create the posterior medians for the neighbourhood matrix W
 W.posterior <- array(NA, c(n,n))
+W.border.prob <- array(NA, c(n,n))
 	for(i in 1:n)
 	{
 		for(j in 1:n)
@@ -893,14 +947,15 @@ W.posterior <- array(NA, c(n,n))
 				z.temp <- c(z.temp, Z[[k]][i,j])
 				}	
 			z.temp <- z.temp[-1]
-			w.posterior <- exp(-samples.alpha %*% z.temp)
-			W.posterior[i,j] <- median(w.posterior)
+			w.temp <- exp(-samples.alpha %*% z.temp)
+			w.posterior <- as.numeric(w.temp>=0.5)
+			W.posterior[i,j] <- ceiling(median(w.posterior))
+			W.border.prob[i,j] <- (1 - sum(w.posterior) / length(w.posterior))
 			}else
 			{
 			}	
 		}	
 	}
-
 
 
 
@@ -911,7 +966,7 @@ W.posterior <- array(NA, c(n,n))
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
 	cat("Likelihood model - Binomial (logistic link function)\n")
-	cat("Random effects model - Localised CAR continuous weights\n")
+	cat("Random effects model - Localised CAR binary weights\n")
 	cat("Regression equation - ")
 	print(formula)
 	cat("Dissimilarity metrics - ")
@@ -925,15 +980,16 @@ W.posterior <- array(NA, c(n,n))
 	print(summary.results)
 	cat("\n\n")
 	cat("The global spatial correlation parameter rho is fixed at ", rho,"\n\n", sep="")
-	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
+	cat("Acceptance rate for the random effects is ", round(accept.phi,1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
+	cat("\n")
 	}else
 	{
 	cat("\n#################\n")
 	cat("#### Model fitted\n")
 	cat("#################\n\n")
 	cat("Likelihood model - Binomial (logistic link function)\n")
-	cat("Random effects model - Localised CAR continuous weights\n")
+	cat("Random effects model - Localised CAR binary weights\n")
 	cat("Regression equation - ")
 	print(formula)
 	cat("Dissimilarity metrics - ")
@@ -946,18 +1002,19 @@ W.posterior <- array(NA, c(n,n))
 	cat("Posterior quantiles and acceptance rates\n\n")
 	print(summary.results)
 	cat("\n\n")
-	cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
+	cat("Acceptance rate for the random effects is ", round(accept.phi,1), "%","\n\n", sep="")
 	cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
+	cat("\n")
 	}
 
 
 ## Compile and return the results
 	if(fix.rho)
 	{
-	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, W.border.prob=W.border.prob, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 	}else
 	{
-	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+	results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), samples.alpha=mcmc(samples.alpha), fitted.values=fitted.values, random.effects=random.effects, W.posterior=W.posterior, W.border.prob=W.border.prob, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 	}
 
 return(results)

@@ -1,5 +1,5 @@
 poisson.independent <-
-function(formula, beta=NULL, theta=NULL, sigma2=NULL, burnin=0, n.sample=1000, blocksize.beta=5, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.sigma2=NULL)
+function(formula, beta=NULL, theta=NULL, sigma2=NULL, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.sigma2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -109,6 +109,8 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
     if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
 
     if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
     if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
@@ -174,10 +176,11 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 
 ## Matrices to store samples
-samples.beta <- array(NA, c((n.sample-burnin), p))
-samples.theta <- array(NA, c((n.sample-burnin), n))
-samples.sigma2 <- array(NA, c((n.sample-burnin), 1))
-samples.deviance <- array(NA, c((n.sample-burnin), 1))
+n.keep <- floor((n.sample - burnin)/thin)
+samples.beta <- array(NA, c(n.keep, p))
+samples.theta <- array(NA, c(n.keep, n))
+samples.sigma2 <- array(NA, c(n.keep, 1))
+samples.deviance <- array(NA, c(n.keep, 1))
 
 ## Metropolis quantities
 accept.all <- rep(0,4)
@@ -296,9 +299,9 @@ sigma2.posterior.shape <- 0.5 * n - 1
     ###################
     ## Save the results
     ###################
-        if(j > burnin)
+        if(j > burnin & (j-burnin)%%thin==0)
         {
-        ele <- j - burnin
+        ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
         samples.theta[ele, ] <- theta
         samples.sigma2[ele, ] <- sigma2
@@ -321,10 +324,10 @@ sigma2.posterior.shape <- 0.5 * n - 1
         accept <- c(0,0,0,0)
             
         #### beta tuning parameter
-            if(accept.beta > 40)
+            if(accept.beta > 70)
             {
             proposal.sd.beta <- 2 * proposal.sd.beta
-            }else if(accept.beta < 30)              
+            }else if(accept.beta < 50)              
             {
             proposal.sd.beta <- 0.5 * proposal.sd.beta
             }else
@@ -365,6 +368,12 @@ sigma2.posterior.shape <- 0.5 * n - 1
 ###################################
 #### Summarise and save the results 
 ###################################
+## Compute the acceptance rates
+accept.beta <- 100 * accept.all[1] / accept.all[2]
+accept.theta <- 100 * accept.all[3] / accept.all[4]
+accept.sigma2 <- 100
+
+
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.theta <- apply(samples.theta, 2, median)
@@ -372,43 +381,49 @@ fitted.median <- exp(X.standardised %*% median.beta + median.theta + offset)
 deviance.fitted <- -2 * sum(Y * log(fitted.median) -  fitted.median - lfactorial(Y))
 p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
-residuals <- Y - fitted.median
+
 
 
 
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
-    for(r in 1:p)
+number.cts <- sum(X.indicator==1)     
+if(number.cts>0)
+{
+  for(r in 1:p)
+  {
+    if(X.indicator[r]==1)
     {
-        if(X.indicator[r]==1)
-        {
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
-        }else if(X.indicator[r]==2 & p>1)
-        {
-        X.transformed <- which(X.indicator==1)
-        samples.temp <- as.matrix(samples.beta[ ,X.transformed])
-            for(s in 1:length(X.transformed))
-            {
-            samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
-            }
-        intercept.adjustment <- apply(samples.temp, 1,sum) 
-        samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
-        }else
-        {
-        }
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] / X.sd[r]
+    }else if(X.indicator[r]==2 & p>1)
+    {
+      X.transformed <- which(X.indicator==1)
+      samples.temp <- as.matrix(samples.beta[ ,X.transformed])
+      for(s in 1:length(X.transformed))
+      {
+        samples.temp[ ,s] <- samples.temp[ ,s] * X.mean[X.transformed[s]]  / X.sd[X.transformed[s]]
+      }
+      intercept.adjustment <- apply(samples.temp, 1,sum) 
+      samples.beta.orig[ ,r] <- samples.beta[ ,r] - intercept.adjustment
+    }else
+    {
     }
+  }
+}else
+{
+}
 
 
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep((n.sample-burnin), p), as.numeric(100 * (1-rejectionRate(samples.beta.orig))))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta, p))
 rownames(summary.beta) <- colnames(X)
 colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 
 summary.hyper <- quantile(samples.sigma2, c(0.5, 0.025, 0.975))
-summary.hyper <- c(summary.hyper, (n.sample-burnin), as.numeric(100 * (1-rejectionRate(mcmc(samples.sigma2)))))
+summary.hyper <- c(summary.hyper, n.keep, accept.sigma2)
 
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[nrow(summary.results)] <- "sigma2"
@@ -428,16 +443,25 @@ random.effects <- round(random.effects, 4)
 
 #### Create the Fitted values
 fitted.values <- array(NA, c(n, 5))
+residuals <- array(NA, c(n, 5))
 colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
+colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
 fitted.temp <- array(NA, c(nrow(samples.beta), n))
+residuals.temp <- array(NA, c(nrow(samples.beta), n))
     for(i in 1:nrow(samples.beta))
     {
-    fitted.temp[i, ] <- exp(X.standardised %*% samples.beta[i, ] + samples.theta[i, ] + offset)
+    temp <- exp(X.standardised %*% samples.beta[i, ] + samples.theta[i, ] + offset)
+    fitted.temp[i, ] <- temp
+    residuals.temp[i, ] <- Y - temp
     }
 fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
 fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
 fitted.values[ ,3:5] <- t(apply(fitted.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 fitted.values <- round(fitted.values, 4)
+residuals[ ,1] <- apply(residuals.temp, 2, mean)
+residuals[ ,2] <- apply(residuals.temp, 2, sd)
+residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
+residuals <- round(residuals, 4)
 
 
 #### Print a summary of the results to the screen
@@ -456,7 +480,7 @@ cat("############\n\n")
 cat("Posterior quantiles and acceptance rates\n\n")
 print(summary.results)
 cat("\n\n")
-cat("Acceptance rate for the random effects is ", round(100 * accept.all[3] / accept.all[4],1), "%","\n\n", sep="")
+cat("Acceptance rate for the random effects is ", round(accept.theta,1), "%","\n\n", sep="")
 cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 
 
@@ -464,3 +488,4 @@ cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 results <- list(formula=formula, samples.beta=samples.beta.orig, samples.theta=mcmc(samples.theta), samples.sigma2=mcmc(samples.sigma2), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
 return(results)
 }
+
