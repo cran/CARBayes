@@ -17,8 +17,8 @@ The creation of this package was supported by the Economic and Social Research C
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 1.3\cr
-Date: \tab 2013-02-19\cr
+Version: \tab 1.4\cr
+Date: \tab 2013-05-06\cr
 License: \tab GPL (>= 2)\cr
 }
 
@@ -65,14 +65,6 @@ Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small 
 ################################################################
 #### Load the libraries required to do an extended analysis
 ################################################################
-library(MASS)
-library(lattice)
-library(coda)
-library(MCMCpack)
-library(spam)
-library(evd)
-library(stats4)
-library(truncdist)
 library(foreign)
 library(shapefiles)
 library(sp)
@@ -95,30 +87,26 @@ data(housedata)
 data(shp)
 data(dbf)
 
-#### Combine the data and shapefile and create the neighbourhood matrix W
+#### Remove the outlying observation
+housedata <- housedata[!rownames(housedata)=="S02000655", ]
+
+#### Combine the data and shapefile
 data.combined <- combine.data.shapefile(housedata, shp, dbf)
+
+#### Transform the price and crime variables
+housedata$logprice <- log(housedata$price)
+housedata$logcrime <- log(housedata$crime)
+housedata$logdriveshop <- log(housedata$driveshop)
+
+#### Compute the neighbourhood matrix
 W.nb <- poly2nb(data.combined, row.names = rownames(housedata))
+W.list <- nb2listw(W.nb, style="B")
 W.mat <- nb2mat(W.nb, style="B")
 
-#### Run a regression model with spatially correlated random effects
-housedata$crime.inv <- 1 / housedata$crime
-form <- housedata$price~housedata$crime.inv+housedata$rooms+housedata$sales+factor(housedata$type)
 \dontrun{
-model.spatial <- gaussian.properCAR(formula=form, W=W.mat, burnin=20000, n.sample=100000, 
-thin=10, prior.max.nu2=1000000, prior.max.tau2=1000000, prior.var.beta=rep(10000000, 7))
-
-#### Plot the fitted values on a map
-fitted.housedata <- model.spatial$fitted.values[ ,3]
-data.combined@data <- data.frame(data.combined@data, fitted.housedata)
-northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), offset = c(220000,647000), 
-scale = 4000)
-scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = c(225000,647000), 
-scale = 10000, fill=c("transparent","black"))
-text1 <- list("sp.text", c(225000,649000), "0")
-text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(data.combined, c("fitted.housedata"), sp.layout=list(northarrow, scalebar, text1, text2), 
-at=seq(min(fitted.housedata)-1, max(fitted.housedata)+1, length.out=51), 
-col.regions=terrain.colors(n=50))
+form <- housedata$logprice~housedata$logcrime+housedata$rooms+housedata$sales+factor(housedata$type) 
++ housedata$logdriveshop
+model.spatial <- gaussian.properCAR(formula=form, W=W.mat, burnin=20000, n.sample=100000, thin=10)
 }
 
 
@@ -126,21 +114,23 @@ col.regions=terrain.colors(n=50))
 #### Example 2 - disease mapping
 ################################
 #### Read in the data
-data(respdata) 
+data(respdata)
 data(shp)
 data(dbf)
 
 #### Combine the data and shapefile and create the neighbourhood matrix W
+respdata$SIR2010 <- respdata$observed2010 / respdata$expected2010
 data.combined <- combine.data.shapefile(respdata, shp, dbf)
 W.nb <- poly2nb(data.combined, row.names = rownames(respdata))
 W.mat <- nb2mat(W.nb, style="B")
 
 #### Create the dissimilrity metric
 Z.incomedep <- as.matrix(dist(cbind(respdata$incomedep2010, respdata$incomedep2010), 
-method="manhattan", diag=TRUE, upper=TRUE)) * W.mat
+method="manhattan", diag=TRUE, upper=TRUE)) * W.mat / 2
 
 #### Run the local CAR model
 formula <- respdata$observed2010 ~ offset(log(respdata$expected2010))
+
 \dontrun{
 model.dissimilarity <- poisson.dissimilarityCAR(formula=formula, W=W.mat, 
 Z=list(Z.incomedep=Z.incomedep), rho=0.99, fix.rho=TRUE, burnin=20000, 
@@ -160,7 +150,7 @@ scale = 10000, fill=c("transparent","black"))
 text1 <- list("sp.text", c(225000,649000), "0")
 text2 <- list("sp.text", c(230000,649000), "5000 m")
 spplot(data.combined, c("risk.estimates"), sp.layout=list(northarrow, scalebar, text1, text2, boundaries),
-at=seq(min(risk.estimates)-0.1, max(risk.estimates)+0.1, length.out=51), 
-col.regions=terrain.colors(n=50))
+scales=list(draw = TRUE), at=seq(min(risk.estimates)-0.1, max(risk.estimates)+0.1, length.out=8), 
+col.regions=c("#FFFFB2", "#FED976", "#FEB24C", "#FD8D3C", "#FC4E2A", "#E31A1C", "#B10026"))
 }
 }

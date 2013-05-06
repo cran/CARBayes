@@ -12,12 +12,13 @@ Data on median property prices in 2008 and possible covariates for the 271 Inter
 }
 \usage{data(housedata)}
 \format{
-  A data frame with 271 observations on the following 5 variables.
+  A data frame with 271 observations on the following 6 variables.
   \describe{
     \item{\code{price}}{Median property price in each IG.}
     \item{\code{crime}}{The crime rate (number of crimes per 10,000 people) in each IG.}
     \item{\code{rooms}}{The median number of rooms in a property in each IG.}
     \item{\code{sales}}{The percentage of properties that sold in each IG in a year.}
+    \item{\code{driveshop}}{The average time taken to drive to a shopping centre in minutes.}
     \item{\code{type}}{The predominant property type in each IG with levels: \code{detached}, \code{flat}, \code{semi}, \code{terrace}}
   }
 }

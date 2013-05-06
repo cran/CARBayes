@@ -1,8 +1,8 @@
 Package: CARBayes
 Type: Package
 Title: Spatial areal unit modelling
-Version: 1.3
-Date: 2013-02-19
+Version: 1.4
+Date: 2013-05-06
 Author: Duncan Lee
 Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
 Description: This package implements Bayesian hierarchical spatial
@@ -19,7 +19,7 @@ Depends: R (>= 2.10.0), coda, evd, MASS, lattice, MCMCpack, spam,
 Suggests: boot, deldir, foreign, grid, maptools, Matrix, nlme,
         shapefiles, sp, spdep, splines
 LazyLoad: yes
-Packaged: 2013-03-05 14:01:12 UTC; duncan
+Packaged: 2013-05-06 14:18:58 UTC; duncan
 NeedsCompilation: no
 Repository: CRAN
-Date/Publication: 2013-03-05 16:02:35
+Date/Publication: 2013-05-06 21:33:33
