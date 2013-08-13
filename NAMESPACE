@@ -21,13 +21,7 @@ export(
 	highlight.borders
 )
 
-import(
-  coda,
-  MASS,
-  MCMCpack,
-  spam,
-  truncdist,
-  evd,
-  stats4,
-  lattice
-)
+import(MASS)
+importFrom(truncdist, rtrunc)
+importFrom(spam, as.spam,  chol.spam, diag)
+importFrom(coda, mcmc)

@@ -17,8 +17,8 @@ The creation of this package was supported by the Economic and Social Research C
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 1.4\cr
-Date: \tab 2013-05-06\cr
+Version: \tab 1.5\cr
+Date: \tab 2013-08-13\cr
 License: \tab GPL (>= 2)\cr
 }
 
@@ -104,8 +104,8 @@ W.list <- nb2listw(W.nb, style="B")
 W.mat <- nb2mat(W.nb, style="B")
 
 \dontrun{
-form <- housedata$logprice~housedata$logcrime+housedata$rooms+housedata$sales+factor(housedata$type) 
-+ housedata$logdriveshop
+form <- housedata$logprice~housedata$logcrime+housedata$rooms+housedata$sales
++factor(housedata$type)+housedata$logdriveshop
 model.spatial <- gaussian.properCAR(formula=form, W=W.mat, burnin=20000, n.sample=100000, thin=10)
 }
 
@@ -149,8 +149,9 @@ scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = c(225000
 scale = 10000, fill=c("transparent","black"))
 text1 <- list("sp.text", c(225000,649000), "0")
 text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(data.combined, c("risk.estimates"), sp.layout=list(northarrow, scalebar, text1, text2, boundaries),
-scales=list(draw = TRUE), at=seq(min(risk.estimates)-0.1, max(risk.estimates)+0.1, length.out=8), 
+spplot(data.combined, c("risk.estimates"), sp.layout=list(northarrow, scalebar, text1, text2, 
+boundaries),scales=list(draw = TRUE), at=seq(min(risk.estimates)-0.1, 
+max(risk.estimates)+0.1, length.out=8), 
 col.regions=c("#FFFFB2", "#FED976", "#FEB24C", "#FD8D3C", "#FC4E2A", "#E31A1C", "#B10026"))
 }
 }
