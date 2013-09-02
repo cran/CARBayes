@@ -1,5 +1,5 @@
-52b93d9c11296aecf87f448fd2b42453 *DESCRIPTION
-65f16bd25f0341796fb1d5324522b71b *NAMESPACE
+bb86c2476adb20aebe695fd6fe0acc87 *DESCRIPTION
+db487021edba5b709ac8dcc82c234895 *NAMESPACE
 38ac441da4ddcf9d13619f32e7c4c7b3 *R/binomial.bymCAR.R
 94dca9c1e4c7434d2bada0bc897aff18 *R/binomial.dissimilarityCAR.R
 abb545e3ec16d227c43989c73c2730e3 *R/binomial.iarCAR.R
@@ -21,11 +21,12 @@ ea1b51cda0b014f47f23537f19c6b956 *R/poisson.independent.R
 49bb1e620784340765e530bf57a507f6 *R/poisson.lerouxCAR.R
 cdf2c3eb875bf837ce37a6aaa45ec8bd *R/poisson.properCAR.R
 ceccb79a48c4c0bf1276398d24e4a37a *data/datalist
-f0c8b2c264dc9fbf4931dd928260e737 *data/dbf.rda
-a17241817209409ef55971d6a7e5fa31 *data/housedata.rda
-ea6a8009bd4cf712a6dc6f8cf0b6c0e3 *data/respdata.rda
-67fb464ced8fbb8cc3866a5537672763 *data/shp.rda
-a266b9265b7380aae6794b299b578c0c *man/CARBayes-package.Rd
+8710ed1f8bef8a207050764974ab1b35 *data/dbf.rda
+e2aaf70780a219a6d90cfeda10f8ebdc *data/housedata.rda
+5fa4ad8ec25ca3ee2ba082def71da071 *data/respdata.rda
+fb38341aea7592329a08d504ed75d03a *data/shp.rda
+4d3754f6f8650d9ce3c83522b331146b *inst/doc/CARBayes-Vignette.pdf
+4ea2cb8ec1bc1dc906851e56cedad138 *man/CARBayes-package.Rd
 b07d1e3b810a2c0fc3314406bbf746fd *man/binomial.bymCAR.Rd
 2abed1dc345ef52136ed21213f374068 *man/binomial.dissimilarityCAR.Rd
 2c7b9c77ef45c9cefcc901c88cd8b925 *man/binomial.iarCAR.Rd
