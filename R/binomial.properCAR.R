@@ -1,11 +1,11 @@
 binomial.properCAR <-
-function(formula, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, trials, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL)
+function(formula, data=NULL, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, trials, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.tau2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
 #### Overall formula object
-frame <- try(suppressWarnings(model.frame(formula, na.action=na.pass)), silent=TRUE)
+frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)), silent=TRUE)
 if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g the variables may be different lengths.", call.=FALSE)
 
 
@@ -475,7 +475,8 @@ accept.beta <- 100 * accept.all[1] / accept.all[2]
 accept.phi <- 100 * accept.all[3] / accept.all[4]
 accept.rho <- 100 * accept.all[5] / accept.all[6]
 accept.tau2 <- 100
-
+accept.final <- c(accept.beta, accept.phi, accept.rho, accept.tau2)
+names(accept.final) <- c("beta", "phi", "rho", "tau2")
 
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
@@ -575,29 +576,15 @@ residuals <- round(residuals, 4)
      
      
 
-#### Print a summary of the results to the screen
-cat("\n#################\n")
-cat("#### Model fitted\n")
-cat("#################\n\n")
-cat("Likelihood model - Binomial (logistic link function)\n")
-cat("Random effects model - Proper CAR\n")
-cat("Regression equation - ")
-print(formula)
 
-cat("\n\n############\n")
-cat("#### Results\n")
-cat("############\n\n")
-
-cat("Posterior quantiles and acceptance rates\n\n")
-print(summary.results)
-cat("\n\n")
-cat("Acceptance rate for the random effects is ", round(accept.phi,1), "%","\n\n", sep="")
-cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 
 
 
 ## Compile and return the results
-results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.tau2=mcmc(samples.tau2), samples.rho=mcmc(samples.rho), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Proper CAR\n")
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho))
+results <- list(formula=formula, samples=samples,  fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
+class(results) <- "carbayes"
 return(results)
 }
 

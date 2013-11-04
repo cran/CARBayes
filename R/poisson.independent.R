@@ -1,11 +1,11 @@
 poisson.independent <-
-function(formula, beta=NULL, theta=NULL, sigma2=NULL, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.sigma2=NULL)
+function(formula, data=NULL, beta=NULL, theta=NULL, sigma2=NULL, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.sigma2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
 #### Overall formula object
-frame <- try(suppressWarnings(model.frame(formula, na.action=na.pass)), silent=TRUE)
+frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)), silent=TRUE)
 if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g the variables may be different lengths.", call.=FALSE)
 
 
@@ -372,7 +372,8 @@ sigma2.posterior.shape <- 0.5 * n - 1
 accept.beta <- 100 * accept.all[1] / accept.all[2]
 accept.theta <- 100 * accept.all[3] / accept.all[4]
 accept.sigma2 <- 100
-
+accept.final <- c(accept.beta, accept.theta, accept.sigma2)
+names(accept.final) <- c("beta", "theta", "sigma2")
 
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
@@ -464,28 +465,12 @@ residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 residuals <- round(residuals, 4)
 
 
-#### Print a summary of the results to the screen
-cat("\n#################\n")
-cat("#### Model fitted\n")
-cat("#################\n\n")
-cat("Likelihood model - Poisson (log link function) \n")
-cat("Random effects model - Independent\n")
-cat("Regression equation - ")
-print(formula)
-
-cat("\n\n############\n")
-cat("#### Results\n")
-cat("############\n\n")
-
-cat("Posterior quantiles and acceptance rates\n\n")
-print(summary.results)
-cat("\n\n")
-cat("Acceptance rate for the random effects is ", round(accept.theta,1), "%","\n\n", sep="")
-cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
-
 
 ## Compile and return the results
-results <- list(formula=formula, samples.beta=samples.beta.orig, samples.theta=mcmc(samples.theta), samples.sigma2=mcmc(samples.sigma2), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Independent\n")
+samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2))
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=NULL, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
+class(results) <- "carbayes"
 return(results)
 }
 

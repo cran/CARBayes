@@ -12,14 +12,18 @@ The function fits a binomial logistic random effects models to spatial data, whe
 
 
 \usage{
-binomial.independent(formula, beta = NULL, theta = NULL, sigma2 = NULL, trials, 
-burnin = 0, n.sample = 1000, thin=1, blocksize.beta = 5, blocksize.theta = 10, 
-prior.mean.beta = NULL, prior.var.beta = NULL, prior.max.sigma2 = NULL)
+binomial.independent(formula, data = NULL, beta = NULL, theta = NULL, sigma2 = NULL, 
+trials, burnin = 0, n.sample = 1000, thin=1, blocksize.beta = 5, 
+blocksize.theta = 10, prior.mean.beta = NULL, prior.var.beta = NULL, 
+prior.max.sigma2 = NULL)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{formula}{
 A formula for the covariate part of the model, using the same notation as for the lm() function. The offsets should also be included here using the offset() function.
+}
+  \item{data}{
+A data.frame containing the  variables in the formula.
 }
   \item{beta}{
 A vector of starting values for the regression parameters (including the intercept term). If this argument is not specified the function will randomly generate starting values.
@@ -66,15 +70,17 @@ For further details about how to apply the function see the examples below and i
 
 \value{
 \item{formula }{The formula for the covariate and offset part of the model.}
-\item{samples.beta }{A matrix of MCMC samples for the regression parameters beta.}
-\item{samples.theta }{A matrix of MCMC samples for the random effects theta.}
-\item{samples.sigma2 }{A matrix of MCMC samples for the random effects variance sigma2.}
+\item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
+\item{W.summary }{NULL.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
 \item{summary.results }{A summary table of the parameters.}
+\item{model }{A text string describing the model fit.}
+\item{accept }{The acceptance probabilities for the parameters.}
+
 }
 
 

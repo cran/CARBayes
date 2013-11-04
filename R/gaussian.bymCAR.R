@@ -1,11 +1,11 @@
 gaussian.bymCAR <-
-function(formula, beta=NULL, phi=NULL, theta=NULL, nu2=NULL, tau2=NULL, sigma2=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.phi=10, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL, prior.max.sigma2=NULL)
+function(formula, data=NULL, beta=NULL, phi=NULL, theta=NULL, nu2=NULL, tau2=NULL, sigma2=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.phi=10, blocksize.theta=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL, prior.max.sigma2=NULL)
 {
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
 #### Overall formula object
-frame <- try(suppressWarnings(model.frame(formula, na.action=na.pass)), silent=TRUE)
+frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)), silent=TRUE)
 if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g the variables may be different lengths.", call.=FALSE)
 
 
@@ -378,7 +378,11 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 }
 
 
+accept.final <- rep(100, 6)
+names(accept.final) <- c("beta", "phi", "nu2", "tau2", "theta", "sigma")
 
+     
+     
 ###################################
 #### Summarise and save the results 
 ###################################
@@ -480,28 +484,13 @@ residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 residuals <- round(residuals, 4)
 
 
-#### Print a summary of the results to the screen
-cat("\n#################\n")
-cat("#### Model fitted\n")
-cat("#################\n\n")
-cat("Likelihood model - Gaussian (identity link function) \n")
-cat("Random effects model - BYM CAR\n")
-cat("Regression equation - ")
-print(formula)
-
-cat("\n\n############\n")
-cat("#### Results\n")
-cat("############\n\n")
-
-cat("Posterior quantiles and acceptance rates\n\n")
-print(summary.results)
-cat("\n\n")
-cat("Acceptance rate for the random effects is  phi ", 100, "%, theta ", 100, "%.", "\n\n", sep="")
-cat("DIC = ", DIC, "     ", "p.d = ", p.d, "\n")
 
 
 ## Compile and return the results
-results <- list(formula=formula, samples.beta=samples.beta.orig, samples.phi=mcmc(samples.phi), samples.theta=mcmc(samples.theta), samples.nu2=mcmc(samples.nu2), samples.tau2=mcmc(samples.tau2), samples.sigma2=mcmc(samples.sigma2), fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, DIC=DIC, p.d=p.d, summary.results=summary.results)
+model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - BYM CAR\n")     
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), theta=mcmc(samples.theta), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), sigma2=mcmc(samples.sigma2))
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
+class(results) <- "carbayes"
 return(results)
 }
 

@@ -18,7 +18,8 @@ export(
 	binomial.bymCAR, 
 	binomial.dissimilarityCAR, 
 	combine.data.shapefile,
-	highlight.borders
+	highlight.borders,
+	print.carbayes
 )
 
 import(MASS)
