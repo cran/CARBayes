@@ -17,8 +17,8 @@ The creation of this package was supported by the Economic and Social Research C
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 1.5\cr
-Date: \tab 2013-08-13\cr
+Version: \tab 1.6\cr
+Date: \tab 2013-11-04\cr
 License: \tab GPL (>= 2)\cr
 }
 
@@ -55,6 +55,8 @@ and Boehning, E and Lesaffre, E and Viel, J and Bertollini, R (eds). Wiley.
 Lee, D. (2011). A comparison of conditional autoregressive model used in Bayesian disease mapping. Spatial and Spatio-temporal Epidemiology 2, 79-89.
 
 Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. Biostatistics, 13, 415-426.
+
+Lee, D (2013). CARBayes: An R Package for Bayesian Spatial Modeling with Conditional Autoregressive Priors. Journal of Statistical Software, 55, 13, 1-24.
 
 Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small areas: A new mixed model for spatial dependence, Chapter Statistical Models in Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds), pp. 135-178. Springer-Verlag, New York.
 }
@@ -104,9 +106,9 @@ W.list <- nb2listw(W.nb, style="B")
 W.mat <- nb2mat(W.nb, style="B")
 
 \dontrun{
-form <- housedata$logprice~housedata$logcrime+housedata$rooms+housedata$sales
-+factor(housedata$type)+housedata$logdriveshop
-model.spatial <- gaussian.properCAR(formula=form, W=W.mat, burnin=20000, n.sample=100000, thin=10)
+form <- "logprice~logcrime+rooms+sales+factor(type)+logdriveshop"
+model.spatial <- gaussian.properCAR(formula=form, data=housedata, W=W.mat, 
+burnin=20000, n.sample=100000, thin=10)
 }
 
 
@@ -129,15 +131,15 @@ Z.incomedep <- as.matrix(dist(cbind(respdata$incomedep2010, respdata$incomedep20
 method="manhattan", diag=TRUE, upper=TRUE)) * W.mat / 2
 
 #### Run the local CAR model
-formula <- respdata$observed2010 ~ offset(log(respdata$expected2010))
+formula <- "observed2010 ~ offset(log(expected2010))"
 
 \dontrun{
-model.dissimilarity <- poisson.dissimilarityCAR(formula=formula, W=W.mat, 
-Z=list(Z.incomedep=Z.incomedep), rho=0.99, fix.rho=TRUE, burnin=20000, 
-n.sample=100000, thin=10)
+model.dissimilarity <- poisson.dissimilarityCAR(formula=formula, data=respdata, 
+W=W.mat,  Z=list(Z.incomedep=Z.incomedep), rho=0.99, fix.rho=TRUE, 
+burnin=20000, n.sample=100000, thin=10)
 
 #### Plot a map with the boundaries overlayed
-border.locations <- model.dissimilarity$W.posterior
+border.locations <- model.dissimilarity$W.summary$W.posterior
 risk.estimates <- model.dissimilarity$fitted.values[ ,3] / respdata$expected2010
 data.combined@data <- data.frame(data.combined@data, risk.estimates)
 boundary.final <- highlight.borders(border.locations=border.locations, ID=rownames(respdata), 
