@@ -1,6 +1,8 @@
 gaussian.dissimilarityCAR <-
-function(formula, data=NULL, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, rho=NULL, fix.rho=FALSE, alpha=NULL, W, Z, burnin=0, n.sample=1000, thin=1, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL, prior.max.alpha=NULL)
+function(formula, data=NULL, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, rho=0.99, alpha=NULL, W, Z, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL)
 {
+cat("Setting up the model\n")
+a<-proc.time()
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
@@ -131,99 +133,24 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)    
 
 ## Global correlation parameter rho
-    if(is.null(rho) & fix.rho==TRUE) stop("rho is fixed yet a value has not been specified.", call.=FALSE)
-    if(is.null(rho)) rho <- runif(1)
     if(length(rho)!= 1) stop("rho is the wrong length.", call.=FALSE)
     if(sum(is.na(rho))>0) stop("rho has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(rho)) stop("rho has non-numeric values.", call.=FALSE)
-    if(rho < 0 | rho >=1) stop("rho is outside the interval [0,1).", call.=FALSE)
+    if(rho < 0.5 | rho >=1) stop("rho is outside the interval [0.5,1).", call.=FALSE)
 
 ## Covariance parameters alpha
-    if(is.null(alpha)) alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
+     if(is.null(alpha)) alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
     if(length(alpha)!= q) stop("alpha is the wrong length.", call.=FALSE)
     if(sum(is.na(alpha))>0) stop("alpha has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(alpha)) stop("alpha has non-numeric values.", call.=FALSE)
 
 
-
-#### MCMC quantities
-## Checks
-    if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
-    if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE)    
-    if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
-    if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
-    if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
-    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
-    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
-
-    if(!is.numeric(blocksize.phi)) stop("blocksize.phi is not a number", call.=FALSE)
-    if(blocksize.phi <= 0) stop("blocksize.phi is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.phi)==ceiling(blocksize.phi))) stop("blocksize.phi has non-integer values.", call.=FALSE)
-
-
-## Compute the blocking structure for phi
-     if(blocksize.phi >= n)
-     {
-     n.phi.block <- 1
-     phi.beg <- 1
-     phi.fin <- n  
-     }else
-     {
-     n.standard <- 1 + floor((n-blocksize.phi) / blocksize.phi)
-     remainder <- n - (n.standard * blocksize.phi)
-     
-          if(remainder==0)
-          {
-          phi.beg <- c(1,seq((blocksize.phi+1), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi))
-          n.phi.block <- length(phi.beg)
-          }else if(remainder==1)
-          {
-          phi.beg <- c(1, seq((blocksize.phi), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi-1, seq((blocksize.phi+blocksize.phi-1), n, blocksize.phi), n)
-          n.phi.block <- length(phi.beg)    
-          }else
-          {
-          phi.beg <- c(1, seq((blocksize.phi+1), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi), n)
-          n.phi.block <- length(phi.beg)
-          }
-     }
-
-
-## Matrices to store samples
-n.keep <- floor((n.sample - burnin)/thin)
-samples.beta <- array(NA, c(n.keep, p))
-samples.phi <- array(NA, c(n.keep, n))
-samples.nu2 <- array(NA, c(n.keep, 1))
-samples.tau2 <- array(NA, c(n.keep, 1))
-samples.alpha <- array(NA, c(n.keep, q))
-samples.deviance <- array(NA, c(n.keep, 1))
-
-	if(fix.rho)
-	{
-     accept <- c(0,0)
-	}else
-	{
-     accept <- c(0,0,0,0)
-     accept.all <- accept
-	samples.rho <- array(NA, c(n.keep, 1))
-	proposal.sd.rho <- 0.02
-	}
-
-nu2.posterior.shape <- 0.5*n-1
-tau2.posterior.shape <- 0.5*n-1
-
 #### Priors
 ## Put in default priors
-## N(0, 100) for beta 
-## U(0, 10) for tau2
-## U(0, M_i) for alpha
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    if(is.null(prior.max.tau2)) prior.max.tau2 <- 1000
-    if(is.null(prior.max.nu2)) prior.max.nu2 <- 1000
-    if(is.null(prior.max.alpha)) prior.max.alpha <- alpha.max
+    if(is.null(prior.tau2)) prior.tau2 <- c(0.001, 0.001)
+    if(is.null(prior.nu2)) prior.nu2 <- c(0.001, 0.001)
 
     
 ## Checks    
@@ -236,23 +163,42 @@ tau2.posterior.shape <- 0.5*n-1
     if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
     if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
  
-    if(length(prior.max.tau2)!=1) stop("the maximum prior value for tau2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.tau2)) stop("the maximum prior value for tau2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.tau2))!=0) stop("the maximum prior value for tau2 has missing values.", call.=FALSE)    
-    if(min(prior.max.tau2) <=0) stop("the maximum prior value for tau2 is less than zero", call.=FALSE)
-    
-    if(length(prior.max.nu2)!=1) stop("the maximum prior value for nu2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.nu2)) stop("the maximum prior value for nu2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.nu2))!=0) stop("the maximum prior value for nu2 has missing values.", call.=FALSE)    
-    if(min(prior.max.nu2) <=0) stop("the maximum prior value for nu2 is less than zero", call.=FALSE)
-
-    if(length(prior.max.alpha)!=q) stop("the vector of prior maximums for alpha is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.alpha)) stop("the vector of prior maximums for alpha is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.alpha))!=0) stop("the vector of prior maximums for alpha has missing values.", call.=FALSE)    
+    if(length(prior.tau2)!=2) stop("the prior value for tau2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.tau2)) stop("the prior value for tau2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.tau2))!=0) stop("the prior value for tau2 has missing values.", call.=FALSE)    
+   
+    if(length(prior.nu2)!=2) stop("the prior value for nu2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.nu2)) stop("the prior value for nu2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.nu2))!=0) stop("the prior value for nu2 has missing values.", call.=FALSE)    
 
 
-#### Specify the proposal sd for alpha
-proposal.sd.alpha <- 0.02 * prior.max.alpha
+#### MCMC quantities
+## Checks
+    if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
+    if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE)    
+    if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
+    if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
+    if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
+
+
+## Matrices to store samples
+n.keep <- floor((n.sample - burnin)/thin)
+samples.beta <- array(NA, c(n.keep, p))
+samples.phi <- array(NA, c(n.keep, n))
+samples.nu2 <- array(NA, c(n.keep, 1))
+samples.tau2 <- array(NA, c(n.keep, 1))
+samples.alpha <- array(NA, c(n.keep, q))
+samples.deviance <- array(NA, c(n.keep, 1))
+
+
+     
+## Metropolis quantities
+accept <- c(0,0)
+proposal.sd.alpha <- 0.02 * alpha.max
+tau2.posterior.shape <- prior.tau2[1] + 0.5*(n-1)
+nu2.posterior.shape <- prior.nu2[1] + 0.5*n
 
 
 #### Checks for the original W matrix
@@ -264,23 +210,72 @@ proposal.sd.alpha <- 0.02 * prior.max.alpha
     if(!sum(names(table(W))==c(0,1))==2) stop("W has non-binary (zero and one) values.", call.=FALSE)
 
 
-#### Specify the precision matrix
-I.n <- diag(1,n)
-Z.combined <- array(0, c(n,n))
+## Ensure the W matrix is symmetric
+Wnew <- array(0, c(n,n))
+     for(i in 1:n)
+     {
+          for(j in 1:n)
+          {
+               if(i>j)
+               {
+               temp <- W[i,j]
+               Wnew[i,j] <- temp
+               Wnew[j,i] <- temp
+               }else{}
+          }
+     }
+W <- Wnew  
+n.neighbours <- apply(W, 2, sum)
+spam.W <- as.spam(W)
+     
+     
+## Create the triplet object
+W.triplet <- c(NA, NA, NA)
+     for(i in 1:n)
+     {
+          for(j in 1:n)
+          {
+               if(W[i,j]==1)
+               {
+               W.triplet <- rbind(W.triplet, c(i,j, NA))     
+               }else{}
+          }
+     }
+W.triplet <- W.triplet[-1, ]     
+n.triplet <- nrow(W.triplet) 
 
-	for(r in 1:q)
-	{
-	Z.combined <- Z.combined + alpha[r] * Z[[r]]
-	}
-	
-W.temp <- array(as.numeric(exp(-Z.combined)>=0.5), c(n,n)) * W
-W.star <- -W.temp
-diag(W.star) <- apply(W.temp, 1, sum)
-Q <- rho * W.star + (1-rho) * I.n
-spam.Q <- as.spam(Q)
-spam.Q.proposal <- spam.Q
-det.Q <- sum(log(diag(chol.spam(spam.Q))))
-indices.Q <- which(as.numeric(Q)!=0)
+     
+## Create the start and finish points for W updating
+W.begfin <- array(NA, c(n, 2))     
+temp <- 1
+     for(i in 1:n)
+     {
+     W.begfin[i, ] <- c(temp, (temp + n.neighbours[i]-1))
+     temp <- temp + n.neighbours[i]
+     }
+     
+     
+## Create the Z triplet form
+Z.triplet <- array(NA, c(n.triplet, q))
+     for(i in 1:n.triplet)
+     {
+     row <- W.triplet[i,1]
+     col <- W.triplet[i,2]
+          for(j in 1:q)
+          {
+          Z.triplet[i,j] <- Z[[j]][row, col]     
+          }     
+     }
+W.triplet[ ,3] <- as.numeric(exp(-Z.triplet %*% alpha)>=0.5)
+spam.W@entries <- W.triplet[ ,3]      
+spam.Wprop <- spam.W     
+W.tripletprop <- W.triplet
+     
+     
+#### Create the matrix form of Q     
+Q <- -rho * spam.W 
+diag(Q) <- rho * rowSums(spam.W) + 1-rho
+det.Q <- sum(log(diag(chol.spam(Q))))     
 
 
 #### Beta update quantities
@@ -300,9 +295,12 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 ###########################
 #### Run the Bayesian model
 ###########################
-	if(fix.rho)
-	{
-		for(j in 1:n.sample)
+## Start timer
+cat("Collecting", n.sample, "samples\n", sep = " ")
+progressBar <- txtProgressBar(style = 3)
+percentage.points<-round((1:100/100)*n.sample)
+
+          for(j in 1:n.sample)
     	     {
 		####################
 		## Sample from beta
@@ -318,90 +316,63 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 		##################
 		## Sample from nu2
 		##################
-		fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-		nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-		nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+          fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
+          nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y - fitted.current)^2)
+          nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
 		
 
 
 		####################
 		## Sample from phi
 		####################
-		Q.temp <- Q / tau2
-		data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
-		data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
-		b <- rnorm(n)
-		
-		     for(r in 1:n.phi.block)
-		     {
-		     ## Create the prior  mean and variance
-		     n.current <- length(phi.beg[r]:phi.fin[r])     
-		     Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
-		     U <- chol(Q.current)
-		     Uinv <- backsolve(U, diag(rep(1,n.current)))
-		     block.mean <- - Uinv %*% (t(Uinv) %*% Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
-		     
-		     ## Create the full conditional
-		     U2 <- chol((Q.current + data.precision.phi[1:n.current, 1:n.current])) 
-		     U2inv <- backsolve(U2, diag(rep(1,n.current)))
-		     fc.mean.phi <- U2inv %*% t(U2inv) %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
-		     
-		     ## Update phi
-		     phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + U2inv %*% b[phi.beg[r]:phi.fin[r]]
-		     }   
-		phi <- phi - mean(phi)
+          offset.phi <- (Y - as.numeric(X.standardised %*% beta) - offset) / nu2    
+          phi <- gaussiandissimilaritycarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, nsites=n, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi)
+          phi <- phi - mean(phi)
 		
     
     
 		##################
 		## Sample from tau2
 		##################
-		tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
-		tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
-		
+          temp2 <- quadformW(Wtriplet=W.triplet, Wbegfin=W.begfin, n_triplet=n.triplet, nsites=n, phi=phi, rho=rho)
+          tau2.posterior.scale <- temp2 + prior.tau2[2] 
+          tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))		
     
  
-		######################
+        	######################
 		#### Sample from alpha
 		######################
-		proposal.alpha <- alpha
-		     for(r in 1:q)
-		     {
-		     proposal.alpha[r] <- rtrunc(n=1, spec="norm", a=0, b=prior.max.alpha[r],  mean=alpha[r], sd=proposal.sd.alpha[r])
-		     }
-		
-		#### Calculate Q.proposal
-		Z.combined.proposal <- array(0, c(n,n))
-		     for(r in 1:q)
-		     {
-		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
-		     }
-		
-		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
-		W.star.proposal <- -W.temp.proposal
-		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
-		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
-		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
-		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
-		
-		#### Calculate the acceptance probability
-		logprob.current <- det.Q - 0.5 * sum(phi * (spam.Q %*% phi)) / tau2
-		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
-		prob <- exp(logprob.proposal - logprob.current)
-		
-		#### Accept or reject the proposed value
-		     if(prob > runif(1))
-		     {
-		     alpha <- proposal.alpha
-		     Q <- proposal.Q
-		     det.Q <- proposal.det.Q 
-		     spam.Q <- spam.Q.proposal
-		     W.star <- W.star.proposal 
-		     accept[1] <- accept[1] + 1   
-		     }else
-		     {
-		     }
-    accept[2] <- accept[2] + 1   
+    	     ## Propose a value
+          proposal.alpha <- alpha
+    	          for(r in 1:q)
+    	          {
+    	          proposal.alpha[r] <- rtrunc(n=1, spec="norm", a=0, b=alpha.max[r],  mean=alpha[r], sd=proposal.sd.alpha[r])
+    	          }
+               
+          ## Create the proposal values for W and Q
+          W.tripletprop[ ,3] <- as.numeric(exp(-Z.triplet %*% proposal.alpha)>=0.5)
+          spam.Wprop@entries <- W.tripletprop[ ,3]     
+          Qprop <- -rho * spam.Wprop 
+          diag(Qprop) <- rho * rowSums(spam.Wprop) + 1-rho
+          det.Qprop <- sum(log(diag(chol.spam(Qprop))))     
+          temp3 <- quadformW(Wtriplet=W.tripletprop, Wbegfin=W.begfin, n_triplet=n.triplet, nsites=n, phi=phi, rho=rho)
+               
+          #### Calculate the acceptance probability
+    	     logprob.current <- det.Q - temp2 / tau2
+    	     logprob.proposal <- det.Qprop - temp3 / tau2
+          prob <- exp(logprob.proposal - logprob.current)
+    	     
+    	     #### Accept or reject the proposed value
+    	          if(prob > runif(1))
+    	          {
+    	          alpha <- proposal.alpha
+    	          det.Q <- det.Qprop 
+               W.triplet[ ,3] <- W.tripletprop[ ,3] 
+               accept[1] <- accept[1] + 1
+    	          }else
+    	          {
+    	          }  
+    	     accept[2] <- accept[2] + 1     
 		
       
              
@@ -431,242 +402,27 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 
     
     
-         	#######################################
-    	     #### Print out the number of iterations
-    	     #######################################
-    	     k <- j/1000
-               if(ceiling(k)==floor(k))
+          ################################       
+          ## print progress to the console
+          ################################
+               if(j %in% percentage.points)
                {
-               cat("Completed ",j, " samples\n")
-               flush.console()
-               }else
-               {
+               setTxtProgressBar(progressBar, j/n.sample)
                }
    		}
-	}else
-	{
-		for(j in 1:n.sample)
-    	     {
-		####################
-		## Sample from beta
-		####################
-		data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
-		U <- chol((prior.precision.beta + data.precision.beta / nu2))
-		Uinv <- backsolve(U, diag(rep(1,p)))
-		fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
-		beta <- fc.mean.beta + Uinv %*% rnorm(p)
-		     
 
 
-		##################
-		## Sample from nu2
-		##################
-		fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-		nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-		nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
-		
-
-
-		####################
-		## Sample from phi
-		####################
-		Q.temp <- Q / tau2
-		data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
-		data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
-		b <- rnorm(n)
-		
-		     for(r in 1:n.phi.block)
-		     {
-		     ## Create the prior  mean and variance
-		     n.current <- length(phi.beg[r]:phi.fin[r])     
-		     Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
-		     U <- chol(Q.current)
-		     Uinv <- backsolve(U, diag(rep(1,n.current)))
-		     block.mean <- - Uinv %*% (t(Uinv) %*% Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
-		     
-		     ## Create the full conditional
-		     U2 <- chol((Q.current + data.precision.phi[1:n.current, 1:n.current])) 
-		     U2inv <- backsolve(U2, diag(rep(1,n.current)))
-		     fc.mean.phi <- U2inv %*% t(U2inv) %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
-		     
-		     ## Update phi
-		     phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + U2inv %*% b[phi.beg[r]:phi.fin[r]]
-		     }   
-		phi <- phi - mean(phi)
-		
-    
-
-		##################
-		## Sample from tau2
-		##################
-		tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
-		tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
-		
-    
- 
-		##################
-		## Sample from rho
-		##################
-		#### Propose a value
-		proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1,  mean=rho, sd=proposal.sd.rho)    
-		
-		#### Calculate the acceptance probability
-		proposal.Q <- proposal.rho * W.star + (1-proposal.rho) * I.n
-		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
-		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
-		logprob.current <- det.Q - tau2.posterior.scale / tau2
-		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
-		prob <- exp(logprob.proposal - logprob.current)
-		
-		#### Accept or reject the proposal
-		     if(prob > runif(1))
-		     {
-		     rho <- proposal.rho
-		     Q <- proposal.Q
-		     spam.Q <- spam.Q.proposal
-		     det.Q <- proposal.det.Q
-		     accept[3] <- accept[3] + 1   
-		     }else
-		     {
-		     }
-		accept[4] <- accept[4] + 1   
-		
-
-   
-		######################
-		#### Sample from alpha
-		######################
-		proposal.alpha <- alpha
-		     for(r in 1:q)
-		     {
-		     proposal.alpha[r] <- rtrunc(n=1, spec="norm", a=0, b=prior.max.alpha[r],  mean=alpha[r], sd=proposal.sd.alpha[r])
-		     }
-		
-		#### Calculate Q.proposal
-		Z.combined.proposal <- array(0, c(n,n))
-		     for(r in 1:q)
-		     {
-		     Z.combined.proposal <- Z.combined.proposal + proposal.alpha[r] * Z[[r]]
-		     }
-		
-		W.temp.proposal <- array(as.numeric(exp(-Z.combined.proposal)>=0.5), c(n,n)) * W
-		W.star.proposal <- -W.temp.proposal
-		diag(W.star.proposal) <- apply(W.temp.proposal, 1, sum)
-		proposal.Q <- rho * W.star.proposal + (1 - rho) * I.n
-		spam.Q.proposal@entries <- as.numeric(proposal.Q)[indices.Q]   
-		proposal.det.Q <- sum(log(diag(chol.spam(spam.Q.proposal))))
-		
-		#### Calculate the acceptance probability
-		logprob.current <- det.Q - 0.5 * sum(phi * (spam.Q %*% phi)) / tau2
-		logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (spam.Q.proposal %*% phi)) / tau2
-		prob <- exp(logprob.proposal - logprob.current)
-		
-		#### Accept or reject the proposed value
-		     if(prob > runif(1))
-		     {
-		     alpha <- proposal.alpha
-		     Q <- proposal.Q
-		     det.Q <- proposal.det.Q 
-		     spam.Q <- spam.Q.proposal
-		     W.star <- W.star.proposal 
-		     accept[1] <- accept[1] + 1   
-		     }else
-		     {
-		     }
-		accept[2] <- accept[2] + 1   
-		
-		
-             
-
-    	     #########################
-    	     ## Calculate the deviance
-    	     #########################
-    	     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-    	     deviance <- -2 * sum(dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log = TRUE))
-
-
-
-    	     ###################
-    	     ## Save the results
-    	     ###################
-               if(j > burnin & (j-burnin)%%thin==0)
-               {
-               ele <- (j - burnin) / thin
-               samples.beta[ele, ] <- beta
-               samples.phi[ele, ] <- phi
-               samples.nu2[ele, ] <- nu2
-               samples.tau2[ele, ] <- tau2
-               samples.rho[ele, ] <- rho
-               samples.alpha[ele, ] <- alpha
-               samples.deviance[ele, ] <- deviance
-               }else
-               {
-               }
-
-    
-               
-     #######################################
-     #### Update the acceptance rate for rho
-     #######################################
-      k <- j/100
-          if(ceiling(k)==floor(k))
-          {
-          #### Determine the acceptance probabilities
-          accept.rho <- 100 * accept[3] / accept[4]
-          accept.all <- accept.all + accept
-          accept <- c(0,0,0,0)
-                    
-               #### rho tuning parameter
-               if(accept.rho > 70)
-               {
-               proposal.sd.rho <- min(2 * proposal.sd.rho, 10)
-               }else if(accept.rho < 50)              
-               {
-               proposal.sd.rho <- 0.5 * proposal.sd.rho
-               }else
-               {
-               }
-          }else
-          {   
-          }
-
-               
-               
-    	     #######################################
-    	     #### Print out the number of iterations
-    	     #######################################
-    	     k <- j/1000
-               if(ceiling(k)==floor(k))
-               {
-               cat("Completed ",j, " samples\n")
-               flush.console()
-               }else
-               {
-               }
-   		}
-	}	
-		
-	
-
-
-
+# end timer
+cat("\nSummarising results")
+close(progressBar)
 ###################################
 #### Summarise and save the results 
 ###################################
 ## Acceptance rates
-     if(fix.rho)
-     {
-     accept.alpha <- 100 * accept[1] / accept[2]
-     accept.final <- c(100, 100, 100, 100, accept.alpha)
-     names(accept.final) <- c("beta", "phi", "nu2", "tau2", "alpha")
-     }else
-     {
-     accept.alpha <- 100 * accept.all[1] / accept.all[2]
-     accept.rho <- 100 * accept.all[3] / accept.all[4] 
-     accept.final <- c(100, 100, 100, 100, accept.alpha, accept.rho)
-     names(accept.final) <- c("beta", "phi", "nu2", "tau2", "alpha", "rho")
-     }
-
+accept.alpha <- 100 * accept[1] / accept[2]
+accept.final <- c(100, 100, 100, 100, accept.alpha)
+names(accept.final) <- c("beta", "phi", "nu2", "tau2", "alpha")
+ 
         
      
 ## Deviance information criterion (DIC)
@@ -679,7 +435,16 @@ p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
 
 
-
+#### Compute the Conditional Predictive Ordinate
+CPO.temp <- array(NA, c(nrow(samples.phi), n))
+    for(i in 1:nrow(samples.phi))
+    {
+    temp.fitted <- samples.phi[i, ] + X.standardised %*% samples.beta[i, ] + offset
+    CPO.temp[i, ] <- 1 / dnorm(x=Y, mean=temp.fitted, sd=sqrt(samples.nu2[i,1]))
+    }
+CPO <- 1/apply(CPO.temp, 2, mean)
+MPL <- sum(log(CPO)) 
+     
 
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
@@ -737,40 +502,20 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	}
 
 
-	if(fix.rho)
-	{
-	summary.hyper <- array(NA, c(2 ,5))
-	summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
-	summary.hyper[1, 4:5] <- c(n.keep, 100)
-	summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-	summary.hyper[2, 4:5] <- c(n.keep, 100)
 
-	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
-	alpha.min <- c(rep(NA, (p+2)), alpha.threshold)
-	summary.results <- cbind(summary.results, alpha.min)
-	rownames(summary.results)[(p+1):(p+2)] <- c("nu2", "tau2")
-	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-	summary.results[ , 6] <- round(summary.results[ , 6], 4)
-	}else
-	{
-  accept.rho <- 100 * accept.all[3] / accept.all[4]  
-	summary.hyper <- array(NA, c(3 ,5))
-	summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
-	summary.hyper[1, 4:5] <- c(n.keep, 100)
-	summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-	summary.hyper[2, 4:5] <- c(n.keep, 100)
-	summary.hyper[3, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-	summary.hyper[3, 4:5] <- c(n.keep, accept.rho)
+summary.hyper <- array(NA, c(2 ,5))
+summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
+summary.hyper[1, 4:5] <- c(n.keep, 100)
+summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper[2, 4:5] <- c(n.keep, 100)
 
-	summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
-	alpha.min <- c(rep(NA, (p+3)), alpha.threshold)
-	summary.results <- cbind(summary.results, alpha.min)
-	rownames(summary.results)[(p+1):(p+3)] <- c("nu2", "tau2", "rho")
-	summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-	summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-	summary.results[ , 6] <- round(summary.results[ , 6], 4)
-	}
+summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
+alpha.min <- c(rep(NA, (p+2)), alpha.threshold)
+summary.results <- cbind(summary.results, alpha.min)
+rownames(summary.results)[(p+1):(p+2)] <- c("nu2", "tau2")
+summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
+summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+summary.results[ , 6] <- round(summary.results[ , 6], 4)
 
 
 
@@ -840,20 +585,11 @@ W.border.prob <- array(NA, c(n,n))
 
 ## Compile and return the results
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     
-
-     
-	if(fix.rho)
-	{
-     samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha))
-     W.summary <- list(W.posterior=W.posterior, W.border.prob=W.border.prob)
-	results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W.summary, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
-	}else
-	{
-     samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), rho=mcmc(samples.rho))
-     W.summary <- list(W.posterior=W.posterior, W.border.prob=W.border.prob)
-	results <- list(formula=formula, samples=samples,  fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W.summary,  DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)	
-	}
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha))
+W.summary <- list(W.posterior=W.posterior, W.border.prob=W.border.prob)
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W.summary, DIC=DIC, p.d=p.d,  MPL=MPL, summary.results=summary.results, model=model.string, accept=accept.final)
 class(results) <- "carbayes"
-     
+b<-proc.time()
+cat(" finished in ", round(b[3]-a[3], 1), "seconds")   
 return(results)
 }

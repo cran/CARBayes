@@ -10,11 +10,9 @@ Fit an independent random effects model to spatial Gaussian data
 The function fits a Gaussian random effects models to spatial data, where the random effects are modelled as independent. The model represents the mean function for the set of Gaussian responses  by a combination of covariates and a set of independent random effects. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
-\usage{
-gaussian.independent(formula, data = NULL, beta = NULL, theta = NULL, nu2 = NULL, 
-sigma2 = NULL,  burnin = 0, n.sample = 1000, thin=1, prior.mean.beta = NULL,  
-prior.var.beta = NULL, prior.max.nu2 = NULL, 
-prior.max.sigma2 = NULL)
+\usage{gaussian.independent(formula, data=NULL, beta=NULL, theta=NULL, nu2=NULL,
+sigma2=NULL, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL,
+prior.var.beta=NULL, prior.nu2=NULL, prior.sigma2=NULL)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -52,11 +50,11 @@ A vector of prior means for the regression parameters beta (Gaussian priors are 
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
-  \item{prior.max.nu2}{
-The maximum allowable value for the Gaussian data variance nu2 (a Uniform(0,M) prior is assumed). Defaults to M=1000.
+  \item{prior.nu2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for nu2. Defaults to c(0.001, 0.001).  
 }
-  \item{prior.max.sigma2}{
-The maximum allowable value for the random effects variance sigma2 (a Uniform(0,M) prior is assumed). Defaults to M=1000.
+  \item{prior.sigma2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for sigma2. Defaults to c(0.001, 0.001).  
 }
 }
 
@@ -74,6 +72,7 @@ For further details about how to apply the function see the examples below and i
 \item{W.summary }{Null.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
+\item{MPL }{The Marginal Predictive Likelihood of the model.}
 \item{summary.results }{A summary table of the parameters.}
 \item{model }{A text string describing the model fit.}
 \item{accept }{The acceptance probabilities for the parameters.}

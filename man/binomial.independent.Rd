@@ -12,10 +12,9 @@ The function fits a binomial logistic random effects models to spatial data, whe
 
 
 \usage{
-binomial.independent(formula, data = NULL, beta = NULL, theta = NULL, sigma2 = NULL, 
-trials, burnin = 0, n.sample = 1000, thin=1, blocksize.beta = 5, 
-blocksize.theta = 10, prior.mean.beta = NULL, prior.var.beta = NULL, 
-prior.max.sigma2 = NULL)
+binomial.independent(formula, data=NULL, beta=NULL, theta=NULL, sigma2=NULL, 
+trials, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, 
+prior.var.beta=NULL, prior.sigma2=NULL)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -49,17 +48,14 @@ The level of thinning to apply to the MCMC samples to reduce their temporal auto
   \item{blocksize.beta}{
 The size of the blocks in which to update the regression parameters in the MCMC algorithm. Defaults to 5.
 }
-  \item{blocksize.theta}{
-The size of the blocks in which to update the random effects in the MCMC algorithm. Defaults to 10.
-}
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
-  \item{prior.max.sigma2}{
-The maximum allowable value for the random effects variance sigma2 (a Uniform(0,M) prior is assumed). Defaults to M=1000.
+  \item{prior.sigma2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for sigma2. Defaults to c(0.001, 0.001).  
 }
 }
 
@@ -77,6 +73,7 @@ For further details about how to apply the function see the examples below and i
 \item{W.summary }{NULL.}
 \item{DIC }{The Deviance Information Criterion.}
 \item{p.d }{The effective number of parameters in the model.}
+\item{MPL }{The Marginal Predictive Likelihood of the model.}
 \item{summary.results }{A summary table of the parameters.}
 \item{model }{A text string describing the model fit.}
 \item{accept }{The acceptance probabilities for the parameters.}
