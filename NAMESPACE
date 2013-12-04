@@ -1,5 +1,6 @@
+useDynLib(CARBayes)
 export(
-	poisson.independent, 
+     poisson.independent, 
 	poisson.iarCAR, 
 	poisson.lerouxCAR, 
 	poisson.properCAR, 
@@ -21,8 +22,8 @@ export(
 	highlight.borders,
 	print.carbayes
 )
-
 import(MASS)
+import(Rcpp)
 importFrom(truncdist, rtrunc)
-importFrom(spam, as.spam,  chol.spam, diag)
+importFrom(spam, as.spam,  chol.spam, diag, rowSums)
 importFrom(coda, mcmc)

@@ -7,6 +7,7 @@
 Spatial areal unit modelling
 }
 
+
 \description{
 This package implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as a recently developed localised spatial smoothing model. In addition, the package includes functions to enable plotting spatial maps of data (by combining the data with an appropriate shapefile) using the functionality of the sp package.
 
@@ -17,10 +18,11 @@ The creation of this package was supported by the Economic and Social Research C
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 1.6\cr
-Date: \tab 2013-11-04\cr
+Version: \tab 2.0\cr
+Date: \tab 2013-12-03\cr
 License: \tab GPL (>= 2)\cr
 }
+
 
 The package implements Bayesian hierarchical models for spatial areal unit data. The models are an extension of generalised linear models, and the response variable can be binomial, Gaussian or Poisson. The mean function for the data comprises a covariate component and a set of random effects. This package implements a number of different random effects models, which represent different types of spatial correlation structure. These models are within the conditional autoregressive (CAR) class, and capture spatial correlation via a neighbourhood matrix W. This matrix typically (although other options are allowed) has a jkth element equal to one and zero, depending on whether areas j and k are spatially close (typically chosen to mean sharing a common border). Inference for all models is via Markov Chain Monte Carlo (MCMC) simulation. The following random effects models are implemented in this package.
 
@@ -36,7 +38,12 @@ Spatially correlated random effects modelled by the proper CAR model proposed by
 
 Spatially correlated random effects modelled by the localised spatial smoothing approach proposed by Lee and Mitchell (2012).
 
-More detailed descriptions of the methods are given by the references below.
+More detailed descriptions of the methods are given by the references below. The following changes have been made for version 2.
+
+(i) - The MCMC code has been re-engineered using Rcpp, and is hence upto 20 times faster than in the previous version.
+(ii) - a second model comparison metric in addition to the Deviance Information Criterion (DIC), the Marginal Predictive Likelihood (MPL) is now computed.
+(iii) - Inverse-Gamma(a,b) priors are now used for variance parameters rather than uniform(0,b) priors.
+(iv) - Discrete rather than continuous uniform priors are now specified for the spatial dependence parameter rho in the Leroux and proper models.
 }
 
 
@@ -47,6 +54,8 @@ Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
 
 \references{
 Besag, J., J. York, and A. Mollie (1991). Bayesian image restoration with two applications in spatial statistics. Annals of the Institute of Statistics and Mathematics 43, 1-59.
+
+Eddelbuettel, D and Francois, R (2011). Rcpp: seamless R and C++ Integration. Journal of Statistical Software, 40, 1-18. 
 
 Stern, H and Cressie, N. (1999). Inference for extremes in disease mapping, Chapter
 Disease mapping and Risk Assessment for Public Health. Lawson, A and Biggeri, D
@@ -135,7 +144,7 @@ formula <- "observed2010 ~ offset(log(expected2010))"
 
 \dontrun{
 model.dissimilarity <- poisson.dissimilarityCAR(formula=formula, data=respdata, 
-W=W.mat,  Z=list(Z.incomedep=Z.incomedep), rho=0.99, fix.rho=TRUE, 
+W=W.mat,  Z=list(Z.incomedep=Z.incomedep), rho=0.99,
 burnin=20000, n.sample=100000, thin=10)
 
 #### Plot a map with the boundaries overlayed

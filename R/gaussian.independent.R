@@ -1,6 +1,8 @@
 gaussian.independent <-
-function(formula, data=NULL, beta=NULL, theta=NULL, nu2=NULL, sigma2=NULL, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.sigma2=NULL)
+function(formula, data=NULL, beta=NULL, theta=NULL, nu2=NULL, sigma2=NULL, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.sigma2=NULL)
 {
+cat("Setting up the model\n")
+a<-proc.time()
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
@@ -106,6 +108,33 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(sigma2 <= 0) stop("sigma2 is negative or zero.", call.=FALSE)
 
 
+#### Priors
+## Put in default priors
+    if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.nu2)) prior.nu2 <- c(0.001, 0.001)
+    if(is.null(prior.sigma2)) prior.sigma2 <- c(0.001, 0.001)       
+    
+    
+## Checks    
+    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
+ 
+    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
+    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
+
+    if(length(prior.nu2)!=2) stop("the prior value for nu2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.nu2)) stop("the prior value for nu2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.nu2))!=0) stop("the prior value for nu2 has missing values.", call.=FALSE)    
+
+    if(length(prior.sigma2)!=2) stop("the prior value for sigma2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.sigma2)) stop("the prior value for sigma2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.sigma2))!=0) stop("the prior value for sigma2 has missing values.", call.=FALSE)    
+
+     
 #### MCMC quantities
 ## Checks
     if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
@@ -126,40 +155,10 @@ samples.sigma2 <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
 
 ## Metropolis quantities
-nu2.posterior.shape <- 0.5*n-1
-sigma2.posterior.shape <- 0.5*n-1
+nu2.posterior.shape <- prior.nu2[1] + 0.5*n
+sigma2.posterior.shape <- prior.sigma2[1] + 0.5*n
 
-#### Priors
-## Put in default priors
-## N(0, 100) for beta 
-## U(0, 10) for sigma2
-    if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    if(is.null(prior.max.sigma2)) prior.max.sigma2 <- 1000
-    if(is.null(prior.max.nu2)) prior.max.nu2 <- 1000
-    
-    
-## Checks    
-    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
- 
-    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
-    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
-
-    if(length(prior.max.sigma2)!=1) stop("the maximum prior value for sigma2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.sigma2)) stop("the maximum prior value for sigma2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.sigma2))!=0) stop("the maximum prior value for sigma2 has missing values.", call.=FALSE)    
-    if(min(prior.max.sigma2) <=0) stop("the maximum prior value for sigma2 is less than zero", call.=FALSE)
-
-    if(length(prior.max.nu2)!=1) stop("the maximum prior value for nu2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.nu2)) stop("the maximum prior value for nu2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.nu2))!=0) stop("the maximum prior value for nu2 has missing values.", call.=FALSE)    
-    if(min(prior.max.nu2) <=0) stop("the maximum prior value for nu2 is less than zero", call.=FALSE)
-
-
+     
 #### Beta update quantities
 data.precision.beta <- t(X.standardised) %*% X.standardised
 data.var.beta <- solve(data.precision.beta)
@@ -176,6 +175,11 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 ###########################
 #### Run the Bayesian model
 ###########################
+## Start timer
+cat("Collecting", n.sample, "samples\n", sep = " ")
+progressBar <- txtProgressBar(style = 3)
+percentage.points<-round((1:100/100)*n.sample)
+     
     for(j in 1:n.sample)
     {
     ####################
@@ -193,9 +197,9 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ## Sample from nu2
     ##################
     fitted.current <-  as.numeric(X.standardised %*% beta) + theta + offset
-    nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
-    
+    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y - fitted.current)^2)
+    nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))
+   
 
 
     ####################
@@ -212,8 +216,8 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ####################
     ## Sample from sigma2
     ####################
-    sigma2.posterior.scale <- 0.5*sum(theta^2)
-    sigma2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.sigma2), b=Inf,  shape=sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
+    sigma2.posterior.scale <- prior.sigma2[2] + 0.5*sum(theta^2)
+    sigma2 <- 1 / rgamma(1, sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
     
     
             
@@ -242,27 +246,27 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 
     
     
-    #######################################
-    #### Print out the number of iterations
-    #######################################
-    k <- j/1000
-        if(ceiling(k)==floor(k))
-        {
-        cat("Completed ",j, " samples\n")
-        flush.console()
-        }else
-        {
-        }
-}
+    ################################       
+    ## print progress to the console
+    ################################
+          if(j %in% percentage.points)
+          {
+          setTxtProgressBar(progressBar, j/n.sample)
+          }
+     }
 
+# end timer
+cat("\nSummarising results")
+close(progressBar)
 
-accept.final <- rep(100, 4)
-names(accept.final) <- c("beta", "theta", "nu2", "sigma")
-     
-     
 ###################################
 #### Summarise and save the results 
 ###################################
+## Compute the acceptance rates
+accept.final <- rep(100, 4)
+names(accept.final) <- c("beta", "theta", "nu2", "sigma")
+
+     
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.theta <- apply(samples.theta, 2, median)
@@ -273,7 +277,17 @@ p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
 
 
-
+#### Compute the Conditional Predictive Ordinate
+CPO.temp <- array(NA, c(nrow(samples.theta), n))
+    for(i in 1:nrow(samples.theta))
+    {
+    temp.fitted <- samples.theta[i, ] + X.standardised %*% samples.beta[i, ] + offset
+    CPO.temp[i, ] <- 1 / dnorm(x=Y, mean=temp.fitted, sd=sqrt(samples.nu2[i,1]))
+    }
+CPO <- 1/apply(CPO.temp, 2, mean)
+MPL <- sum(log(CPO)) 
+     
+     
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
 number.cts <- sum(X.indicator==1)     
@@ -363,8 +377,10 @@ residuals <- round(residuals, 4)
 ## Compile and return the results
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Independent\n")     
 samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), nu2=mcmc(samples.nu2))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=NULL, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=NULL, DIC=DIC, p.d=p.d, MPL=MPL, summary.results=summary.results, model=model.string, accept=accept.final)
 class(results) <- "carbayes"
+b<-proc.time()
+cat(" finished in ", round(b[3]-a[3], 1), "seconds")
 return(results)
 }
 

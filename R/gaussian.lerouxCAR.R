@@ -1,5 +1,7 @@
-gaussian.lerouxCAR <- function(formula, data=NULL, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, rho=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.phi=10, prior.mean.beta=NULL, prior.var.beta=NULL, prior.max.nu2=NULL, prior.max.tau2=NULL)
+gaussian.lerouxCAR <- function(formula, data=NULL, beta=NULL, phi=NULL, nu2=NULL, tau2=NULL, rho=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.rho=NULL)
 {
+cat("Setting up the model\n")
+a<-proc.time()
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
@@ -105,14 +107,45 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)
 
 ## Global correlation parameter rho
-    if(is.null(rho)) rho <- runif(1)
+    if(is.null(prior.rho)) prior.rho <- seq(0, 0.99, 0.01)
+    if(min(prior.rho) < 0 | max(prior.rho) >=1) stop("prior.rho is outside the interval [0,1).", call.=FALSE)
+    if(sum(duplicated(prior.rho))>0) stop("prior.rho has duplicate values.", call.=FALSE)     
+    if(is.null(rho)) rho <- sample(prior.rho, size=1)
+    if(sum(rho==prior.rho)!= 1) stop("rho is not one of the possible values.", call.=FALSE)
     if(length(rho)!= 1) stop("rho is the wrong length.", call.=FALSE)
     if(sum(is.na(rho))>0) stop("rho has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(rho)) stop("rho has non-numeric values.", call.=FALSE)
     if(rho < 0 | rho >=1) stop("rho is outside the interval [0,1).", call.=FALSE)
+which.rho <- which(rho==prior.rho)    
     
     
+#### Priors
+## Put in default priors
+    if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.tau2)) prior.tau2 <- c(0.001, 0.001)
+    if(is.null(prior.nu2)) prior.nu2 <- c(0.001, 0.001)
 
+    
+## Checks    
+    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
+ 
+    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
+    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
+
+    if(length(prior.tau2)!=2) stop("the prior value for tau2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.tau2)) stop("the prior value for tau2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.tau2))!=0) stop("the prior value for tau2 has missing values.", call.=FALSE)    
+
+    if(length(prior.nu2)!=2) stop("the prior value for nu2 is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.nu2)) stop("the prior value for nu2 is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.nu2))!=0) stop("the prior value for nu2 has missing values.", call.=FALSE)    
+
+     
 #### MCMC quantities
 ## Checks
     if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
@@ -122,41 +155,6 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
     if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
     if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
-
-    if(!is.numeric(blocksize.phi)) stop("blocksize.phi is not a number", call.=FALSE)
-    if(blocksize.phi <= 0) stop("blocksize.phi is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.phi)==ceiling(blocksize.phi))) stop("blocksize.phi has non-integer values.", call.=FALSE)
-
-
-## Compute the blocking structure for phi
-     if(blocksize.phi >= n)
-     {
-     n.phi.block <- 1
-     phi.beg <- 1
-     phi.fin <- n  
-     }else
-     {
-     n.standard <- 1 + floor((n-blocksize.phi) / blocksize.phi)
-     remainder <- n - (n.standard * blocksize.phi)
-     
-          if(remainder==0)
-          {
-          phi.beg <- c(1,seq((blocksize.phi+1), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi))
-          n.phi.block <- length(phi.beg)
-          }else if(remainder==1)
-          {
-          phi.beg <- c(1, seq((blocksize.phi), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi-1, seq((blocksize.phi+blocksize.phi-1), n, blocksize.phi), n)
-          n.phi.block <- length(phi.beg)    
-          }else
-          {
-          phi.beg <- c(1, seq((blocksize.phi+1), n, blocksize.phi))
-          phi.fin <- c(blocksize.phi, seq((blocksize.phi+blocksize.phi), n, blocksize.phi), n)
-          n.phi.block <- length(phi.beg)
-          }
-     }
-
 
 ## Matrices to store samples
 n.keep <- floor((n.sample - burnin)/thin)
@@ -170,41 +168,10 @@ samples.deviance <- array(NA, c(n.keep, 1))
 ## Metropolis quantities
 accept <- rep(0,2)
 accept.all <- accept
-proposal.sd.rho <- 0.02
-nu2.posterior.shape <- 0.5*n-1
-tau2.posterior.shape <- 0.5*n-1
-
-
-#### Priors
-## Put in default priors
-## N(0, 100) for beta 
-## U(0, 10) for tau2
-    if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    if(is.null(prior.max.tau2)) prior.max.tau2 <- 1000
-    if(is.null(prior.max.nu2)) prior.max.nu2 <- 1000
-
-    
-## Checks    
-    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
- 
-    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
-    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
-
-    if(length(prior.max.tau2)!=1) stop("the maximum prior value for tau2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.tau2)) stop("the maximum prior value for tau2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.tau2))!=0) stop("the maximum prior value for tau2 has missing values.", call.=FALSE)    
-    if(min(prior.max.tau2) <=0) stop("the maximum prior value for tau2 is less than zero", call.=FALSE)
-
-    if(length(prior.max.nu2)!=1) stop("the maximum prior value for nu2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.max.nu2)) stop("the maximum prior value for nu2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.max.nu2))!=0) stop("the maximum prior value for nu2 has missing values.", call.=FALSE)    
-    if(min(prior.max.nu2) <=0) stop("the maximum prior value for nu2 is less than zero", call.=FALSE)
-
+tau2.posterior.shape <- prior.tau2[1] + 0.5*n
+nu2.posterior.shape <- prior.nu2[1] + 0.5*n
+rho.step <- 5  
+     
 
 #### CAR quantities
     if(!is.matrix(W)) stop("W is not a matrix.", call.=FALSE)
@@ -216,25 +183,28 @@ tau2.posterior.shape <- 0.5*n-1
     if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
 
 
-## Create the precision matrix Q
+### Create the duplet form
 n.neighbours <- as.numeric(apply(W, 1, sum))
-Wstar <- diag(n.neighbours) - W
-Wstar.eigen <- eigen(Wstar)
-Wstar.val <- diag(Wstar.eigen$values)
-Wstar.vec <- Wstar.eigen$vectors
-Q <- rho * Wstar + (1-rho) * diag(rep(1,n))
-det.Q <- 0.5 * sum(log((rho * diag(Wstar.val) + (1-rho))))
-
-
-## Calculate eigen decomposition for blocks of Wstar               
-Wstar.list.vectors <- as.list(rep(0,n.phi.block))
-Wstar.list.values <- as.list(rep(0,n.phi.block))
-
-     for(i in 1:n.phi.block)
+W.duplet <- c(NA, NA)
+     for(i in 1:n)
      {
-     temp <- eigen(Wstar[phi.beg[i]:phi.fin[i], phi.beg[i]:phi.fin[i]])     
-     Wstar.list.vectors[[i]] <- temp$vectors
-     Wstar.list.values[[i]] <- temp$values
+          for(j in 1:n)
+          {
+               if(W[i,j]==1)
+               {
+               W.duplet <- rbind(W.duplet, c(i,j))     
+               }else{}
+          }
+     }
+W.duplet <- W.duplet[-1, ]     
+n.duplet <- nrow(W.duplet) 
+
+
+## Create the list object
+Wlist <- as.list(rep(NA,n))     
+     for(i in 1:n)
+     {
+     Wlist[[i]] <- which(W[i, ]==1)     
      }
 
 
@@ -251,10 +221,27 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 	}
 
 
+## Create the set of determinants     
+Wstar <- diag(n.neighbours) - W
+Wstar.eigen <- eigen(Wstar)
+Wstar.val <- Wstar.eigen$values
+n.rho <- length(prior.rho)
+det.Q <- rep(NA, n.rho)
+     for(i in 1:n.rho)
+     {
+     det.Q[i] <-  0.5 * sum(log((prior.rho[i] * Wstar.val + (1-prior.rho[i]))))    
+     }
 
+     
+     
 ###########################
 #### Run the Bayesian model
 ###########################
+## Start timer
+cat("Collecting", n.sample, "samples\n", sep = " ")
+progressBar <- txtProgressBar(style = 3)
+percentage.points<-round((1:100/100)*n.sample)
+     
     for(j in 1:n.sample)
     {
     ####################
@@ -272,37 +259,15 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ## Sample from nu2
     ##################
     fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-    nu2.posterior.scale <- 0.5 * sum((Y - fitted.current)^2)
-    nu2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.nu2), b=Inf,  shape=nu2.posterior.shape, scale=(1/nu2.posterior.scale))
-    
+    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y - fitted.current)^2)
+    nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
 
 
     ####################
     ## Sample from phi
     ####################
-    Q.temp <- Q / tau2
-    data.mean.phi <- Y - as.numeric(X.standardised %*% beta) - offset    
-    data.precision.phi <- diag(rep((1/nu2), blocksize.phi))
-    b <- rnorm(n)
-    
-          for(r in 1:n.phi.block)
-          {
-          ## Create the prior  mean and variance
-          n.current <- length(phi.beg[r]:phi.fin[r])
-          Q.current <- Q.temp[phi.beg[r]:phi.fin[r], phi.beg[r]:phi.fin[r]]
-          lambda <- rho *  Wstar.list.values[[r]] + (1-rho)  
-          block.var <- tau2 * Wstar.list.vectors[[r]]  %*% diag(1/lambda) %*% t(Wstar.list.vectors[[r]])
-          block.mean <- - block.var %*% (Q.temp[phi.beg[r]:phi.fin[r], -(phi.beg[r]:phi.fin[r])] %*% phi[-(phi.beg[r]:phi.fin[r])])
- 
-          ## Create the full conditional
-          lambda <- (rho/tau2) *  Wstar.list.values[[r]] + ((1-rho)/tau2) + (1/nu2) 
-          fc.variance.phi <- Wstar.list.vectors[[r]]  %*% diag(1/lambda) %*% t(Wstar.list.vectors[[r]])
-          fc.mean.phi <- fc.variance.phi %*% (Q.current %*% block.mean + data.precision.phi[1:n.current, 1:n.current] %*% data.mean.phi[phi.beg[r]:phi.fin[r]])
-        
-          ## Update phi
-          phi[phi.beg[r]:phi.fin[r]] <- fc.mean.phi + t(chol(fc.variance.phi)) %*% b[phi.beg[r]:phi.fin[r]]
-		}
-                
+    offset.phi <- (Y - as.numeric(X.standardised %*% beta) - offset) / nu2    
+    phi <- gaussiancarupdate(W_list=Wlist, nsites=n, phi=phi, nneighbours=n.neighbours, tau2=tau2, rho_num=rho, rho_den=rho, nu2=nu2, offset=offset.phi)
     phi <- phi - mean(phi)
     
     
@@ -310,36 +275,33 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ##################
     ## Sample from tau2
     ##################
-    tau2.posterior.scale <- 0.5 * sum(phi * (Q %*% phi))
-    tau2 <- 1/rtrunc(n=1, spec="gamma", a=(1/prior.max.tau2), b=Inf,  shape=tau2.posterior.shape, scale=(1/tau2.posterior.scale))
+    temp2 <- quadform(W_duplet1=W.duplet[ ,1], W_duplet2=W.duplet[ ,2], n_duplet=n.duplet,  nsites=n, phi=phi, nneighbours=n.neighbours, diagonal=rho, offdiagonal=rho)      
+    tau2.posterior.scale <- temp2 + prior.tau2[2] 
+    tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
     
     
     
     ##################
     ## Sample from rho
     ##################
-    #### Propose a value
-    proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1,  mean=rho, sd=proposal.sd.rho)    
+     which.proposal.rho <- sample(setdiff(max(1, which.rho-rho.step):min(which.rho+rho.step, n.rho), which.rho), size=1)    
+     proposal.rho <- prior.rho[which.proposal.rho]
+     temp3 <- quadform(W_duplet1=W.duplet[ ,1], W_duplet2=W.duplet[ ,2], n_duplet=n.duplet,  nsites=n, phi=phi, nneighbours=n.neighbours, diagonal=proposal.rho, offdiagonal=proposal.rho)      
+     logprob.current <- det.Q[which.rho] - temp2 / tau2
+     logprob.proposal <- det.Q[which.proposal.rho] - temp3 / tau2
+     prob <- exp(logprob.proposal - logprob.current)
     
-    #### Calculate the acceptance probability
-    proposal.Q <- -proposal.rho * W 
-    diag(proposal.Q) <- n.neighbours * proposal.rho + 1 - proposal.rho
-    proposal.det.Q <- 0.5 * sum(log((proposal.rho * diag(Wstar.val) + (1-proposal.rho))))
-    logprob.current <- det.Q - tau2.posterior.scale / tau2
-    logprob.proposal <- proposal.det.Q - 0.5 * sum(phi * (proposal.Q %*% phi)) / tau2
-    prob <- exp(logprob.proposal - logprob.current)
-    
-    #### Accept or reject the proposal
-          if(prob > runif(1))
-          {
-          rho <- proposal.rho
-          Q <- proposal.Q
-          det.Q <- proposal.det.Q    
-          accept[1] <- accept[1] + 1
-          }else
-          {
-          }              
-    accept[2] <- accept[2] + 1
+     #### Accept or reject the proposal
+         if(prob > runif(1))
+         {
+         rho <- proposal.rho
+         which.rho <- which.proposal.rho
+         accept[1] <- accept[1] + 1           
+         }else
+         {
+         }              
+     accept[2] <- accept[2] + 1           
+
 
     
    
@@ -380,13 +342,13 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
           accept.all <- accept.all + accept
           accept <- c(0,0)
                     
-               #### rho tuning parameter
+           #### rho tuning parameter
                if(accept.rho > 70)
                {
-               proposal.sd.rho <- min(2 * proposal.sd.rho, 10)
+               rho.step <- min(rho.step+1, round(n.rho/4))
                }else if(accept.rho < 50)              
                {
-               proposal.sd.rho <- 0.5 * proposal.sd.rho
+               proposal.sd.rho <- max(rho.step-1, 1)
                }else
                {
                }
@@ -395,21 +357,19 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
           }
 
          
-    #######################################
-    #### Print out the number of iterations
-    #######################################
-    k <- j/1000
-        if(ceiling(k)==floor(k))
-        {
-        cat("Completed ",j, " samples\n")
-        flush.console()
-        }else
-        {
-        }
-}
+    ################################       
+    ## print progress to the console
+    ################################
+          if(j %in% percentage.points)
+          {
+          setTxtProgressBar(progressBar, j/n.sample)
+          }
+     }
 
-
-
+# end timer
+cat("\nSummarising results")
+close(progressBar)
+     
 ###################################
 #### Summarise and save the results 
 ###################################
@@ -430,7 +390,17 @@ p.d <- mean(samples.deviance) - deviance.fitted
 DIC <- 2 * mean(samples.deviance) - deviance.fitted
 
 
-
+#### Compute the Conditional Predictive Ordinate
+CPO.temp <- array(NA, c(nrow(samples.phi), n))
+    for(i in 1:nrow(samples.phi))
+    {
+    temp.fitted <- samples.phi[i, ] + X.standardised %*% samples.beta[i, ] + offset
+    CPO.temp[i, ] <- 1 / dnorm(x=Y, mean=temp.fitted, sd=sqrt(samples.nu2[i,1]))
+    }
+CPO <- 1/apply(CPO.temp, 2, mean)
+MPL <- sum(log(CPO)) 
+     
+     
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
 number.cts <- sum(X.indicator==1)     
@@ -524,8 +494,10 @@ residuals <- round(residuals, 4)
 ## Compile and return the results
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Leroux CAR\n")     
 samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), rho=mcmc(samples.rho))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, summary.results=summary.results, model=model.string, accept=accept.final)
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, MPL=MPL, summary.results=summary.results, model=model.string, accept=accept.final)
 class(results) <- "carbayes"
+b<-proc.time()
+cat(" finished in ", round(b[3]-a[3], 1), "seconds")
 return(results)
 }
 
