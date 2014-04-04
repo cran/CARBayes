@@ -1,8 +1,16 @@
 poisson.iarCAR <-
-function(formula, data=NULL, beta=NULL, phi=NULL, tau2=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL)
+function(formula, data=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
 {
-cat("Setting up the model\n")
-a<-proc.time()
+#### Check on the verbose option
+     if(is.null(verbose)) verbose=TRUE     
+     if(!is.logical(verbose)) stop("the verbose option is not logical.", call.=FALSE)
+
+     if(verbose)
+     {
+     cat("Setting up the model\n")
+     a<-proc.time()
+     }else{}
+
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
@@ -84,24 +92,9 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 
 #### Initial parameter values
-## Regression parameters beta
-    if(is.null(beta)) beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
-    if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
-    if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
-
-## Random effects phi
-    if(is.null(phi)) phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-    if(length(phi)!= n) stop("phi is the wrong length.", call.=FALSE)
-    if(sum(is.na(phi))>0) stop("phi has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(phi)) stop("phi has non-numeric values.", call.=FALSE)
-
-## Random effects variance tau2
-    if(is.null(tau2)) tau2 <- runif(1)
-    if(length(tau2)!= 1) stop("tau2 is the wrong length.", call.=FALSE)
-    if(sum(is.na(tau2))>0) stop("tau2 has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(tau2)) stop("tau2 has non-numeric values.", call.=FALSE)
-    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)
+beta <- glm(Y~X.standardised-1, offset=offset, family=poisson)$coefficients
+phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
+tau2 <- runif(1)
 
 
 #### Priors
@@ -173,7 +166,8 @@ n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
 samples.phi <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
+samples.deviance <- array(NA, c(n.keep, n))
+samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
 accept.all <- rep(0,4)
@@ -223,9 +217,17 @@ Wlist <- as.list(rep(NA,n))
 #### Run the Bayesian model
 ###########################
 ## Start timer
-cat("Collecting", n.sample, "samples\n", sep = " ")
-progressBar <- txtProgressBar(style = 3)
-percentage.points<-round((1:100/100)*n.sample)
+     if(verbose)
+     {
+     cat("Collecting", n.sample, "samples\n", sep = " ")
+     progressBar <- txtProgressBar(style = 3)
+     percentage.points<-round((1:100/100)*n.sample)
+     }else
+     {
+     percentage.points<-round((1:100/100)*n.sample)     
+     }
+     
+
      
     for(j in 1:n.sample)
     {
@@ -279,7 +281,7 @@ percentage.points<-round((1:100/100)*n.sample)
     ## Calculate the deviance
     #########################
     fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
-    deviance <- -2 * sum(Y * log(fitted) -  fitted - lfactorial(Y))
+    deviance <- dpois(x=as.numeric(Y), lambda=fitted)
 
 
 
@@ -293,6 +295,7 @@ percentage.points<-round((1:100/100)*n.sample)
         samples.phi[ele, ] <- phi
         samples.tau2[ele, ] <- tau2
         samples.deviance[ele, ] <- deviance
+        samples.fitted[ele, ] <- fitted
         }else
         {
         }
@@ -340,17 +343,22 @@ percentage.points<-round((1:100/100)*n.sample)
     ################################       
     ## print progress to the console
     ################################
-          if(j %in% percentage.points)
+          if(j %in% percentage.points & verbose)
           {
           setTxtProgressBar(progressBar, j/n.sample)
           }
      }
 
+
 # end timer
-cat("\nSummarising results")
-close(progressBar)
+     if(verbose)
+     {
+     cat("\nSummarising results")
+     close(progressBar)
+     }else
+     {}
      
-###################################
+ ###################################
 #### Summarise and save the results 
 ###################################
 ## Acceptance rates
@@ -365,22 +373,18 @@ names(accept.final) <- c("beta", "phi", "tau2")
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
 fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
-deviance.fitted <- -2 * sum(Y * log(fitted.median) -  fitted.median - lfactorial(Y))
-p.d <- mean(samples.deviance) - deviance.fitted
-DIC <- 2 * mean(samples.deviance) - deviance.fitted
+deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
+deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
+p.d <- mean(deviance.sum) - deviance.fitted
+DIC <- 2 * mean(deviance.sum) - deviance.fitted
+like.fitted <- apply(samples.deviance, 2, mean)
+DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
 
      
 #### Compute the Conditional Predictive Ordinate
-CPO.temp <- array(NA, c(nrow(samples.phi), n))
-    for(i in 1:nrow(samples.phi))
-    {
-    temp.lp <- samples.phi[i, ] + X.standardised %*% samples.beta[i, ] + offset
-    temp.fitted <- exp(temp.lp)
-    CPO.temp[i, ] <- 1 / dpois(x=Y, lambda=temp.fitted)
-    }
+CPO.temp <- 1 / samples.deviance
 CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO)) 
-
+MPL <- sum(log(CPO))   
      
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
@@ -428,46 +432,41 @@ summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
 
-#### Create the random effects summary
-random.effects <- array(NA, c(n, 5))
-colnames(random.effects) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-random.effects[ ,1] <- apply(samples.phi, 2, mean)
-random.effects[ ,2] <- apply(samples.phi, 2, sd)
-random.effects[ ,3:5] <- t(apply(samples.phi, 2, quantile, c(0.5, 0.025, 0.975)))
-random.effects <- round(random.effects, 4)
-
-
-
-#### Create the Fitted values
+#### Create the Fitted values and residuals
 fitted.values <- array(NA, c(n, 5))
-residuals <- array(NA, c(n, 5))
 colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.temp <- array(NA, c(nrow(samples.beta), n))
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-    for(i in 1:nrow(samples.beta))
-    {
-    temp <- exp(X.standardised %*% samples.beta[i, ] + samples.phi[i, ] + offset)
-    fitted.temp[i, ] <- temp
-    residuals.temp[i, ] <- Y - temp
-    }
-fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
-fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
-fitted.values[ ,3:5] <- t(apply(fitted.temp, 2, quantile, c(0.5, 0.025, 0.975)))
+fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
+fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
+fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
 fitted.values <- round(fitted.values, 4)
+
+residuals <- array(NA, c(n, 5))
+colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
+residuals.temp <- array(NA, c(nrow(samples.beta), n))
+     for(i in 1:nrow(samples.beta))
+     {
+     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
+     }
 residuals[ ,1] <- apply(residuals.temp, 2, mean)
 residuals[ ,2] <- apply(residuals.temp, 2, sd)
 residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 residuals <- round(residuals, 4)
 
 
-
+## Compile and return the results
+modelfit <- c(DIC, p.d, DIC3, MPL)
+names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Intrinsic CAR\n")
 samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, MPL=MPL, summary.results=summary.results, model=model.string, accept=accept.final)
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=W, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
 class(results) <- "carbayes"
-b<-proc.time()
-cat(" finished in ", round(b[3]-a[3], 1), "seconds")
+
+     if(verbose)
+     {
+     b<-proc.time()
+     cat(" finished in ", round(b[3]-a[3], 1), "seconds")
+     }else
+     {}
 return(results)
 }
 

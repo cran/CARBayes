@@ -41,7 +41,6 @@ double binomialbetaupdate(NumericMatrix X, const int nsites, const int p, Numeri
 {
 // Compute the acceptance probability for beta
 //Create new objects
-int accept=0;
 double acceptance, oldlikebit=0, newlikebit=0, likebit, priorbit=0;
 NumericVector lp_current(nsites), lp_proposal(nsites), p_current(nsites), p_proposal(nsites);
 
@@ -158,7 +157,7 @@ phinew = phi;
           if(runif(1)[0] <= acceptance) 
           {
           phinew[j] = propphi;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -205,7 +204,7 @@ thetanew = theta;
           if(runif(1)[0] <= acceptance) 
           {
           thetanew[j] = proptheta;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -252,7 +251,7 @@ thetanew = theta;
           if(runif(1)[0] <= acceptance) 
           {
           thetanew[j] = proptheta;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -309,7 +308,7 @@ phinew = phi;
           if(runif(1)[0] <= acceptance) 
           {
           phinew[j] = propphi;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -333,7 +332,6 @@ double poissonbetaupdate(NumericMatrix X, const int nsites, const int p, Numeric
 {
 // Compute the acceptance probability for beta
 //Create new objects
-int accept=0;
 double acceptance, oldlikebit=0, newlikebit=0, likebit, priorbit=0;
 NumericVector lp_current(nsites), lp_proposal(nsites), fitted_current(nsites), fitted_proposal(nsites);
 
@@ -437,7 +435,7 @@ phinew = phi;
           for(int l = rowstart; l < rowend; l++) 
           {
           int r = Wtriplet(l,1) - 1;
-          sumphi += Wtriplet(l, 2) * phi[r];
+          sumphi += Wtriplet(l, 2) * phinew[r];
           rowtotal += Wtriplet(l,2);
           }
      priorvardenom = (rowtotal * rho + (1-rho));
@@ -458,7 +456,7 @@ phinew = phi;
           if(runif(1)[0] <= acceptance) 
           {
           phinew[j] = propphi;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -507,7 +505,7 @@ phinew = phi;
           for(int l = rowstart; l < rowend; l++) 
           {
           int r = Wtriplet(l,1) - 1;
-          sumphi += Wtriplet(l, 2) * phi[r];
+          sumphi += Wtriplet(l, 2) * phinew[r];
           rowtotal += Wtriplet(l,2);
           }
      priorvardenom = (rowtotal * rho + (1-rho));
@@ -528,7 +526,7 @@ phinew = phi;
           if(runif(1)[0] <= acceptance) 
           {
           phinew[j] = propphi;
-          accept = accept++;
+          accept = accept + 1;
           }
           else
           { 
@@ -575,7 +573,7 @@ phinew = phi;
           for(int l = rowstart; l < rowend; l++) 
           {
           int r = Wtriplet(l,1) - 1;
-          sumphi += Wtriplet(l, 2) * phi[r];
+          sumphi += Wtriplet(l, 2) * phinew[r];
           rowtotal += Wtriplet(l,2);
           }
       priorvardenom = (rowtotal * rho + (1-rho));
@@ -636,3 +634,122 @@ tau2_posteriorscale = 0.5 * (tau2_phisq - rho * tau2_quadform);
 return tau2_posteriorscale;
 }
 
+
+
+
+// [[Rcpp::export]]
+NumericVector binomialxupdate(const NumericVector y, const NumericVector failures, NumericVector offset,
+               NumericVector x, const int nsites, NumericVector beta, NumericVector proposal){
+  
+  //Create new objects
+  NumericVector xnew(nsites);
+  int current, prop;
+  double pold, pnew;
+  double oldlikebit, newlikebit;  
+  double acceptance;
+  
+
+  //  outer loop for each random effect
+  xnew = x;
+    for(int j = 0; j < nsites; j++){
+       // Accept or reject the proposed value
+     current = x[j] - 1;
+     prop = proposal[j] - 1;
+     pold = exp(offset[j] + beta[current]) / (1 + exp(offset[j] + beta[current]));
+     pnew = exp(offset[j] + beta[prop]) / (1 + exp(offset[j] + beta[prop]));
+     oldlikebit = y[j] * log(pold) + failures[j] * log((1-pold));
+     newlikebit = y[j] * log(pnew) + failures[j] * log((1-pnew));
+     acceptance = exp(newlikebit - oldlikebit);
+      if(acceptance >= 1){
+        xnew[j] = proposal[j];
+      }else 
+        if(runif(1)[0] <= acceptance) {
+          xnew[j] = proposal[j];
+        }
+      else{ 
+      }
+    }
+  
+  return xnew;
+}
+
+
+
+
+
+
+// [[Rcpp::export]]
+NumericVector poissonxupdate(const NumericVector y, NumericVector offset, NumericVector x, 
+     const int nsites, NumericVector beta, NumericVector proposal)
+     {
+  
+  //Create new objects
+  NumericVector xnew(nsites);
+  int current, prop;
+  double muold, munew;
+  double oldlikebit, newlikebit;  
+  double acceptance;
+  
+
+  //  outer loop for each random effect
+  xnew = x;
+  
+    for(int j = 0; j < nsites; j++)
+    {
+    // Accept or reject the proposed value
+     current = x[j] - 1;
+     prop = proposal[j] - 1;
+     muold = offset[j] * exp(beta[current]);
+     munew = offset[j] * exp(beta[prop]);
+     oldlikebit = y[j] * log(muold) - muold;
+     newlikebit = y[j] * log(munew) - munew;
+     acceptance = exp(newlikebit - oldlikebit);
+      if(acceptance >= 1){
+        xnew[j] = proposal[j];
+      }else 
+        if(runif(1)[0] <= acceptance) {
+          xnew[j] = proposal[j];
+        }
+      else{ 
+      }
+    }
+
+  return xnew;
+}
+
+
+
+
+// [[Rcpp::export]]
+NumericVector gaussianxupdate(const NumericVector y, NumericVector offset, double nu2,
+     NumericVector x, const int nsites, NumericVector beta, NumericVector proposal)
+     {
+  
+  //Create new objects
+  NumericVector xnew(nsites);
+  int current, prop;
+  double oldlikebit, newlikebit;  
+  double acceptance;
+  
+
+  //  outer loop for each random effect
+  xnew = x;
+    for(int j = 0; j < nsites; j++){
+       // Accept or reject the proposed value
+     current = x[j] - 1;
+     prop = proposal[j] - 1;
+     oldlikebit = pow((y[j] - offset[j] - beta[current]),2) / (2*nu2);
+     newlikebit = pow((y[j] - offset[j] - beta[prop]),2) / (2*nu2);
+     acceptance = exp(oldlikebit - newlikebit);
+      if(acceptance >= 1){
+        xnew[j] = proposal[j];
+      }else 
+        if(runif(1)[0] <= acceptance) {
+          xnew[j] = proposal[j];
+        }
+      else{ 
+      }
+    }
+
+  return xnew;
+}

@@ -9,7 +9,7 @@ Spatial areal unit modelling
 
 
 \description{
-This package implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as a recently developed localised spatial smoothing model. In addition, the package includes functions to enable plotting spatial maps of data (by combining the data with an appropriate shapefile) using the functionality of the sp package.
+This package implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as a recently developed localised spatial smoothing model. In addition, the package includes functions to enable plotting spatial maps of data (by combining the data with an appropriate shapefile) using the functionality of the sp package. There is a vignette accompanying this package, which can be accessed through the main CARBayes helpfile (via the index link at the bottom of this page and then through the "User guides" link).
 
 The creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256.
 }
@@ -18,8 +18,8 @@ The creation of this package was supported by the Economic and Social Research C
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 2.0\cr
-Date: \tab 2013-12-03\cr
+Version: \tab 3.0\cr
+Date: \tab 2014-04-04\cr
 License: \tab GPL (>= 2)\cr
 }
 
@@ -38,12 +38,14 @@ Spatially correlated random effects modelled by the proper CAR model proposed by
 
 Spatially correlated random effects modelled by the localised spatial smoothing approach proposed by Lee and Mitchell (2012).
 
-More detailed descriptions of the methods are given by the references below. The following changes have been made for version 2.
+More detailed descriptions of the methods are given by the references below. The following changes have been made for version 3.0.
 
-(i) - The MCMC code has been re-engineered using Rcpp, and is hence upto 20 times faster than in the previous version.
-(ii) - a second model comparison metric in addition to the Deviance Information Criterion (DIC), the Marginal Predictive Likelihood (MPL) is now computed.
-(iii) - Inverse-Gamma(a,b) priors are now used for variance parameters rather than uniform(0,b) priors.
-(iv) - Discrete rather than continuous uniform priors are now specified for the spatial dependence parameter rho in the Leroux and proper models.
+(i) - The functions have been re-organised to have a 'family' argument. Thus the
+binomial, gaussian and poisson variations of a model are now under the same
+function call.
+(ii) - A new cluster model has been added, and details are given in the vignette.
+(iii) - A verbose=TRUE/FALSE option has been added to turn off the progress 
+updates if required.
 }
 
 
@@ -116,9 +118,11 @@ W.mat <- nb2mat(W.nb, style="B")
 
 \dontrun{
 form <- "logprice~logcrime+rooms+sales+factor(type)+logdriveshop"
-model.spatial <- gaussian.properCAR(formula=form, data=housedata, W=W.mat, 
-burnin=20000, n.sample=100000, thin=10)
+model.spatial <- properCAR.re(formula=form, family="gaussian", data=housedata, 
+W=W.mat, burnin=20000, n.sample=100000, thin=10)
+print(model.spatial)
 }
+
 
 
 ################################
@@ -143,9 +147,11 @@ method="manhattan", diag=TRUE, upper=TRUE)) * W.mat / 2
 formula <- "observed2010 ~ offset(log(expected2010))"
 
 \dontrun{
-model.dissimilarity <- poisson.dissimilarityCAR(formula=formula, data=respdata, 
-W=W.mat,  Z=list(Z.incomedep=Z.incomedep), rho=0.99,
-burnin=20000, n.sample=100000, thin=10)
+model.dissimilarity <- dissimilarityCAR.re(formula=formula, family="poisson", 
+data=respdata, W=W.mat, Z=list(Z.incomedep=Z.incomedep), rho=0.99, burnin=20000, 
+n.sample=100000, thin=10)
+print(model.dissimilarity)
+
 
 #### Plot a map with the boundaries overlayed
 border.locations <- model.dissimilarity$W.summary$W.posterior

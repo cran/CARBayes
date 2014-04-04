@@ -1,8 +1,15 @@
 binomial.bymCAR <-
-function(formula, data=NULL, beta=NULL, phi=NULL, theta=NULL, tau2=NULL, sigma2=NULL, trials, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL)
+function(formula, data=NULL, trials, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, verbose=TRUE)
 {
-cat("Setting up the model\n")
-a<-proc.time()
+#### Check on the verbose option
+     if(is.null(verbose)) verbose=TRUE     
+     if(!is.logical(verbose)) stop("the verbose option is not logical.", call.=FALSE)
+
+     if(verbose)
+     {
+     cat("Setting up the model\n")
+     a<-proc.time()
+     }else{}
 
 ##############################################
 #### Format the arguments and check for errors
@@ -95,37 +102,11 @@ offset <- try(model.offset(frame), silent=TRUE)
 #### Initial parameter values
 ## Regression parameters beta
 dat <- cbind(Y, failures)
-
-    if(is.null(beta)) beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
-    if(length(beta)!= p) stop("beta is the wrong length.", call.=FALSE)
-    if(sum(is.na(beta))>0) stop("beta has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(beta)) stop("beta has non-numeric values.", call.=FALSE)
-
-## Random effects phi
-    if(is.null(phi)) phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-    if(length(phi)!= n) stop("phi is the wrong length.", call.=FALSE)
-    if(sum(is.na(phi))>0) stop("phi has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(phi)) stop("phi has non-numeric values.", call.=FALSE)
-
-## Random effects theta
-    if(is.null(theta)) theta <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-    if(length(theta)!= n) stop("theta is the wrong length.", call.=FALSE)
-    if(sum(is.na(theta))>0) stop("theta has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(theta)) stop("theta has non-numeric values.", call.=FALSE)
-    
-## Random effects variance tau2
-    if(is.null(tau2)) tau2 <- runif(1)
-    if(length(tau2)!= 1) stop("tau2 is the wrong length.", call.=FALSE)
-    if(sum(is.na(tau2))>0) stop("tau2 has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(tau2)) stop("tau2 has non-numeric values.", call.=FALSE)
-    if(tau2 <= 0) stop("tau2 is negative or zero.", call.=FALSE)
-
-## Random effects variance sigma2
-    if(is.null(sigma2)) sigma2 <- runif(1)
-    if(length(sigma2)!= 1) stop("sigma2 is the wrong length.", call.=FALSE)
-    if(sum(is.na(sigma2))>0) stop("sigma2 has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(sigma2)) stop("sigma2 has non-numeric values.", call.=FALSE)
-    if(sigma2 <= 0) stop("sigma2 is negative or zero.", call.=FALSE)
+beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
+phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
+theta <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
+tau2 <- runif(1)
+sigma2 <- runif(1)
 
 
 #### Priors
@@ -202,7 +183,8 @@ samples.phi <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.theta <- array(NA, c(n.keep, n))
 samples.sigma2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
+samples.deviance <- array(NA, c(n.keep, n))
+samples.fitted <- array(NA, c(n.keep, n))
 
   
 ## Metropolis quantities
@@ -257,9 +239,16 @@ Wlist <- as.list(rep(NA,n))
 #### Run the Bayesian model
 ###########################
 ## Start timer
-cat("Collecting", n.sample, "samples\n", sep = " ")
-progressBar <- txtProgressBar(style = 3)
-percentage.points<-round((1:100/100)*n.sample)
+     if(verbose)
+     {
+     cat("Collecting", n.sample, "samples\n", sep = " ")
+     progressBar <- txtProgressBar(style = 3)
+     percentage.points<-round((1:100/100)*n.sample)
+     }else
+     {
+     percentage.points<-round((1:100/100)*n.sample)     
+     }
+     
 
      for(j in 1:n.sample)
     {
@@ -334,7 +323,8 @@ percentage.points<-round((1:100/100)*n.sample)
     #########################
     logit <- as.numeric(X.standardised %*% beta) + phi + theta + offset    
     prob <- exp(logit)  / (1 + exp(logit))
-    deviance <- -2 * sum(dbinom(x=Y, size=trials, prob=prob, log=TRUE))
+    fitted <- trials * prob
+    deviance <- dbinom(x=Y, size=trials, prob=prob)
 
 
 
@@ -350,6 +340,7 @@ percentage.points<-round((1:100/100)*n.sample)
         samples.theta[ele, ] <- theta
         samples.sigma2[ele, ] <- sigma2
         samples.deviance[ele, ] <- deviance
+        samples.fitted[ele, ] <- fitted
         }else
         {
         }
@@ -408,15 +399,20 @@ percentage.points<-round((1:100/100)*n.sample)
     ################################       
     ## print progress to the console
     ################################
-          if(j %in% percentage.points)
+          if(j %in% percentage.points & verbose)
           {
           setTxtProgressBar(progressBar, j/n.sample)
           }
      }
 
 # end timer
-cat("\nSummarising results")
-close(progressBar)
+     if(verbose)
+     {
+     cat("\nSummarising results")
+     close(progressBar)
+     }else
+     {}
+     
 ###################################
 #### Summarise and save the results 
 ###################################
@@ -437,20 +433,17 @@ median.logit <- as.numeric(X.standardised %*% median.beta) + median.phi + median
 median.prob <- exp(median.logit)  / (1 + exp(median.logit))
 fitted.median <- trials * median.prob
 deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
-p.d <- mean(samples.deviance) - deviance.fitted
-DIC <- 2 * mean(samples.deviance) - deviance.fitted
+deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
+p.d <- mean(deviance.sum) - deviance.fitted
+DIC <- 2 * mean(deviance.sum) - deviance.fitted
+like.fitted <- apply(samples.deviance, 2, mean)
+DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
 
 
 #### Compute the Conditional Predictive Ordinate
-CPO.temp <- array(NA, c(nrow(samples.phi), n))
-    for(i in 1:nrow(samples.phi))
-    {
-    temp.logit <- samples.phi[i, ]  + samples.theta[i, ] + X.standardised %*% samples.beta[i, ] + offset
-    temp <- exp(temp.logit)  / (1 + exp(temp.logit))
-    CPO.temp[i, ] <- 1 / dbinom(x=Y, size=trials, prob=temp)
-    }
+CPO.temp <- 1 / samples.deviance
 CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))     
+MPL <- sum(log(CPO))  
 
      
      
@@ -504,50 +497,41 @@ summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
-
-#### Create the random effects summary
-random.effects <- array(NA, c(n, 5))
-colnames(random.effects) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-samples.re <- samples.phi + samples.theta
-random.effects[ ,1] <- apply(samples.re, 2, mean)
-random.effects[ ,2] <- apply(samples.re, 2, sd)
-random.effects[ ,3:5] <- t(apply(samples.re, 2, quantile, c(0.5, 0.025, 0.975)))
-random.effects <- round(random.effects, 4)
-
-
-
-#### Create the Fitted values
+#### Create the Fitted values and residuals
 fitted.values <- array(NA, c(n, 5))
-residuals <- array(NA, c(n, 5))
 colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.temp <- array(NA, c(nrow(samples.beta), n))
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-    for(i in 1:nrow(samples.beta))
-    {
-    temp.logit <- X.standardised %*% samples.beta[i, ] + samples.re[i, ] + offset    
-    temp <- trials * exp(temp.logit)  / (1 + exp(temp.logit))
-    fitted.temp[i, ] <- temp
-    residuals.temp[i, ] <- Y - temp    
-    }
-fitted.values[ ,1] <- apply(fitted.temp, 2, mean)
-fitted.values[ ,2] <- apply(fitted.temp, 2, sd)
-fitted.values[ ,3:5] <- t(apply(fitted.temp, 2, quantile, c(0.5, 0.025, 0.975)))
+fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
+fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
+fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
 fitted.values <- round(fitted.values, 4)
+
+residuals <- array(NA, c(n, 5))
+colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
+residuals.temp <- array(NA, c(nrow(samples.beta), n))
+     for(i in 1:nrow(samples.beta))
+     {
+     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
+     }
 residuals[ ,1] <- apply(residuals.temp, 2, mean)
 residuals[ ,2] <- apply(residuals.temp, 2, sd)
 residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
 residuals <- round(residuals, 4)
 
 
-
 ## Compile and return the results
+modelfit <- c(DIC, p.d, DIC3, MPL)
+names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - BYM CAR\n")
 samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), theta=mcmc(samples.theta), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, random.effects=random.effects, residuals=residuals, W.summary=W, DIC=DIC, p.d=p.d, MPL=MPL, summary.results=summary.results, model=model.string, accept=accept.final)
+results <- list(formula=formula, samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=W, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
 class(results) <- "carbayes"
-b<-proc.time()
-cat(" finished in ", round(b[3]-a[3], 1), "seconds")
+
+     if(verbose)
+     {
+     b<-proc.time()
+     cat(" finished in ", round(b[3]-a[3], 1), "seconds")
+     }else
+     {}
 return(results)
 }
 

@@ -1,46 +1,39 @@
-\name{binomial.lerouxCAR}
-\alias{binomial.lerouxCAR}
+\name{properCAR.re}
+\alias{properCAR.re}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 
 \title{
-Fit the Leroux conditional autoregressive (CAR) model to spatial binomial data
+Fit the proper conditional autoregressive (CAR) model to spatial data
 }
 
 \description{
-The function fits a binomial logistic random effects models to spatial data, where the random effects are modelled by the conditional autoregressive (CAR) model proposed by Leroux et. al. 1999. The model represents the logit transform of the mean function for the set of binomial responses by a combination of covariates and a sets of random effects. The latter are spatially correlated and come from the Leroux CAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by the conditional autoregressive (CAR) model proposed by Stern and Cressie 1999. The model represents the linear predictor by a combination of covariates and a sets of random effects. The latter are spatially correlated and come from the proper CAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
 
+
 \usage{
-binomial.lerouxCAR(formula, data=NULL, beta=NULL, phi=NULL, tau2=NULL, rho=NULL, 
-trials, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, 
-prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.rho=NULL)
+properCAR.re(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0,
+n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL,
+prior.nu2=NULL, prior.tau2=NULL, prior.rho=NULL, verbose=TRUE)
+
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{formula}{
 A formula for the covariate part of the model, using the same notation as for the lm() function. The offsets should also be included here using the offset() function.
 }
+  \item{family}{
+One of either 'binomial', 'gaussian' or 'poisson', which respectively specify a binomial likelihood model with a logistic link function, a Gaussian likelihood model with an identity link function, or a Poisson likelihood model with a log link function. 
+}
   \item{data}{
 A data.frame containing the  variables in the formula.
-}
-  \item{beta}{
-A vector of starting values for the regression parameters (including the intercept term). If this argument is not specified the function will randomly generate starting values.
-}
-  \item{phi}{
-A vector of starting values for the random effects. If this argument is not specified the function will randomly generate starting values.
-}
-  \item{tau2}{
-A starting value for the variance parameter of the random effects. If this argument is not specified the function will randomly generate a starting value.
-}
-  \item{rho}{
-A starting value for the spatial correlation parameter rho. If this argument is not specified the function will randomly generate a starting value.
 }
  \item{trials}{
 A vector the same length as the response containing the total number of trials for each area.
 }
-   \item{W}{
+  \item{W}{
 A binary n by n neighbourhood matrix (where n is the number of spatial units). The jkth element equals one if areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
 }
   \item{burnin}{
@@ -61,16 +54,22 @@ A vector of prior means for the regression parameters beta (Gaussian priors are 
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
+    \item{prior.nu2}{
+Only used for the Gaussian model. The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for nu2. Defaults to c(0.001, 0.001).  
+}
   \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for tau2. Defaults to c(0.001, 0.001).  
 }
   \item{prior.rho}{
 A discrete prior is assigned for rho. The prior is the set of possible values in the interval [0,1). Defaults to (0, 0.01,...,0.98, 0.99).   
 }
+  \item{verbose}{
+Logical, should the function update the user on its progress.  
+}
 }
 
 \details{
-For further details about how to apply the function see the examples below and in the main CARBayes helpfile.
+For further details about how to apply the function see the examples below and in the vignette.
 }
 
 
@@ -78,19 +77,18 @@ For further details about how to apply the function see the examples below and i
 \item{formula }{The formula for the covariate and offset part of the model.}
 \item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{W.summary }{The neighbourhood matrix W from the model.}
-\item{DIC }{The Deviance Information Criterion.}
-\item{p.d }{The effective number of parameters in the model.}
-\item{MPL }{The Marginal Predictive Likelihood of the model.}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), DIC3 and the Marginal Predictive Likelihood (MPL).}
 \item{summary.results }{A summary table of the parameters.}
 \item{model }{A text string describing the model fit.}
 \item{accept }{The acceptance probabilities for the parameters.}
 }
 
 \references{
-Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small areas: A new mixed model for spatial dependence, Chapter Statistical Models in Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds), pp. 135-178. Springer-Verlag, New York.
+Stern, H. and N. Cressie (1999). Inference for extremes in disease mapping, Chapter
+Disease mapping and Risk Assessment for Public Health. Lawson, A and Biggeri, D
+and Boehning, E and Lesaffre, E and Viel, J and Bertollini, R (eds). Wiley.
 }
 
 \author{
@@ -136,12 +134,8 @@ trials <- rep(50,n)
 Y <- rbinom(n=n, size=trials, prob=prob)
 
 
-#### Run the Leroux model
-#### Let the function randomly generate starting values for the parameters
-#### Use the default priors specified by the function (for details see the help files)
+#### Run the proper model
 formula <- Y ~ x1 + x2
-\dontrun{model <- binomial.lerouxCAR(formula=formula, trials=trials, W=W, burnin=5000, 
-n.sample=10000)}
-\dontshow{model <- binomial.lerouxCAR(formula=formula, trials=trials, W=W, burnin=20, 
-n.sample=50)}
+\dontrun{model <- properCAR.re(formula=formula, family="binomial", trials=trials,
+W=W, burnin=5000, n.sample=10000)}
 }

@@ -1,38 +1,33 @@
-\name{binomial.independent}
-\alias{binomial.independent}
+\name{independent.re}
+\alias{independent.re}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
-Fit the independent random effects model to spatial binomial data
+Fit the independent random effects model to spatial data
 }
 
 \description{
-The function fits a binomial logistic random effects models to spatial data, where the random effects are modelled as independent. The model represents the logit transform of the mean function for the set of binomial responses  by a combination of covariates and a set of independent random effects. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Bayesian hierarchical model with independent random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The model represents the linear predictor by a combination of covariates and a set of independent random effects. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
 
 \usage{
-binomial.independent(formula, data=NULL, beta=NULL, theta=NULL, sigma2=NULL, 
-trials, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, 
-prior.var.beta=NULL, prior.sigma2=NULL)
+independent.re(formula, family=NULL, data=NULL,  trials=NULL, burnin=0, 
+n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, 
+prior.nu2=NULL, prior.sigma2=NULL, verbose=TRUE)
 }
+
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{formula}{
 A formula for the covariate part of the model, using the same notation as for the lm() function. The offsets should also be included here using the offset() function.
 }
-  \item{data}{
+  \item{family}{
+One of either 'binomial', 'gaussian' or 'poisson', which respectively specify a binomial likelihood model with a logistic link function, a Gaussian likelihood model with an identity link function, or a Poisson likelihood model with a log link function. 
+}
+     \item{data}{
 A data.frame containing the  variables in the formula.
 }
-  \item{beta}{
-A vector of starting values for the regression parameters (including the intercept term). If this argument is not specified the function will randomly generate starting values.
-}
-  \item{theta}{
-A vector of starting values for the random effects. If this argument is not specified the function will randomly generate starting values.
-}
-  \item{sigma2}{
-A starting value for the variance parameter of the random effects. If this argument is not specified the function will randomly generate a starting value.
-}  
   \item{trials}{
 A vector the same length as the response containing the total number of trials for each area.
 }
@@ -54,13 +49,19 @@ A vector of prior means for the regression parameters beta (Gaussian priors are 
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
+     \item{prior.nu2}{
+Only used for the Gaussian model. The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for nu2. Defaults to c(0.001, 0.001).  
+}
   \item{prior.sigma2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for sigma2. Defaults to c(0.001, 0.001).  
+}  
+     \item{verbose}{
+Logical, should the function update the user on its progress.  
 }
 }
 
 \details{
-For further details about how to apply the function see the examples below and in the main CARBayes helpfile.
+For further details about how to apply the function see the examples below and in the vignette.
 }
 
 
@@ -68,16 +69,12 @@ For further details about how to apply the function see the examples below and i
 \item{formula }{The formula for the covariate and offset part of the model.}
 \item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{random.effects }{A summary matrix of the posterior distributions of the random effects for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
 \item{W.summary }{NULL.}
-\item{DIC }{The Deviance Information Criterion.}
-\item{p.d }{The effective number of parameters in the model.}
-\item{MPL }{The Marginal Predictive Likelihood of the model.}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), DIC3 and the Marginal Predictive Likelihood (MPL).}
 \item{summary.results }{A summary table of the parameters.}
 \item{model }{A text string describing the model fit.}
 \item{accept }{The acceptance probabilities for the parameters.}
-
 }
 
 
@@ -112,11 +109,7 @@ Y <- rbinom(n=n, size=trials, prob=prob)
 
 
 #### Run the independent model
-#### Let the function randomly generate starting values for the parameters
-#### Use the default priors specified by the function (for details see the help files)
 formula <- Y ~ x1 + x2
-\dontrun{model <- binomial.independent(formula=formula, trials=trials, burnin=5000, 
-n.sample=10000)}
-\dontshow{model <- binomial.independent(formula=formula, trials=trials, burnin=20, 
-n.sample=50)}
+\dontrun{model <- independent.re(formula=formula, family="binomial", trials=trials, 
+burnin=5000, n.sample=10000)}
 }

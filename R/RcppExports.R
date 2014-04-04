@@ -53,4 +53,19 @@ quadformW <- function(Wtriplet, Wbegfin, n_triplet, nsites, phi, rho) {
     .Call('CARBayes_quadformW', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, n_triplet, nsites, phi, rho)
 }
 
+binomialxupdate <- function(y, failures, offset, x, nsites, beta, proposal) {
+    .Call('CARBayes_binomialxupdate', PACKAGE = 'CARBayes', y, failures, offset, x, nsites, beta, proposal)
+}
+
+poissonxupdate <- function(y, offset, x, nsites, beta, proposal) {
+    .Call('CARBayes_poissonxupdate', PACKAGE = 'CARBayes', y, offset, x, nsites, beta, proposal)
+}
+
+gaussianxupdate <- function(y, offset, nu2, x, nsites, beta, proposal) {
+    .Call('CARBayes_gaussianxupdate', PACKAGE = 'CARBayes', y, offset, nu2, x, nsites, beta, proposal)
+}
+
+rcpp_hello_world <- function() {
+    .Call('CARBayes_rcpp_hello_world', PACKAGE = 'CARBayes')
+}
 

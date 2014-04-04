@@ -1,26 +1,15 @@
 useDynLib(CARBayes)
 export(
-     poisson.independent, 
-	poisson.iarCAR, 
-	poisson.lerouxCAR, 
-	poisson.properCAR, 
-	poisson.bymCAR, 
-	poisson.dissimilarityCAR, 
-	gaussian.independent, 
-	gaussian.iarCAR, 
-	gaussian.lerouxCAR, 
-	gaussian.properCAR, 
-	gaussian.bymCAR, 
-	gaussian.dissimilarityCAR, 
-	binomial.independent, 
-	binomial.iarCAR, 
-	binomial.lerouxCAR, 
-	binomial.properCAR, 
-	binomial.bymCAR, 
-	binomial.dissimilarityCAR, 
-	combine.data.shapefile,
+     bymCAR.re, 
+	clusterCAR.re,
+     combine.data.shapefile,
+     dissimilarityCAR.re,
 	highlight.borders,
-	print.carbayes
+     iarCAR.re,
+     independent.re,
+     lerouxCAR.re,
+	print.carbayes,
+     properCAR.re     
 )
 import(MASS)
 import(Rcpp)

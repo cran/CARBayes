@@ -295,3 +295,65 @@ BEGIN_RCPP
     return __sexp_result;
 END_RCPP
 }
+// binomialxupdate
+NumericVector binomialxupdate(const NumericVector y, const NumericVector failures, NumericVector offset, NumericVector x, const int nsites, NumericVector beta, NumericVector proposal);
+RcppExport SEXP CARBayes_binomialxupdate(SEXP ySEXP, SEXP failuresSEXP, SEXP offsetSEXP, SEXP xSEXP, SEXP nsitesSEXP, SEXP betaSEXP, SEXP proposalSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP );
+        Rcpp::traits::input_parameter< const NumericVector >::type failures(failuresSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP );
+        Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type beta(betaSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type proposal(proposalSEXP );
+        NumericVector __result = binomialxupdate(y, failures, offset, x, nsites, beta, proposal);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}
+// poissonxupdate
+NumericVector poissonxupdate(const NumericVector y, NumericVector offset, NumericVector x, const int nsites, NumericVector beta, NumericVector proposal);
+RcppExport SEXP CARBayes_poissonxupdate(SEXP ySEXP, SEXP offsetSEXP, SEXP xSEXP, SEXP nsitesSEXP, SEXP betaSEXP, SEXP proposalSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP );
+        Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type beta(betaSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type proposal(proposalSEXP );
+        NumericVector __result = poissonxupdate(y, offset, x, nsites, beta, proposal);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}
+// gaussianxupdate
+NumericVector gaussianxupdate(const NumericVector y, NumericVector offset, double nu2, NumericVector x, const int nsites, NumericVector beta, NumericVector proposal);
+RcppExport SEXP CARBayes_gaussianxupdate(SEXP ySEXP, SEXP offsetSEXP, SEXP nu2SEXP, SEXP xSEXP, SEXP nsitesSEXP, SEXP betaSEXP, SEXP proposalSEXP) {
+BEGIN_RCPP
+    SEXP __sexp_result;
+    {
+        Rcpp::RNGScope __rngScope;
+        Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP );
+        Rcpp::traits::input_parameter< double >::type nu2(nu2SEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP );
+        Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type beta(betaSEXP );
+        Rcpp::traits::input_parameter< NumericVector >::type proposal(proposalSEXP );
+        NumericVector __result = gaussianxupdate(y, offset, nu2, x, nsites, beta, proposal);
+        PROTECT(__sexp_result = Rcpp::wrap(__result));
+    }
+    UNPROTECT(1);
+    return __sexp_result;
+END_RCPP
+}

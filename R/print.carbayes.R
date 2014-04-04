@@ -14,6 +14,6 @@ cat("#### Results\n")
 cat("############\n")
 cat("Posterior quantiles and DIC\n\n")
 print(x$summary.results)
-cat("\nDIC = ", x$DIC, "     ", "p.d = ", x$p.d, "\n")
+cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "\n")
 return(invisible(x))
 }
