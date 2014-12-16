@@ -1,4 +1,4 @@
-gaussian.lerouxCAR <- function(formula, data=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.rho=NULL, verbose=TRUE)
+gaussian.lerouxCAR <- function(formula, data=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -90,15 +90,10 @@ offset <- try(model.offset(frame), silent=TRUE)
 #### Initial parameter values
 beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
 nu2 <- runif(1)
-phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
 tau2 <- runif(1)
-
-    if(is.null(prior.rho)) prior.rho <- seq(0, 0.99, 0.01)
-    if(min(prior.rho) < 0 | max(prior.rho) >=1) stop("prior.rho is outside the interval [0,1).", call.=FALSE)
-    if(sum(duplicated(prior.rho))>0) stop("prior.rho has duplicate values.", call.=FALSE)     
-rho <- sample(prior.rho, size=1)
-which.rho <- which(rho==prior.rho)    
-    
+phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
+rho <- runif(1)  
+     
     
 #### Priors
 ## Put in default priors
@@ -144,15 +139,16 @@ samples.phi <- array(NA, c(n.keep, n))
 samples.nu2 <- array(NA, c(n.keep, 1))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.rho <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, n))
+samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
 accept <- rep(0,2)
 accept.all <- accept
+proposal.sd.rho <- 0.02
 tau2.posterior.shape <- prior.tau2[1] + 0.5*n
 nu2.posterior.shape <- prior.nu2[1] + 0.5*n
-rho.step <- 5  
+ 
      
 
 #### CAR quantities
@@ -165,29 +161,39 @@ rho.step <- 5
     if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
 
 
-### Create the duplet form
-n.neighbours <- as.numeric(apply(W, 1, sum))
-W.duplet <- c(NA, NA)
+## Create the triplet object
+W.triplet <- c(NA, NA, NA)
      for(i in 1:n)
      {
           for(j in 1:n)
           {
                if(W[i,j]==1)
                {
-               W.duplet <- rbind(W.duplet, c(i,j))     
+               W.triplet <- rbind(W.triplet, c(i,j, W[i,j]))     
                }else{}
           }
      }
-W.duplet <- W.duplet[-1, ]     
-n.duplet <- nrow(W.duplet) 
+W.triplet <- W.triplet[-1, ]     
+n.triplet <- nrow(W.triplet) 
+W.triplet.sum <- tapply(W.triplet[ ,3], W.triplet[ ,1], sum)
+n.neighbours <- tapply(W.triplet[ ,3], W.triplet[ ,1], length)
 
-
-## Create the list object
-Wlist <- as.list(rep(NA,n))     
+     
+## Create the start and finish points for W updating
+W.begfin <- array(NA, c(n, 2))     
+temp <- 1
      for(i in 1:n)
      {
-     Wlist[[i]] <- which(W[i, ]==1)     
+     W.begfin[i, ] <- c(temp, (temp + n.neighbours[i]-1))
+     temp <- temp + n.neighbours[i]
      }
+     
+             
+## Create the determinant     
+Wstar <- diag(apply(W,1,sum)) - W
+Wstar.eigen <- eigen(Wstar)
+Wstar.val <- Wstar.eigen$values
+det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))    
 
 
 #### Beta update quantities
@@ -203,16 +209,7 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 	}
 
 
-## Create the set of determinants     
-Wstar <- diag(n.neighbours) - W
-Wstar.eigen <- eigen(Wstar)
-Wstar.val <- Wstar.eigen$values
-n.rho <- length(prior.rho)
-det.Q <- rep(NA, n.rho)
-     for(i in 1:n.rho)
-     {
-     det.Q[i] <-  0.5 * sum(log((prior.rho[i] * Wstar.val + (1-prior.rho[i]))))    
-     }
+  
 
      
      
@@ -255,7 +252,7 @@ det.Q <- rep(NA, n.rho)
     ## Sample from phi
     ####################
     offset.phi <- (Y - as.numeric(X.standardised %*% beta) - offset) / nu2    
-    phi <- gaussiancarupdate(W_list=Wlist, nsites=n, phi=phi, nneighbours=n.neighbours, tau2=tau2, rho_num=rho, rho_den=rho, nu2=nu2, offset=offset.phi)
+    phi <- gaussiancarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi)
     phi <- phi - mean(phi)
     
     
@@ -263,7 +260,7 @@ det.Q <- rep(NA, n.rho)
     ##################
     ## Sample from tau2
     ##################
-    temp2 <- quadform(W_duplet1=W.duplet[ ,1], W_duplet2=W.duplet[ ,2], n_duplet=n.duplet,  nsites=n, phi=phi, nneighbours=n.neighbours, diagonal=rho, offdiagonal=rho)      
+    temp2 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho)
     tau2.posterior.scale <- temp2 + prior.tau2[2] 
     tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
     
@@ -272,18 +269,18 @@ det.Q <- rep(NA, n.rho)
     ##################
     ## Sample from rho
     ##################
-     which.proposal.rho <- sample(setdiff(max(1, which.rho-rho.step):min(which.rho+rho.step, n.rho), which.rho), size=1)    
-     proposal.rho <- prior.rho[which.proposal.rho]
-     temp3 <- quadform(W_duplet1=W.duplet[ ,1], W_duplet2=W.duplet[ ,2], n_duplet=n.duplet,  nsites=n, phi=phi, nneighbours=n.neighbours, diagonal=proposal.rho, offdiagonal=proposal.rho)      
-     logprob.current <- det.Q[which.rho] - temp2 / tau2
-     logprob.proposal <- det.Q[which.proposal.rho] - temp3 / tau2
+     proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1, mean=rho, sd=proposal.sd.rho)  
+     temp3 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, proposal.rho)
+     det.Q.proposal <- 0.5 * sum(log((proposal.rho * Wstar.val + (1-proposal.rho))))              
+     logprob.current <- det.Q - temp2 / tau2
+     logprob.proposal <- det.Q.proposal - temp3 / tau2
      prob <- exp(logprob.proposal - logprob.current)
     
      #### Accept or reject the proposal
          if(prob > runif(1))
          {
          rho <- proposal.rho
-         which.rho <- which.proposal.rho
+         det.Q <- det.Q.proposal
          accept[1] <- accept[1] + 1           
          }else
          {
@@ -297,8 +294,9 @@ det.Q <- rep(NA, n.rho)
     ## Calculate the deviance
     #########################
     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-    deviance <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n))
-
+    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
+    deviance <- -2 * sum(deviance.all)  
+         
 
     ###################
     ## Save the results
@@ -330,13 +328,13 @@ det.Q <- rep(NA, n.rho)
           accept.all <- accept.all + accept
           accept <- c(0,0)
                     
-           #### rho tuning parameter
+          #### rho tuning parameter
                if(accept.rho > 70)
                {
-               rho.step <- min(rho.step+1, round(n.rho/4))
+               proposal.sd.rho <- min(2 * proposal.sd.rho, 0.5)
                }else if(accept.rho < 50)              
                {
-               proposal.sd.rho <- max(rho.step-1, 1)
+               proposal.sd.rho <- 0.5 * proposal.sd.rho
                }else
                {
                }
@@ -371,25 +369,24 @@ accept.rho <- 100 * accept.all[1] / accept.all[2]
 accept.final <- c(rep(100, 4), accept.rho)
 names(accept.final) <- c("beta", "phi", "nu2", "tau2", "rho")
 
-     
-     
+        
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
 fitted.median <- X.standardised %*% median.beta + median.phi + offset
 nu2.median <- median(samples.nu2)
 deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE))
-deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
-p.d <- mean(deviance.sum) - deviance.fitted
-DIC <- 2 * mean(deviance.sum) - deviance.fitted
-like.fitted <- apply(samples.deviance, 2, mean)
-DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
+p.d <- median(samples.deviance) - deviance.fitted
+DIC <- 2 * median(samples.deviance) - deviance.fitted    
 
      
-#### Compute the Conditional Predictive Ordinate
-CPO.temp <- 1 / samples.deviance
-CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))  
+#### Compute the Conditional Predictive Ordinate  
+CPO <- rep(NA, n)
+     for(j in 1:n)
+     {
+     CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=samples.nu2)))    
+     }
+LMPL <- sum(log(CPO))       
      
      
 #### transform the parameters back to the origianl covariate scale.
@@ -444,32 +441,16 @@ summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
 #### Create the Fitted values and residuals
-fitted.values <- array(NA, c(n, 5))
-colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
-fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
-fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
-fitted.values <- round(fitted.values, 4)
-
-residuals <- array(NA, c(n, 5))
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-     for(i in 1:nrow(samples.beta))
-     {
-     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
-     }
-residuals[ ,1] <- apply(residuals.temp, 2, mean)
-residuals[ ,2] <- apply(residuals.temp, 2, sd)
-residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
-residuals <- round(residuals, 4)
-
+fitted.values <- apply(samples.fitted, 2, median)
+residuals <- as.numeric(Y) - fitted.values
+     
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, DIC3, MPL)
-names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
+modelfit <- c(DIC, p.d, LMPL)
+names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Leroux CAR\n")     
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), rho=mcmc(samples.rho))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=W, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted))
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
      if(verbose)

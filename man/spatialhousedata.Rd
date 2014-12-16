@@ -1,18 +1,18 @@
-\name{housedata}
-\alias{housedata}
+\name{spatialhousedata}
+\alias{spatialhousedata}
 
 \docType{data}
 
 \title{
-Property price data for the 271 Intermediate Geographies (IG) in the Greater Glasgow and Clyde health board.
+A SpatialPolygonsDataFrame object (from the sp package) containing property price data for the 271 Intermediate Geographies (IG) in the Greater Glasgow and Clyde health board.
 }
 
 \description{
-Data on median property prices in 2008 and possible covariates for the 271 Intermediate Geographies (IG) in the Greater Glasgow and Clyde health board. These data  are used in the worked example in the main help page of CARBayes.
+A SpatialPolygonsDataFrame object containing data on median property prices in 2008 and possible covariates for the 270 Intermediate Geographies (IG) in the Greater Glasgow and Clyde health board. These data  are used in the worked example in the main help page of CARBayes.
 }
-\usage{data(housedata)}
+\usage{data(spatialhousedata)}
 \format{
-  A data frame with 271 observations on the following 6 variables.
+  A SpatialPolygonsDataFrame object where the dataframe contains 271 observations on the following 6 variables.
   \describe{
     \item{\code{price}}{Median property price in each IG.}
     \item{\code{crime}}{The crime rate (number of crimes per 10,000 people) in each IG.}
@@ -28,7 +28,7 @@ These data were provided by the Scottish Government, and can also be downloaded 
 }
 
 \examples{
-data(housedata)
+data(spatialhousedata)
 }
 
 \keyword{datasets}

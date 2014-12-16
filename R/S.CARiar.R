@@ -1,4 +1,4 @@
-iarCAR.re <- function(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
+S.CARiar <- function(formula, family, data=NULL,  trials=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 {
 #### This is a wrapper function that calls one of
 ## binomial.iarCAR
@@ -10,7 +10,7 @@ iarCAR.re <- function(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0
      if(family=="binomial")
      {
           if(is.null(trials)) stop("a binomial model was specified but the trials arugment was not specified", call.=FALSE)
-     model <- binomial.iarCAR(formula=formula, data=data,  trials=trials, W=W, burnin=burnin, n.sample=n.sample, thin=thin, blocksize.beta=blocksize.beta, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, prior.tau2=prior.tau2, verbose=verbose)
+     model <- binomial.iarCAR(formula=formula, data=data,  trials=trials, W=W, burnin=burnin, n.sample=n.sample, thin=thin, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, prior.tau2=prior.tau2, verbose=verbose)
      }else if(family=="gaussian")
      {
           if(!is.null(trials)) stop("you do not need a trials arugment as a binomial model was not specified", call.=FALSE)
@@ -18,7 +18,7 @@ iarCAR.re <- function(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0
      }else if(family=="poisson")
      {
           if(!is.null(trials)) stop("you do not need a trials arugment as a binomial model was not specified", call.=FALSE)
-     model <- poisson.iarCAR(formula=formula, data=data,  W=W, burnin=burnin, n.sample=n.sample, thin=thin, blocksize.beta=blocksize.beta, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, prior.tau2=prior.tau2, verbose=verbose)          
+     model <- poisson.iarCAR(formula=formula, data=data,  W=W, burnin=burnin, n.sample=n.sample, thin=thin, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, prior.tau2=prior.tau2, verbose=verbose)          
      }else
      {
      stop("the family arugment is not one of `binomial', `gaussian' or `poisson'.", call.=FALSE)     

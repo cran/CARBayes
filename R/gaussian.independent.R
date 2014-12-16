@@ -139,7 +139,7 @@ samples.beta <- array(NA, c(n.keep, p))
 samples.theta <- array(NA, c(n.keep, n))
 samples.nu2 <- array(NA, c(n.keep, 1))
 samples.sigma2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, n))
+samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
@@ -219,8 +219,8 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ## Calculate the deviance
     #########################
     fitted <- as.numeric(X.standardised %*% beta) + theta + offset
-    deviance <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n))
-
+    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
+    deviance <- -2 * sum(deviance.all)  
 
 
     ###################
@@ -273,17 +273,18 @@ median.theta <- apply(samples.theta, 2, median)
 fitted.median <- X.standardised %*% median.beta + median.theta + offset
 nu2.median <- median(samples.nu2)
 deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE))
-deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
-p.d <- mean(deviance.sum) - deviance.fitted
-DIC <- 2 * mean(deviance.sum) - deviance.fitted
-like.fitted <- apply(samples.deviance, 2, mean)
-DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
+p.d <- median(samples.deviance) - deviance.fitted
+DIC <- 2 * median(samples.deviance) - deviance.fitted    
 
      
-#### Compute the Conditional Predictive Ordinate
-CPO.temp <- 1 / samples.deviance
-CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))  
+#### Compute the Conditional Predictive Ordinate  
+CPO <- rep(NA, n)
+     for(j in 1:n)
+     {
+     CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=samples.nu2)))    
+     }
+LMPL <- sum(log(CPO))       
+
      
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
@@ -335,32 +336,16 @@ summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
 #### Create the Fitted values and residuals
-fitted.values <- array(NA, c(n, 5))
-colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
-fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
-fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
-fitted.values <- round(fitted.values, 4)
-
-residuals <- array(NA, c(n, 5))
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-     for(i in 1:nrow(samples.beta))
-     {
-     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
-     }
-residuals[ ,1] <- apply(residuals.temp, 2, mean)
-residuals[ ,2] <- apply(residuals.temp, 2, sd)
-residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
-residuals <- round(residuals, 4)
+fitted.values <- apply(samples.fitted, 2, median)
+residuals <- as.numeric(Y) - fitted.values
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, DIC3, MPL)
-names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
+modelfit <- c(DIC, p.d, LMPL)
+names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Independent\n")     
-samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), nu2=mcmc(samples.nu2))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=NULL, modelfit=modelfit,  summary.results=summary.results, model=model.string, accept=accept.final)
+samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), nu2=mcmc(samples.nu2), fitted=mcmc(samples.fitted))
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
      if(verbose)

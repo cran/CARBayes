@@ -1,4 +1,4 @@
-binomial.clusterCAR <- function(formula, data=NULL, trials, G, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
+poisson.clusterCARagg <- function(formula, exposure=NULL, data=NULL, G, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -11,7 +11,6 @@ binomial.clusterCAR <- function(formula, data=NULL, trials, G, W, burnin=0, n.sa
      }else{}
 
      
-     
 ##############################################
 #### Format the arguments and check for errors
 ##############################################
@@ -19,7 +18,7 @@ binomial.clusterCAR <- function(formula, data=NULL, trials, G, W, burnin=0, n.sa
 frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)), silent=TRUE)
      if(class(frame)=="try-error") stop("the formula inputted contains an error, e.g the variables may be different lengths.", call.=FALSE)
                    
-     
+ 
 #### Design matrix
 ## Create the matrix
 X <- try(suppressWarnings(model.matrix(object=attr(frame, "terms"), data=frame)), silent=TRUE)
@@ -64,53 +63,83 @@ diag(cor.X) <- 0
           X.indicator[j] <- 0
           }
      }
-
-     
-#### Response variable and trials
+          
+          
+          
+#### Response variable
 ## Create the response
 Y <- model.response(frame)
-failures <- trials - Y
-n <- length(Y)
-
-     
+          
 ## Check for errors
-    if(sum(is.na(trials))>0) stop("the numbers of trials has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(trials)) stop("the numbers of trials has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(trials)==floor(trials))
-    if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
-    if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
-
-    if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
+     if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
+     if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
 int.check <- n-sum(ceiling(Y)==floor(Y))
-    if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
-    if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
-    if(sum(Y>trials)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
-
-
-
+     if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
+     if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
+          
+          
+          
 #### Offset variable
 ## Create the offset
 offset <- try(model.offset(frame), silent=TRUE)
-
+          
 ## Check for errors
-    if(class(offset)=="try-error")   stop("the offset is not numeric.", call.=FALSE)
-    if(is.null(offset))  offset <- rep(0,n)
-    if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
+     if(class(offset)=="try-error")   stop("the offset is not numeric.", call.=FALSE)
+     if(is.null(offset))  offset <- rep(0,n)
+     if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
+     if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
+ 
+
+#### exposure list 
+     if(!is.list(exposure))   stop("the exposure is not a list.", call.=FALSE)
+     if(length(exposure)!=n)   stop("the exposure does not have the same number of elements as data points.", call.=FALSE)
+is.mat <- rep(0, n)
+is.2col <- rep(0,n)
+is.legal <- rep(0,n)
+     for(j in 1:n)
+     {
+     is.mat[j] <- !is.matrix(exposure[[j]])    
+     is.2col[j] <- ncol(exposure[[j]])==0
+     is.legal[j] <- min(exposure[[j]][ ,2])
+     }     
+     if(!sum(is.mat)==0)   stop("some elements of exposure are not matrices.", call.=FALSE)
+     if(!sum(is.2col)==0)   stop("some elements of exposure do not have two columns.", call.=FALSE)
+     if(min(is.legal,na.rm=T)<0 | sum(is.na(is.legal))>0) stop("the population data you supplied contains missing or negative values.", call.=FALSE)
+
      
+n.exposure <- rep(NA, n)
+mean.exposure <- rep(NA, n)
+     for(j in 1:n)
+     {
+     n.exposure[j] <- nrow(exposure[[j]])
+     mean.exposure[j] <- exposure[[j]][ ,1] %*% exposure[[j]][ ,2] / sum(exposure[[j]][ ,2])
+     }     
+mean.allexposure <- mean(mean.exposure)
+
+    
+#### Create the proportions and exposures separately
+proportions <- as.list(rep(NA,n))     
+exposures.only <- as.list(rep(NA,n))  
+     for(j in 1:n)
+     {
+     proportions[[j]] <- exposure[[j]][ ,2] / sum(exposure[[j]][ ,2])
+     exposures.only[[j]] <- exposure[[j]][ ,1] - mean.allexposure
+     }
+mean.exposure.std <- mean.exposure - mean.allexposure     
      
-#### Number of clusters G
+     #### Number of clusters G
   if(length(G)!=1) stop("G is the wrong length.", call.=FALSE)    
   if(!is.numeric(G)) stop("G is not numeric.", call.=FALSE)    
   if(G<=0) stop("G is not positive.", call.=FALSE)    
   if(G!=round(G)) stop("G is not an integer.", call.=FALSE) 
 Gbar <- (G+1)/2 
+  
      
- 
 #### Priors
      if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
      if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+     if(is.null(prior.mean.alpha)) prior.mean.alpha <- 0
+     if(is.null(prior.var.alpha)) prior.var.alpha <- 1000
      if(is.null(prior.tau2)) prior.tau2 <- c(0.001, 0.001)
      if(is.null(prior.delta)) prior.delta <- 10
 
@@ -124,6 +153,13 @@ Gbar <- (G+1)/2
      if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
      if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
 
+     if(length(prior.mean.alpha)!=1) stop("the prior mean for alpha is the wrong length.", call.=FALSE)    
+     if(!is.numeric(prior.mean.alpha)) stop("the prior mean for alpha is not numeric.", call.=FALSE)    
+          
+     if(length(prior.var.alpha)!=1) stop("the prior variance for alpha is the wrong length.", call.=FALSE)    
+     if(!is.numeric(prior.var.alpha)) stop("the prior variance for alpha is not numeric.", call.=FALSE)    
+     if(prior.var.alpha <=0) stop("the prior variance for alpha is less than zero", call.=FALSE)
+
      if(length(prior.tau2)!=2) stop("the prior value for tau2 is the wrong length.", call.=FALSE)    
     if(!is.numeric(prior.tau2)) stop("the prior value for tau2 is not numeric.", call.=FALSE)    
     if(sum(is.na(prior.tau2))!=0) stop("the prior value for tau2 has missing values.", call.=FALSE)    
@@ -134,18 +170,12 @@ Gbar <- (G+1)/2
   if(prior.delta<=0) stop("the prior value for delta is not positive.", call.=FALSE)    
 
      
-     
 #### Initial parameter values
-## Cluster allocation
-phat <- Y/trials
-phat[phat==0] <- 0.01
-phat[phat==1] <- 0.99
-logit.phat <- log(phat/ (1-phat))
-dat <- cbind(Y, failures)
-mod.glm <- glm(dat~X.standardised-1, offset=offset, family=binomial)
-res <- logit.phat - mod.glm$linear.predictors
+X.general <- cbind(X.standardised, mean.exposure.std)
+mod.glm <- glm(Y~X.general-1 + offset(offset), family=poisson)
+res <- log(Y) - offset - (X.general %*% mod.glm$coefficients) + mod.glm$coefficients[which(X.indicator==2)]
 cluster.factor <- kmeans(x=res, centers=G, nstart=1000)$cluster
-     Z.temp <- array(NA, c(n,G))
+Z.temp <- array(NA, c(n,G))
           for(i in 1:G)
           {
           Z.temp[ ,i] <- as.numeric(cluster.factor==i)    
@@ -159,7 +189,7 @@ Z <- cluster.factor
      
 lambda <- tapply(res, Z, mean)
 delta <- runif(1,0, prior.delta)
-beta <- mod.glm$coefficients
+beta <- mod.glm$coefficients[-length(mod.glm$coefficients)]
 beta[which(X.indicator==2)] <- 0    
 phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
      for(i in 1:G)
@@ -167,9 +197,10 @@ phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
      phi[which(Z==i)] <- phi[which(Z==i)] - mean(phi[which(Z==i)])
      }
 tau2 <- runif(1)
-rho <- runif(1)     
+rho <- runif(1)  
 beta.regression <- as.numeric(X.standardised %*% beta)   
-     
+alpha <- mod.glm$coefficients[length(mod.glm$coefficients)]
+    
      
 #### MCMC quantities
 ## Checks
@@ -210,11 +241,11 @@ blocksize <- 5
      }         
      
      
-
 ## Matrices to store samples
 n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
 samples.phi <- array(NA, c(n.keep, n))
+samples.alpha <- array(NA, c(n.keep, 1))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.rho <- array(NA, c(n.keep, 1))
 samples.Z <- array(NA, c(n.keep, n))
@@ -222,16 +253,17 @@ samples.lambda <- array(NA, c(n.keep, G))
 samples.delta <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
+ 
      
-
 ## Metropolis quantities
-accept.all <- rep(0,10)
+accept.all <- rep(0,12)
 accept <- accept.all
 proposal.sd.phi <- 0.1
 proposal.sd.beta <- 0.01
 proposal.sd.rho <- 0.02
 proposal.sd.delta <- 0.1
 proposal.sd.lambda <- 0.01
+proposal.sd.alpha <- 0.01
 proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
 chol.proposal.corr.beta <- chol(proposal.corr.beta) 
 tau2.posterior.shape <- prior.tau2[1] + 0.5 * n
@@ -280,9 +312,7 @@ temp <- 1
 Wstar <- diag(apply(W,1,sum)) - W
 Wstar.eigen <- eigen(Wstar)
 Wstar.val <- Wstar.eigen$values
-det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))   
-
-
+det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))    
 
 
 ###########################
@@ -304,17 +334,46 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
     for(j in 1:n.sample)
     {
      ####################
+     ## Sample from alpha
+     ####################
+     offset.alpha <- exp(lambda[Z] + phi + beta.regression + offset)
+     alpha.proposal <- rnorm(n=1, mean=alpha, sd=proposal.sd.alpha)         
+     alpha.temp1 <- mapply("*", lapply(lapply(exposures.only, "*", alpha), exp), proportions,SIMPLIFY=FALSE)     
+     alpha.temp2 <- as.numeric(lapply(alpha.temp1,sum))
+     alpha.temp1.proposal <- mapply("*", lapply(lapply(exposures.only, "*", alpha.proposal), exp), proportions,SIMPLIFY=FALSE)     
+     alpha.temp2.proposal <- as.numeric(lapply(alpha.temp1.proposal,sum))
+     prob1 <- sum(Y *  (log(alpha.temp2.proposal) - log(alpha.temp2)))     
+     prob2 <- sum(offset.alpha * (alpha.temp2 - alpha.temp2.proposal)) 
+     prob3 <- 0.5 * ((alpha - prior.mean.alpha)^2 - (alpha.proposal - prior.mean.alpha)^2) / prior.var.alpha
+     prob <- exp(prob1 + prob2 + prob3)
+    
+     #### Accept or reject the proposal
+         if(prob > runif(1))
+         {
+         alpha <- alpha.proposal
+         alpha.func <- alpha.temp2.proposal 
+         accept[11] <- accept[11] + 1           
+         }else
+         {
+         alpha.func <- alpha.temp2
+         }   
+     accept[12] <- accept[12] + 1           
+
+
+         
+         
+     ####################
      ## Sample from beta
      ####################
      proposal <- beta + (sqrt(proposal.sd.beta)* t(chol.proposal.corr.beta)) %*% rnorm(p)
      proposal[which(X.indicator==2)] <- 0   
      proposal.beta <- beta 
-     beta.offset <- phi + offset + lambda[Z]
+     beta.offset <- phi + offset + lambda[Z] + log(alpha.func)
 
        for(r in 1:n.beta.block)
        {
        proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-       prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, beta.offset, Y, failures, prior.mean.beta, prior.var.beta)
+       prob <- poissonbetaupdate(X.standardised, n, p, beta, proposal.beta, beta.offset, Y, prior.mean.beta, prior.var.beta)
             if(prob > runif(1))
             {
             beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -326,14 +385,14 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
         }
      beta.regression <- as.numeric(X.standardised %*% beta)
      accept[2] <- accept[2] + n.beta.block    
-
-         
-
+               
+               
+               
      ####################
      ## Sample from phi
      ####################
-     phi.offset <- beta.regression + offset  + lambda[Z]
-     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=rho, offset=phi.offset)
+     phi.offset <- beta.regression + offset  + lambda[Z] + log(alpha.func)
+     temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=rho, offset=phi.offset)
      phi <- temp1[[1]]
           for(i in 1:G)
           {
@@ -341,7 +400,7 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
           }
      accept[3] <- accept[3] + temp1[[2]]
      accept[4] <- accept[4] + n    
-  
+         
          
      ##################
      ## Sample from tau2
@@ -349,9 +408,9 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
      temp2 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho)
      tau2.posterior.scale <- temp2 + prior.tau2[2] 
      tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
- 
-          
-         
+              
+               
+
      ##################
      ## Sample from rho
      ##################
@@ -372,8 +431,8 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
          {
          }              
      accept[6] <- accept[6] + 1           
+
          
-    
          
     ####################
     ## Sample from lambda
@@ -384,12 +443,11 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
            proposal[(i+1)] <- rtrunc(n=1, spec="norm", a=proposal[i], b=proposal[(i+2)], mean=proposal[(i+1)], sd=proposal.sd.lambda)    
           }
      proposal <- proposal[2:(G+1)]
-     lp.current <- lambda[Z] + phi + beta.regression + offset
-     lp.proposal <- proposal[Z] + phi + beta.regression + offset
-     prob.current <- exp(lp.current)  / (1 + exp(lp.current))
-     prob.proposal <- exp(lp.proposal)  / (1 + exp(lp.proposal))
-     prob1 <- sum(Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current)))          
-     prob <- exp(prob1)
+     lp.current <- lambda[Z] + phi + beta.regression + offset + log(alpha.func)
+     lp.proposal <- proposal[Z] + phi + beta.regression + offset + log(alpha.func)
+     prob1 <- sum((exp(lp.current) - exp(lp.proposal)))
+     prob2 <- sum(Y * (lp.proposal - lp.current))
+     prob <- exp(prob1 + prob2)
           if(prob > runif(1))
           {
           lambda <- proposal
@@ -399,24 +457,19 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
           }
      accept[8] <- accept[8] + 1       
 
-         
-         
-         
-     ################
-     ## Sample from Z
-     ################
-     Z.proposal <- sample(1:G, size=n, replace=TRUE)
-     prior <- delta * ((Z - Gbar)^2 - (Z.proposal-Gbar)^2)    
-     lp.current <- lambda[Z] + phi + beta.regression + offset
-     lp.proposal <- lambda[Z.proposal] + phi + beta.regression + offset
-     prob.current <- exp(lp.current)  / (1 + exp(lp.current))
-     prob.proposal <- exp(lp.proposal)  / (1 + exp(lp.proposal))
-     like <- Y * (log(prob.proposal) - log(prob.current)) + failures * (log(1-prob.proposal) - log(1-prob.current))        
-     prob <- exp(like + prior)   
+     
+    
+    ################
+    ## Sample from Z
+    ################
+    Z.offset <- phi + offset + beta.regression + log(alpha.func)
+    Z.proposal <- sample(1:G, size=n, replace=TRUE)
+    prior <- delta * ((Z - Gbar)^2 - (Z.proposal-Gbar)^2)    
+    like <- exp(Z.offset) * (exp(lambda[Z]) - exp(lambda[Z.proposal])) + Y * (lambda[Z.proposal] - lambda[Z])         
+    prob <- exp(like + prior)   
     test <- prob> runif(n)         
     Z[test] <- Z.proposal[test]         
-       
- 
+
          
          
     ##################
@@ -436,18 +489,15 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
      accept[10] <- accept[10] + 1       
 
          
- 
+         
     #########################
     ## Calculate the deviance
     #########################
-    logit <- lambda[Z] + phi + beta.regression + offset
-    prob <- exp(logit)  / (1 + exp(logit))
-    fitted <- trials * prob
-    deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
+    fitted <- exp(lambda[Z] + phi + beta.regression + offset + log(alpha.func))
+    deviance.all <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
     deviance <- -2 * sum(deviance.all)    
+         
 
-         
-         
     ###################
     ## Save the results
     ###################
@@ -455,6 +505,7 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
         {
         ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
+        samples.alpha[ele, ] <- alpha
         samples.phi[ele, ] <- phi
         samples.lambda[ele, ] <- lambda
         samples.tau2[ele, ] <- tau2
@@ -466,8 +517,6 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
         }else
         {
         }
-
-         
 
 
     ########################################
@@ -482,8 +531,9 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
         accept.rho <- 100 * accept[5] / accept[6]
         accept.lambda <- 100 * accept[7] / accept[8]
         accept.delta <- 100 * accept[9] / accept[10]
+        accept.alpha <- 100 * accept[11] / accept[12]
         accept.all <- accept.all + accept
-        accept <- rep(0,10)
+        accept <- rep(0,12)
             
         #### beta tuning parameter
             if(accept.beta > 70)
@@ -538,7 +588,18 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
             proposal.sd.delta <- 0.5 * proposal.sd.delta
             }else
             {
-            }              
+            }
+           
+        #### alpha tuning parameter
+            if(accept.alpha > 70)
+            {
+            proposal.sd.alpha <- 2 * proposal.sd.alpha
+            }else if(accept.alpha < 50)              
+            {
+            proposal.sd.alpha <- 0.5 * proposal.sd.alpha
+            }else
+            {
+            }
         }else
         {   
         }
@@ -571,30 +632,31 @@ accept.phi <- 100 * accept.all[3] / accept.all[4]
 accept.rho <- 100 * accept.all[5] / accept.all[6]
 accept.lambda <- 100 * accept.all[7] / accept.all[8]
 accept.delta <- 100 * accept.all[9] / accept.all[10]
+accept.alpha <- 100 * accept.all[11] / accept.all[12]
 accept.tau2 <- 100
-accept.final <- c(accept.beta, accept.phi, accept.rho, accept.lambda, accept.delta, accept.tau2)
-names(accept.final) <- c("beta", "phi", "rho", "lambda", "delta", "tau2")
+accept.final <- c(accept.beta, accept.alpha, accept.phi, accept.rho, accept.lambda, accept.delta, accept.tau2)
+names(accept.final) <- c("beta", "alpha", "phi", "rho", "lambda", "delta", "tau2")
 
-
-
+     
 ## Deviance information criterion (DIC)
 median.phi <- apply(samples.phi, 2, median)
 median.beta <- apply(samples.beta,2,median)
 median.Z <- round(apply(samples.Z,2,median),0)
 median.lambda <- apply(samples.lambda,2,median)
-median.logit <- median.lambda[median.Z] + median.phi + as.numeric(X.standardised %*% median.beta) + offset
-median.prob <- exp(median.logit)  / (1 + exp(median.logit))
-fitted.deviance <- dbinom(x=Y, size=trials, prob=median.prob)
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
+median.alpha <- median(samples.alpha)
+alpha.temp1 <- mapply("*", lapply(lapply(exposures.only, "*", median.alpha), exp), proportions,SIMPLIFY=FALSE)     
+alpha.temp2 <- as.numeric(lapply(alpha.temp1,sum))
+fitted.median <- exp(X.standardised %*% median.beta + median.lambda[median.Z] + median.phi + offset + log(alpha.temp2))
+deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
 p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted     
+DIC <- 2 * median(samples.deviance) - deviance.fitted      
 
 
 #### Compute the Conditional Predictive Ordinate
 CPO <- rep(NA, n)
      for(j in 1:n)
      {
-     CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
+     CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
      }
 LMPL <- sum(log(CPO))  
 
@@ -617,8 +679,8 @@ number.cts <- sum(X.indicator==1)
      }else
      {
      }
-
-
+     
+ 
 #### Shrink the lambda object to only include those levels used
 Z.used <- as.numeric(names(table(samples.Z)))
 Greal <- length(Z.used)     
@@ -626,7 +688,7 @@ samples.lambda <- samples.lambda[ ,Z.used]
 colnames(samples.lambda) <- Z.used
      
      
-#### Create a summary object   
+#### Create a summary object
 samples.beta <- mcmc(samples.beta)
 summary.beta <- t(apply(samples.beta, 2, quantile, c(0.5, 0.025, 0.975))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta, p))
@@ -638,6 +700,9 @@ summary.lambda <- t(apply(samples.lambda, 2, quantile, c(0.5, 0.025, 0.975)))
 summary.lambda <- cbind(summary.lambda, rep(n.keep, length(Z.used)), rep(accept.lambda, length(Z.used)))
 colnames(summary.lambda) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 
+samples.alpha <- mcmc(samples.alpha)
+summary.alpha <- c(quantile(samples.alpha, c(0.5, 0.025, 0.975)), n.keep, accept.alpha)    
+     
 summary.hyper <- array(NA, c(3 ,5))
 summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
 summary.hyper[1, 4:5] <- c(n.keep, accept.tau2)
@@ -646,31 +711,30 @@ summary.hyper[2, 4:5] <- c(n.keep, accept.rho)
 summary.hyper[3, 1:3] <- quantile(samples.delta, c(0.5, 0.025, 0.975))
 summary.hyper[3, 4:5] <- c(n.keep, accept.delta)
          
-summary.results <- rbind(summary.beta, summary.lambda, summary.hyper)
-rownames(summary.results)[(p+length(Z.used)+1):(p+length(Z.used)+3)] <- c("tau2", "rho", "delta")
+summary.results <- rbind(summary.beta, summary.lambda, summary.alpha, summary.hyper)
+rownames(summary.results)[(p+length(Z.used)+1)] <- "alpha"
+rownames(summary.results)[(p+length(Z.used)+2):(p+length(Z.used)+4)] <- c("tau2", "rho", "delta")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 summary.results <- summary.results[-which(X.indicator==2), ]
-
 
 
 #### Create the Fitted values and residuals
 fitted.values <- apply(samples.fitted, 2, median)
 residuals <- as.numeric(Y) - fitted.values
 
-
+     
 ## Compile and return the results
 modelfit <- c(DIC, p.d, LMPL)
-names(modelfit) <- c("DIC", "p.d", "LMPL")   
-     
-     
-model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects  model - Leroux CAR with clusters\n")
+names(modelfit) <- c("DIC", "p.d", "LMPL")     
+       
+model.string <- c("Likelihood model - Poisson (log link function) aggregate", "\nRandom effects  model - Leroux CAR with clusters\n")
      if(length(which(X.indicator==2))==p)
      {
-     samples <- list(phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))
+     samples <- list(alpha=mcmc(samples.alpha), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))
      }else
      {
-     samples <- list(beta=mcmc(samples.beta.orig[ ,-which(X.indicator==2)]), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))          
+     samples <- list(beta=mcmc(samples.beta.orig[ ,-which(X.indicator==2)]), alpha=mcmc(samples.alpha), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))          
      }
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=median.Z,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"

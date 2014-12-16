@@ -1,18 +1,20 @@
 useDynLib(CARBayes)
 export(
-     bymCAR.re, 
-	clusterCAR.re,
      combine.data.shapefile,
-     dissimilarityCAR.re,
 	highlight.borders,
-     iarCAR.re,
-     independent.re,
-     lerouxCAR.re,
-	print.carbayes,
-     properCAR.re     
-)
+     print.carbayes,
+     S.CARbym, 
+     S.CARcluster,
+     S.CARdissimilarity,
+     S.CARiar,
+     S.CARleroux,
+     S.independent,
+     summarise.lincomb,
+     summarise.samples
+     )
 import(MASS)
 import(Rcpp)
 importFrom(truncdist, rtrunc)
 importFrom(spam, as.spam,  chol.spam, diag, rowSums)
 importFrom(coda, mcmc)
+importFrom(sp, Polygon,  Polygons, SpatialPolygons, SpatialPolygonsDataFrame, SpatialPoints)

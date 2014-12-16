@@ -1,5 +1,4 @@
-poisson.dissimilarityCAR <-
-function(formula, data=NULL, rho=0.99, W, Z, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
+poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -120,14 +119,6 @@ phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
 tau2 <- runif(1)
 alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))  
 
-## Global correlation parameter rho
-    if(length(rho)!= 1) stop("rho is the wrong length.", call.=FALSE)
-    if(sum(is.na(rho))>0) stop("rho has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(rho)) stop("rho has non-numeric values.", call.=FALSE)
-    if(rho < 0.5 | rho >=1) stop("rho is outside the interval [0.5,1).", call.=FALSE)
- 
-
-
 
 #### Priors
 ## Put in default priors
@@ -159,12 +150,10 @@ alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
     if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
     if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
     if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
-    if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
-    if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.beta)==ceiling(blocksize.beta))) stop("blocksize.beta has non-integer values.", call.=FALSE)
 
 
 ## Compute the blocking structure for beta     
+blocksize.beta <- 5
      if(blocksize.beta >= p)
      {
      n.beta.block <- 1
@@ -195,7 +184,7 @@ samples.beta <- array(NA, c(n.keep, p))
 samples.phi <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
-samples.deviance <- array(NA, c(n.keep, n))
+samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
@@ -252,6 +241,7 @@ W.triplet <- W.triplet[-1, ]
 n.triplet <- nrow(W.triplet) 
 
      
+     
 ## Create the start and finish points for W updating
 W.begfin <- array(NA, c(n, 2))     
 temp <- 1
@@ -274,18 +264,20 @@ Z.triplet <- array(NA, c(n.triplet, q))
      }
 
 W.triplet[ ,3] <- as.numeric(exp(-Z.triplet %*% alpha)>=0.5)
+W.triplet.sum <- tapply(W.triplet[ ,3], W.triplet[ ,1], sum)
 spam.W@entries <- W.triplet[ ,3]      
 spam.Wprop <- spam.W     
 W.tripletprop <- W.triplet
+
+     
      
  
-#### Create the matrix form of Q     
+#### Create the matrix form of Q
+rho <- 0.99
 Q <- -rho * spam.W     
 diag(Q) <- rho * rowSums(spam.W) + 1-rho
 det.Q <- sum(log(diag(chol.spam(Q))))     
 
-#Q <- rho * (WW - diag(apply(WW,1,sum))) + (1-rho) * diag(rep(1,n))     
-#det.Q <- sum(log(diag(chol.spam(Q))))     
      
 ###########################
 #### Run the Bayesian model
@@ -334,22 +326,23 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     	     ## Sample from phi
     	     ####################
     	     beta.offset <- as.numeric(X.standardised %*% beta) + offset        
-    	     temp1 <- poissondissimilaritycarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
+    	     temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
           phi <- temp1[[1]]
           phi <- phi - mean(phi)
           accept[3] <- accept[3] + temp1[[2]]
           accept[4] <- accept[4] + n                  
                
-      
+
     
 
     	     ##################
     	     ## Sample from tau2
     	     ##################
-          temp2 <- quadformW(Wtriplet=W.triplet, Wbegfin=W.begfin, n_triplet=n.triplet, nsites=n, phi=phi, rho=rho)
+          temp2 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho)
           tau2.posterior.scale <- temp2 + prior.tau2[2] 
           tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
  
+
                
  
    		######################
@@ -364,12 +357,13 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                
           ## Create the proposal values for W and Q
           W.tripletprop[ ,3] <- as.numeric(exp(-Z.triplet %*% proposal.alpha)>=0.5)
+          W.triplet.sum.prop <- tapply(W.tripletprop[ ,3], W.tripletprop[ ,1], sum)
           spam.Wprop@entries <- W.tripletprop[ ,3]     
           Qprop <- -rho * spam.Wprop 
           diag(Qprop) <- rho * rowSums(spam.Wprop) + 1-rho
           det.Qprop <- sum(log(diag(chol.spam(Qprop))))     
-          temp3 <- quadformW(Wtriplet=W.tripletprop, Wbegfin=W.begfin, n_triplet=n.triplet, nsites=n, phi=phi, rho=rho)
-               
+          temp3 <- quadform(W.tripletprop, W.triplet.sum.prop, n.triplet, n, phi, phi, rho)              
+
           #### Calculate the acceptance probability
     	     logprob.current <- det.Q - temp2 / tau2
     	     logprob.proposal <- det.Qprop - temp3 / tau2
@@ -380,7 +374,8 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     	          {
     	          alpha <- proposal.alpha
     	          det.Q <- det.Qprop 
-               W.triplet[ ,3] <- W.tripletprop[ ,3] 
+               W.triplet[ ,3] <- W.tripletprop[ ,3]
+               W.triplet.sum <- W.triplet.sum.prop
                accept[5] <- accept[5] + 1
     	          }else
     	          {
@@ -392,8 +387,8 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     	     ## Calculate the deviance
     	     #########################
     	     fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
-          deviance <- dpois(x=as.numeric(Y), lambda=fitted)
-
+          deviance.all <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
+          deviance <- -2 * sum(deviance.all)    
 
 
     	     ###################
@@ -489,17 +484,18 @@ median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
 fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
 deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
-deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
-p.d <- mean(deviance.sum) - deviance.fitted
-DIC <- 2 * mean(deviance.sum) - deviance.fitted
-like.fitted <- apply(samples.deviance, 2, mean)
-DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
+p.d <- median(samples.deviance) - deviance.fitted
+DIC <- 2 * median(samples.deviance) - deviance.fitted     
 
      
 #### Compute the Conditional Predictive Ordinate
-CPO.temp <- 1 / samples.deviance
-CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))   
+CPO <- rep(NA, n)
+     for(j in 1:n)
+     {
+     CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
+     }
+LMPL <- sum(log(CPO))  
+
      
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
@@ -571,26 +567,8 @@ summary.results[ , 6] <- round(summary.results[ , 6], 4)
 
      
 #### Create the Fitted values and residuals
-fitted.values <- array(NA, c(n, 5))
-colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
-fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
-fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
-fitted.values <- round(fitted.values, 4)
-
-residuals <- array(NA, c(n, 5))
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-     for(i in 1:nrow(samples.beta))
-     {
-     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
-     }
-residuals[ ,1] <- apply(residuals.temp, 2, mean)
-residuals[ ,2] <- apply(residuals.temp, 2, sd)
-residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
-residuals <- round(residuals, 4)
-
-
+fitted.values <- apply(samples.fitted, 2, median)
+residuals <- as.numeric(Y) - fitted.values
 
 
 #### Create the posterior medians for the neighbourhood matrix W
@@ -621,12 +599,11 @@ W.border.prob <- array(NA, c(n,n))
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, DIC3, MPL)
-names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
+modelfit <- c(DIC, p.d, LMPL)
+names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha))
-W.summary <- list(W.posterior=W.posterior, W.border.prob=W.border.prob)
-results <- list(formula=formula,  samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=W.summary, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=list(W.posterior=W.posterior, W.border.prob=W.border.prob),  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
      if(verbose)

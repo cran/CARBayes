@@ -1,4 +1,4 @@
-binomial.independent <- function(formula, data=NULL, trials, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.sigma2=NULL, verbose=TRUE)
+binomial.independent <- function(formula, data=NULL, trials, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.sigma2=NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -138,12 +138,9 @@ sigma2 <- runif(1)
     if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
     if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
 
-    if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
-    if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.beta)==ceiling(blocksize.beta))) stop("blocksize.beta has non-integer values.", call.=FALSE)
-
 
 ## Compute the blocking structure for beta     
+blocksize.beta <- 5
      if(blocksize.beta >= p)
      {
      n.beta.block <- 1
@@ -175,7 +172,7 @@ n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
 samples.theta <- array(NA, c(n.keep, n))
 samples.sigma2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, n))
+samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
@@ -256,7 +253,8 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
     logit <- as.numeric(X.standardised %*% beta) + theta + offset    
     prob <- exp(logit)  / (1 + exp(logit))
     fitted <- trials * prob
-    deviance <- dbinom(x=Y, size=trials, prob=prob)
+    deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
+    deviance <- -2 * sum(deviance.all)     
 
 
 
@@ -350,16 +348,17 @@ median.logit <- as.numeric(X.standardised %*% median.beta) + median.theta + offs
 median.prob <- exp(median.logit)  / (1 + exp(median.logit))
 fitted.median <- trials * median.prob
 deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
-deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
-p.d <- mean(deviance.sum) - deviance.fitted
-DIC <- 2 * mean(deviance.sum) - deviance.fitted
-like.fitted <- apply(samples.deviance, 2, mean)
-DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
+p.d <- median(samples.deviance) - deviance.fitted
+DIC <- 2 * median(samples.deviance) - deviance.fitted     
+
 
 #### Compute the Conditional Predictive Ordinate
-CPO.temp <- 1 / samples.deviance
-CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))  
+CPO <- rep(NA, n)
+     for(j in 1:n)
+     {
+     CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
+     }
+LMPL <- sum(log(CPO))     
 
      
 
@@ -404,32 +403,16 @@ summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
 #### Create the Fitted values and residuals
-fitted.values <- array(NA, c(n, 5))
-colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
-fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
-fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
-fitted.values <- round(fitted.values, 4)
-
-residuals <- array(NA, c(n, 5))
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-     for(i in 1:nrow(samples.beta))
-     {
-     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
-     }
-residuals[ ,1] <- apply(residuals.temp, 2, mean)
-residuals[ ,2] <- apply(residuals.temp, 2, sd)
-residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
-residuals <- round(residuals, 4)
-
+fitted.values <- apply(samples.fitted, 2, median)
+residuals <- as.numeric(Y) - fitted.values
+     
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, DIC3, MPL)
-names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
+modelfit <- c(DIC, p.d, LMPL)
+names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Independent\n")
-samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2))
-results <- list(formula=formula, samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=NULL, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
+samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted))
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
      if(verbose)

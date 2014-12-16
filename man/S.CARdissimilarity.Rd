@@ -1,21 +1,19 @@
-\name{dissimilarityCAR.re}
-\alias{dissimilarityCAR.re}
-%- Also NEED an '\alias' for EACH other topic documented here.
+\name{S.CARdissimilarity}
+\alias{S.CARdissimilarity}
 
 \title{
-Fit a localised conditional autoregressive (CAR) model based on dissimilarity metrics with binary neighbourhood relations to spatial data
+Fit a generalised linear model with a set of spatially autocorrelated random effect following the localised conditional autoregressive (CAR) prior proposed by Lee and Mitchell (2012) to spatial data.
 }
 
 \description{
-The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by a localised conditional autoregressive (CAR) model, which is a generalisation of that proposed by Lee and Mitchell (2012). The random effects in neighbouring areas (e.g. those that share a common border) are modelled as correlated or conditionally independent, depending on whether the populations living in the two areas are similar (correlated random effects) or very different (conditionally independent). The model represents the linear predictor  by a combination of covariates and a set of random effects. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by a localised conditional autoregressive (CAR) model, which is a generalisation of that proposed by Lee and Mitchell (2012). The random effects in neighbouring areas (e.g. those that share a common border) are modelled as correlated or conditionally independent, depending on whether the populations living in the two areas are similar (correlated random effects) or very different (conditionally independent). The model represents the linear predictor  by a combination of covariates and a set of random effects. Inference is based on Markov chain Monte Carlo (McMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
 \usage{
-dissimilarityCAR.re(formula, family=NULL, data=NULL,  trials=NULL, rho=0.99, W, 
-Z, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, 
+S.CARdissimilarity(formula, family, data=NULL,  trials=NULL, W, 
+Z, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, 
 prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 }
-%- maybe also 'usage' for other objects documented here.
 
 
 \arguments{
@@ -31,9 +29,6 @@ A data.frame containing the  variables in the formula.
   \item{trials}{
 A vector the same length as the response containing the total number of trials for each area.
 }
-     \item{rho}{
-The fixed value for the global spatial correlation parameter rho. The default is 0.99 which should be retained.
-}
   \item{W}{
 A binary n by n neighbourhood matrix (where n is the number of spatial units). The jkth element equals one if areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
 }
@@ -48,9 +43,6 @@ The number of MCMC samples to generate. Defaults to 1,000.
 }
   \item{thin}{
 The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1.
-}
-  \item{blocksize.beta}{
-The size of the blocks in which to update the regression parameters in the MCMC algorithm. Defaults to 5.
 }
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.
@@ -77,15 +69,16 @@ For further details about how to apply the function see the examples below and i
 
 
 \value{
-\item{formula }{The formula for the covariate and offset part of the model.}
-\item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{W.summary }{The neighbourhood matrix W from the model.}
-\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), DIC3 and the Marginal Predictive Likelihood (MPL).}
 \item{summary.results }{A summary table of the parameters.}
-\item{model }{A text string describing the model fit.}
+\item{samples }{A list containing the McMC samples from the model.}
+\item{fitted.values }{A vector of fitted values for each area.}
+\item{residuals }{A vector of residuals for each area.}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), and the Log Marginal Predictive Likelihood (LMPL).}
 \item{accept }{The acceptance probabilities for the parameters.}
+\item{localised.structure }{A list containing two matrices: W.posterior contains posterior medians for each element wkj of the n by n neighbourhood matrix W; W.border.prob contains posterior probabilities that each wkj element of the n by n neighbourhood matrix W equals zero. This corresponds to the posterior probability of a boundary in the random effects surface. In both cases elements which correspond to two non-neighbouring areas have NA values.}
+\item{formula }{The formula for the covariate and offset part of the model.}
+\item{model }{A text string describing the model fit.}
+\item{X }{The design matrix of covariates.}
 }
 
 
@@ -144,6 +137,6 @@ Z <- list(dissimilarity.matrix=dissimilarity.matrix)
 
 #### Run the localised smoothing model
 formula <- Y ~ 1
-\dontrun{model <- dissimilarityCAR.re(formula=formula, family="binomial", rho=0.99, 
+\dontrun{model <- S.CARdissimilarity(formula=formula, family="binomial",
 trials=trials, W=W, Z=Z, burnin=5000, n.sample=10000)}
 }

@@ -4,27 +4,24 @@
 \docType{package}
 
 \title{
-Spatial areal unit modelling
+Spatial Areal Unit Modelling
 }
 
 
 \description{
-This package implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as a recently developed localised spatial smoothing model. In addition, the package includes functions to enable plotting spatial maps of data (by combining the data with an appropriate shapefile) using the functionality of the sp package. There is a vignette accompanying this package, which can be accessed through the main CARBayes helpfile (via the index link at the bottom of this page and then through the "User guides" link).
-
-The creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256.
+Implements Bayesian hierarchical spatial areal unit models. In such models the spatial correlation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. Examples of the models included are the BYM model as well as a recently developed localised spatial smoothing model. In addition, the package includes functions to enable plotting spatial maps of data (by combining the data with an appropriate shapefile) using the functionality of the sp package. There is a vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development is supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1.
 }
 
 \details{
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 3.0\cr
-Date: \tab 2014-04-04\cr
+Version: \tab 4.0\cr
+Date: \tab 2014-12-15\cr
 License: \tab GPL (>= 2)\cr
 }
 
-
-The package implements Bayesian hierarchical models for spatial areal unit data. The models are an extension of generalised linear models, and the response variable can be binomial, Gaussian or Poisson. The mean function for the data comprises a covariate component and a set of random effects. This package implements a number of different random effects models, which represent different types of spatial correlation structure. These models are within the conditional autoregressive (CAR) class, and capture spatial correlation via a neighbourhood matrix W. This matrix typically (although other options are allowed) has a jkth element equal to one and zero, depending on whether areas j and k are spatially close (typically chosen to mean sharing a common border). Inference for all models is via Markov Chain Monte Carlo (MCMC) simulation. The following random effects models are implemented in this package.
+Implements Bayesian hierarchical models for spatial areal unit data. The models are an extension of generalised linear models, and the response variable can be binomial, Gaussian or Poisson. The mean function for the data comprises a covariate component and a set of random effects. This package implements a number of different random effects models, which represent different types of spatial autocorrelation structure. These models are within the conditional autoregressive (CAR) class, and capture spatial correlation via a neighbourhood matrix W. This matrix typically (although other options are allowed) has a jkth element equal to one and zero, depending on whether areas j and k are spatially close (typically chosen to mean sharing a common border). Inference for all models is via Markov Chain Monte Carlo (MCMC) simulation. The following random effects models are implemented in this package.
 
 Independent and identically distributed random effects.
 
@@ -32,21 +29,16 @@ Spatially correlated random effects modelled by the intrinsic autoregressive (IA
 
 Spatially correlated random effects modelled by the Besag-York-Mollie (BYM) model proposed by Besag et al (1991).
 
-Spatially correlated random effects modelled by the proper CAR model proposed by Stern and Cressie (1999).
-
 Spatially correlated random effects modelled by the proper CAR model proposed by Leroux (1999).
 
 Spatially correlated random effects modelled by the localised spatial smoothing approach proposed by Lee and Mitchell (2012).
 
-More detailed descriptions of the methods are given by the references below. The following changes have been made for version 3.0.
+Spatially correlated random effects modelled by the localised spatial smoothing approach proposed by Lee and Sarran (2014).
 
-(i) - The functions have been re-organised to have a 'family' argument. Thus the
-binomial, gaussian and poisson variations of a model are now under the same
-function call.
-(ii) - A new cluster model has been added, and details are given in the vignette.
-(iii) - A verbose=TRUE/FALSE option has been added to turn off the progress 
-updates if required.
+More detailed descriptions of the methods are given by the references below. CARBayes has several changes from version 3, one of which is the availability of an up-to-date vignette. Other changes are the removal of the proper CAR model by Stern et al (1999), and a change in the notation of the main functions from, for example, lerouxCAR.re() to S.CARleroux(). Finally, two additional functions have been added, which allow the posterior samples (summarise.samples()) and linear combinations of the covariate component (summarise.lincomb()), for example to summarise non-linear relationships, to be summarised. 
 }
+
+
 
 
 \author{
@@ -55,7 +47,7 @@ Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
 
 
 \references{
-Besag, J., J. York, and A. Mollie (1991). Bayesian image restoration with two applications in spatial statistics. Annals of the Institute of Statistics and Mathematics 43, 1-59.
+Besag, J. and  York, J and Mollie, A (1991). Bayesian image restoration with two applications in spatial statistics. Annals of the Institute of Statistics and Mathematics 43, 1-59.
 
 Eddelbuettel, D and Francois, R (2011). Rcpp: seamless R and C++ Integration. Journal of Statistical Software, 40, 1-18. 
 
@@ -65,110 +57,52 @@ and Boehning, E and Lesaffre, E and Viel, J and Bertollini, R (eds). Wiley.
 
 Lee, D. (2011). A comparison of conditional autoregressive model used in Bayesian disease mapping. Spatial and Spatio-temporal Epidemiology 2, 79-89.
 
-Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. Biostatistics, 13, 415-426.
+Lee, D. and Mitchell, R (2012). Boundary detection in disease mapping studies. Biostatistics, 13, 415-426.
 
 Lee, D (2013). CARBayes: An R Package for Bayesian Spatial Modeling with Conditional Autoregressive Priors. Journal of Statistical Software, 55, 13, 1-24.
 
-Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small areas: A new mixed model for spatial dependence, Chapter Statistical Models in Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds), pp. 135-178. Springer-Verlag, New York.
+Leroux, B., Lei, X and Breslow, N (1999). Estimation of disease rates in small areas: A new mixed model for spatial dependence, Chapter Statistical Models in Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds), pp. 135-178. Springer-Verlag, New York.
+
+Lee, D and Sarran, C  (2014). Controlling for unmeasured confounding and spatial misalignment in long-term air pollution and health studies. arXiv:1412.4479.
 }
 
 
 
 \examples{
-################################################################
-#### Load the libraries required to do an extended analysis
-################################################################
-library(foreign)
 library(shapefiles)
 library(sp)
-library(boot)
-library(Matrix)
-library(nlme)
 library(maptools)
-library(grid)
-library(deldir)
 library(splines)
 library(spdep)
 library(CARBayes)
 
 
-#############################
-#### Example 1 - house prices
-#############################
 #### Read in the data
-data(housedata) 
-data(shp)
-data(dbf)
+data(spatialhousedata)
+housedata <- spatialhousedata@data
 
-#### Remove the outlying observation
-housedata <- housedata[!rownames(housedata)=="S02000655", ]
-
-#### Combine the data and shapefile
-data.combined <- combine.data.shapefile(housedata, shp, dbf)
-
-#### Transform the price and crime variables
+#### Transform the price and driveshop variables
 housedata$logprice <- log(housedata$price)
-housedata$logcrime <- log(housedata$crime)
 housedata$logdriveshop <- log(housedata$driveshop)
 
-#### Compute the neighbourhood matrix
-W.nb <- poly2nb(data.combined, row.names = rownames(housedata))
+#### Fit a covariate only  model
+form <- logprice~ns(crime,3)+rooms+sales+factor(type) + logdriveshop
+model <- lm(formula=form, data=housedata)
+
+
+#### Compute a Moran's I test on the residuals
+W.nb <- poly2nb(spatialhousedata, row.names = rownames(housedata))
 W.list <- nb2listw(W.nb, style="B")
-W.mat <- nb2mat(W.nb, style="B")
+resid.model <- residuals(model)
+moran.mc(x=resid.model, listw=W.list, nsim=1000)
 
+
+#### Run a regression model with spatially correlated random effects
+W.mat <- nb2mat(W.nb, style="B")
 \dontrun{
-form <- "logprice~logcrime+rooms+sales+factor(type)+logdriveshop"
-model.spatial <- properCAR.re(formula=form, family="gaussian", data=housedata, 
-W=W.mat, burnin=20000, n.sample=100000, thin=10)
+model.spatial <- S.CARleroux(formula=form, data=housedata, 
+family="gaussian", W=W.mat, burnin=10000, n.sample=40000, 
+verbose=FALSE)
 print(model.spatial)
-}
-
-
-
-################################
-#### Example 2 - disease mapping
-################################
-#### Read in the data
-data(respdata)
-data(shp)
-data(dbf)
-
-#### Combine the data and shapefile and create the neighbourhood matrix W
-respdata$SIR2010 <- respdata$observed2010 / respdata$expected2010
-data.combined <- combine.data.shapefile(respdata, shp, dbf)
-W.nb <- poly2nb(data.combined, row.names = rownames(respdata))
-W.mat <- nb2mat(W.nb, style="B")
-
-#### Create the dissimilrity metric
-Z.incomedep <- as.matrix(dist(cbind(respdata$incomedep2010, respdata$incomedep2010), 
-method="manhattan", diag=TRUE, upper=TRUE)) * W.mat / 2
-
-#### Run the local CAR model
-formula <- "observed2010 ~ offset(log(expected2010))"
-
-\dontrun{
-model.dissimilarity <- dissimilarityCAR.re(formula=formula, family="poisson", 
-data=respdata, W=W.mat, Z=list(Z.incomedep=Z.incomedep), rho=0.99, burnin=20000, 
-n.sample=100000, thin=10)
-print(model.dissimilarity)
-
-
-#### Plot a map with the boundaries overlayed
-border.locations <- model.dissimilarity$W.summary$W.posterior
-risk.estimates <- model.dissimilarity$fitted.values[ ,3] / respdata$expected2010
-data.combined@data <- data.frame(data.combined@data, risk.estimates)
-boundary.final <- highlight.borders(border.locations=border.locations, ID=rownames(respdata), 
-shp=shp, dbf=dbf)
-boundaries = list("sp.points", boundary.final, col="white", pch=19, cex=0.2)
-northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), offset = c(220000,647000), 
-scale = 4000)
-scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = c(225000,647000), 
-scale = 10000, fill=c("transparent","black"))
-text1 <- list("sp.text", c(225000,649000), "0")
-text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(data.combined, c("risk.estimates"), sp.layout=list(northarrow, scalebar, text1, text2, 
-boundaries),scales=list(draw = TRUE), at=seq(min(risk.estimates)-0.1, 
-max(risk.estimates)+0.1, length.out=8), 
-col.regions=c("#FFFFB2", "#FED976", "#FEB24C", "#FD8D3C", "#FC4E2A", "#E31A1C", "#B10026"))
 }
 }

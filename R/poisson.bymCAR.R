@@ -1,5 +1,4 @@
-poisson.bymCAR <-
-function(formula, data=NULL, W, burnin=0, n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, verbose=TRUE)
+poisson.bymCAR <- function(formula, data=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -135,12 +134,9 @@ sigma2 <- runif(1)
     if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
     if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
 
-    if(!is.numeric(blocksize.beta)) stop("blocksize.beta is not a number", call.=FALSE)
-    if(blocksize.beta <= 0) stop("blocksize.beta is less than or equal to zero", call.=FALSE)
-    if(!(floor(blocksize.beta)==ceiling(blocksize.beta))) stop("blocksize.beta has non-integer values.", call.=FALSE)
-
 
 ## Compute the blocking structure for beta     
+blocksize.beta <- 5
      if(blocksize.beta >= p)
      {
      n.beta.block <- 1
@@ -168,11 +164,10 @@ sigma2 <- runif(1)
 ## Matrices to store samples
 n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
-samples.phi <- array(NA, c(n.keep, n))
+samples.re <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
-samples.theta <- array(NA, c(n.keep, n))
 samples.sigma2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, n))
+samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
 
 ## Metropolis quantities
@@ -196,30 +191,32 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
     if(min(W)<0) stop("W has negative elements.", call.=FALSE)
     if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
 
-## Create the duplet form
-n.neighbours <- as.numeric(apply(W, 1, sum))
-W.duplet <- c(NA, NA)
+## Create the triplet object
+W.triplet <- c(NA, NA, NA)
      for(i in 1:n)
      {
           for(j in 1:n)
           {
                if(W[i,j]==1)
                {
-               W.duplet <- rbind(W.duplet, c(i,j))     
+               W.triplet <- rbind(W.triplet, c(i,j, W[i,j]))     
                }else{}
           }
      }
-W.duplet <- W.duplet[-1, ]     
-n.duplet <- nrow(W.duplet) 
+W.triplet <- W.triplet[-1, ]     
+n.triplet <- nrow(W.triplet) 
+W.triplet.sum <- tapply(W.triplet[ ,3], W.triplet[ ,1], sum)
+n.neighbours <- tapply(W.triplet[ ,3], W.triplet[ ,1], length)
 
-
-## Create the list object
-Wlist <- as.list(rep(NA,n))     
+     
+## Create the start and finish points for W updating
+W.begfin <- array(NA, c(n, 2))     
+temp <- 1
      for(i in 1:n)
      {
-     Wlist[[i]] <- which(W[i, ]==1)     
+     W.begfin[i, ] <- c(temp, (temp + n.neighbours[i]-1))
+     temp <- temp + n.neighbours[i]
      }
-
 
 
 ###########################
@@ -269,7 +266,7 @@ Wlist <- as.list(rep(NA,n))
     ## Sample from phi
     ####################
     beta.offset <- X.standardised %*% beta + theta + offset
-    temp1 <- poissoncarupdate(W_list=Wlist, nsites=n, phi=phi, nneighbours=n.neighbours, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho_num=1, rho_den=1, offset=beta.offset)
+    temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
     phi <- temp1[[1]]
     phi <- phi - mean(phi)
     accept[3] <- accept[3] + temp1[[2]]
@@ -293,7 +290,7 @@ Wlist <- as.list(rep(NA,n))
     ###################
     ## Sample from tau2
     ###################
-    temp2 <- quadform(W_duplet1=W.duplet[ ,1], W_duplet2=W.duplet[ ,2], n_duplet=n.duplet,  nsites=n, phi=phi, nneighbours=n.neighbours, diagonal=1, offdiagonal=1)      
+    temp2 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, 1)
     tau2.posterior.scale <- temp2 + prior.tau2[2] 
     tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
     
@@ -311,7 +308,8 @@ Wlist <- as.list(rep(NA,n))
     ## Calculate the deviance
     #########################
     fitted <- exp(as.numeric(X.standardised %*% beta) + phi + theta + offset)
-    deviance <- dpois(x=as.numeric(Y), lambda=fitted)
+    deviance.all <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
+    deviance <- -2 * sum(deviance.all)        
 
 
     ###################
@@ -321,9 +319,8 @@ Wlist <- as.list(rep(NA,n))
         {
         ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
-        samples.phi[ele, ] <- phi
+        samples.re[ele, ] <- phi + theta
         samples.tau2[ele, ] <- tau2
-        samples.theta[ele, ] <- theta
         samples.sigma2[ele, ] <- sigma2
         samples.deviance[ele, ] <- deviance
         samples.fitted[ele, ] <- fitted
@@ -412,26 +409,25 @@ accept.sigma2 <- 100
 accept.final <- c(accept.beta, accept.phi, accept.theta, accept.tau2, accept.sigma2)
 names(accept.final) <- c("beta", "phi", "theta", "tau2", "sigma2")
 
+     
 ## Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
-median.phi <- apply(samples.phi, 2, median)
-median.theta <- apply(samples.theta, 2, median)
-fitted.median <- exp(X.standardised %*% median.beta + median.phi + median.theta + offset)
+median.re <- apply(samples.re, 2, median)
+fitted.median <- exp(X.standardised %*% median.beta + median.re  + offset)
 deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
-deviance.sum <- apply(-2 * log(samples.deviance), 1, sum)
-p.d <- mean(deviance.sum) - deviance.fitted
-DIC <- 2 * mean(deviance.sum) - deviance.fitted
-like.fitted <- apply(samples.deviance, 2, mean)
-DIC3 <- 2 * mean(deviance.sum)   + 2 * sum(log(like.fitted))     
-
+p.d <- median(samples.deviance) - deviance.fitted
+DIC <- 2 * median(samples.deviance) - deviance.fitted     
+     
      
 #### Compute the Conditional Predictive Ordinate
-CPO.temp <- 1 / samples.deviance
-CPO <- 1/apply(CPO.temp, 2, mean)
-MPL <- sum(log(CPO))    
+CPO <- rep(NA, n)
+     for(j in 1:n)
+     {
+     CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
+     }
+LMPL <- sum(log(CPO))  
 
-
-
+     
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- samples.beta
 number.cts <- sum(X.indicator==1)     
@@ -461,7 +457,6 @@ if(number.cts>0)
 }
 
 
-
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
@@ -482,32 +477,16 @@ summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
 
 
 #### Create the Fitted values and residuals
-fitted.values <- array(NA, c(n, 5))
-colnames(fitted.values) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-fitted.values[ ,1] <- apply(samples.fitted, 2, mean)
-fitted.values[ ,2] <- apply(samples.fitted, 2, sd)
-fitted.values[ ,3:5] <- t(apply(samples.fitted, 2, quantile, c(0.5, 0.025, 0.975)))
-fitted.values <- round(fitted.values, 4)
-
-residuals <- array(NA, c(n, 5))
-colnames(residuals) <- c("Mean", "Sd", "Median", "2.5%", "97.5%")
-residuals.temp <- array(NA, c(nrow(samples.beta), n))
-     for(i in 1:nrow(samples.beta))
-     {
-     residuals.temp[i, ] <- as.numeric(Y) - samples.fitted[i, ]
-     }
-residuals[ ,1] <- apply(residuals.temp, 2, mean)
-residuals[ ,2] <- apply(residuals.temp, 2, sd)
-residuals[ ,3:5] <- t(apply(residuals.temp, 2, quantile, c(0.5, 0.025, 0.975)))
-residuals <- round(residuals, 4)
+fitted.values <- apply(samples.fitted, 2, median)
+residuals <- as.numeric(Y) - fitted.values
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, DIC3, MPL)
-names(modelfit) <- c("DIC", "p.d", "DIC3", "MPL")
+modelfit <- c(DIC, p.d, LMPL)
+names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - BYM CAR\n")
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2))
-results <- list(formula=formula,  samples=samples, fitted.values=fitted.values, residuals=residuals, W.summary=W, modelfit=modelfit, summary.results=summary.results, model=model.string, accept=accept.final)
+samples <- list(beta=samples.beta.orig, re=mcmc(samples.re), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted))
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
      if(verbose)

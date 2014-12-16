@@ -1,24 +1,22 @@
-\name{properCAR.re}
-\alias{properCAR.re}
+\name{S.CARbym}
+\alias{S.CARbym}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
-
 \title{
-Fit the proper conditional autoregressive (CAR) model to spatial data
+Fit a generalised linear model with a set of spatially autocorrelated random effect following the BYM conditional autoregressive (CAR) prior to spatial data.
 }
 
 \description{
-The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by the conditional autoregressive (CAR) model proposed by Stern and Cressie 1999. The model represents the linear predictor by a combination of covariates and a sets of random effects. The latter are spatially correlated and come from the proper CAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by the BYM conditional autoregressive (CAR) model (Besag et. al. 1991). The model represents the linear predictor of the data  by a combination of covariates and two sets of random effects. For the latter, the first set are independent, while the second are spatially correlated and come from the IAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov chain Monte Carlo (McMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
-
 
 
 \usage{
-properCAR.re(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0,
-n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.nu2=NULL, prior.tau2=NULL, prior.rho=NULL, verbose=TRUE)
-
+S.CARbym(formula, family, data=NULL, trials=NULL, W, burnin=0, n.sample=1000, 
+thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, 
+prior.tau2=NULL, prior.sigma2=NULL, verbose=TRUE)
 }
+
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{formula}{
@@ -30,10 +28,10 @@ One of either 'binomial', 'gaussian' or 'poisson', which respectively specify a 
   \item{data}{
 A data.frame containing the  variables in the formula.
 }
- \item{trials}{
-A vector the same length as the response containing the total number of trials for each area.
+  \item{trials}{
+Only used if family='binomial'. A vector the same length as the response containing the total number of trials for each area.
 }
-  \item{W}{
+   \item{W}{
 A binary n by n neighbourhood matrix (where n is the number of spatial units). The jkth element equals one if areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
 }
   \item{burnin}{
@@ -45,28 +43,27 @@ The number of MCMC samples to generate. Defaults to 1,000.
   \item{thin}{
 The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1.
 }
-  \item{blocksize.beta}{
-The size of the blocks in which to update the regression parameters in the MCMC algorithm. Defaults to 5.
-}
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
 }
-    \item{prior.nu2}{
+  \item{prior.nu2}{
 Only used for the Gaussian model. The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for nu2. Defaults to c(0.001, 0.001).  
 }
-  \item{prior.tau2}{
+     \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for tau2. Defaults to c(0.001, 0.001).  
 }
-  \item{prior.rho}{
-A discrete prior is assigned for rho. The prior is the set of possible values in the interval [0,1). Defaults to (0, 0.01,...,0.98, 0.99).   
+  \item{prior.sigma2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for sigma2. Defaults to c(0.001, 0.001).  
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
 }
 }
+
+
 
 \details{
 For further details about how to apply the function see the examples below and in the vignette.
@@ -74,28 +71,25 @@ For further details about how to apply the function see the examples below and i
 
 
 \value{
-\item{formula }{The formula for the covariate and offset part of the model.}
-\item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{W.summary }{The neighbourhood matrix W from the model.}
-\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), DIC3 and the Marginal Predictive Likelihood (MPL).}
 \item{summary.results }{A summary table of the parameters.}
-\item{model }{A text string describing the model fit.}
+\item{samples }{A list containing the McMC samples from the model.}
+\item{fitted.values }{A vector of fitted values for each area.}
+\item{residuals }{A vector of residuals for each area.}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), and the Log Marginal Predictive Likelihood (LMPL).}
 \item{accept }{The acceptance probabilities for the parameters.}
+\item{localised.structure }{NULL, for compatability with the other models.}
+\item{formula }{The formula for the covariate and offset part of the model.}
+\item{model }{A text string describing the model fit.}
+\item{X }{The design matrix of covariates.}
 }
 
 \references{
-Stern, H. and N. Cressie (1999). Inference for extremes in disease mapping, Chapter
-Disease mapping and Risk Assessment for Public Health. Lawson, A and Biggeri, D
-and Boehning, E and Lesaffre, E and Viel, J and Bertollini, R (eds). Wiley.
+Besag, J., J. York, and A. Mollie (1991). Bayesian image restoration with two applications in spatial statistics. Annals of the Institute of Statistics and Mathematics 43, 1-59.
 }
 
 \author{
 Duncan Lee
 }
-
-
 
 
 \examples{
@@ -112,7 +106,7 @@ n <- nrow(Grid)
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
 distance <-array(0, c(n,n))
 W <-array(0, c(n,n))
-	for(i in 1:n)
+  for(i in 1:n)
 	{
 		for(j in 1:n)
 		{
@@ -134,8 +128,8 @@ trials <- rep(50,n)
 Y <- rbinom(n=n, size=trials, prob=prob)
 
 
-#### Run the proper model
+#### Run the BYM model
 formula <- Y ~ x1 + x2
-\dontrun{model <- properCAR.re(formula=formula, family="binomial", trials=trials,
+\dontrun{model <- S.CARbym(formula=formula, family="binomial, trials=trials,
 W=W, burnin=5000, n.sample=10000)}
 }

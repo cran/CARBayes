@@ -1,21 +1,21 @@
-\name{lerouxCAR.re}
-\alias{lerouxCAR.re}
+\name{S.CARleroux}
+\alias{S.CARleroux}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 
 \title{
-Fit the Leroux conditional autoregressive (CAR) model to spatial data
+Fit a generalised linear model with a set of spatially autocorrelated random effect following the conditional autoregressive (CAR) prior proposed by Leroux et al. (1999) to spatial data.
 }
 
 \description{
-The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by the conditional autoregressive (CAR) model proposed by Leroux et. al. 1999. The model represents the linear predictor by a combination of covariates and a sets of random effects. The latter are spatially correlated and come from the Leroux CAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov Chain Monte Carlo (MCMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by the conditional autoregressive (CAR) model proposed by Leroux et. al. 1999. The model represents the linear predictor by a combination of covariates and a sets of random effects. The latter are spatially correlated and come from the Leroux CAR model. A set of offsets can also be included on the linear predictor scale. Inference is based on Markov chain Monte Carlo (McMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
 }
 
 
 \usage{
-lerouxCAR.re(formula, family=NULL, data=NULL,  trials=NULL, W, burnin=0, 
-n.sample=1000, thin=1, blocksize.beta=5, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.nu2=NULL, prior.tau2=NULL, prior.rho=NULL, verbose=TRUE)
+S.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin=0, 
+n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
+prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -43,9 +43,6 @@ The number of MCMC samples to generate. Defaults to 1,000.
   \item{thin}{
 The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1.
 }
-  \item{blocksize.beta}{
-The size of the blocks in which to update the regression parameters in the MCMC algorithm. Defaults to 5.
-}
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.
 }
@@ -58,9 +55,6 @@ Only used for the Gaussian model. The prior shape and scale in the form of c(sha
   \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for tau2. Defaults to c(0.001, 0.001).  
 }
-  \item{prior.rho}{
-A discrete prior is assigned for rho. The prior is the set of possible values in the interval [0,1). Defaults to (0, 0.01,...,0.98, 0.99).   
-}
   \item{verbose}{
 Logical, should the function update the user on its progress.  
 }
@@ -72,15 +66,16 @@ For further details about how to apply the function see the examples below and i
 
 
 \value{
-\item{formula }{The formula for the covariate and offset part of the model.}
-\item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{A summary matrix of the posterior distributions of the fitted values for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{residuals }{A summary matrix of the posterior distributions of the residuals for each area. The summaries include: Mean, Sd, Median, and credible interval.}
-\item{W.summary }{The neighbourhood matrix W from the model.}
-\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), DIC3 and the Marginal Predictive Likelihood (MPL).}
 \item{summary.results }{A summary table of the parameters.}
-\item{model }{A text string describing the model fit.}
+\item{samples }{A list containing the McMC samples from the model.}
+\item{fitted.values }{A vector of fitted values for each area.}
+\item{residuals }{A vector of residuals for each area.}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), and the Log Marginal Predictive Likelihood (LMPL).}
 \item{accept }{The acceptance probabilities for the parameters.}
+\item{localised.structure }{NULL, for compatability with the other models.}
+\item{formula }{The formula for the covariate and offset part of the model.}
+\item{model }{A text string describing the model fit.}
+\item{X }{The design matrix of covariates.}
 }
 
 \references{
@@ -132,6 +127,6 @@ Y <- rbinom(n=n, size=trials, prob=prob)
 
 #### Run the Leroux model
 formula <- Y ~ x1 + x2
-\dontrun{model <- lerouxCAR.re(formula=formula, family="binomial", trials=trials,
-W=W, burnin=5000, n.sample=10000)}
+\dontrun{model <- S.CARleroux(formula=formula, family="binomial", 
+trials=trials, W=W, burnin=5000, n.sample=10000)}
 }
