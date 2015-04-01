@@ -1,4 +1,4 @@
-poisson.clusterCARagg <- function(formula, exposure=NULL, data=NULL, G, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
+poisson.clusterCARagg <- function(formula, exposure=NULL, data=NULL, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -204,16 +204,19 @@ alpha <- mod.glm$coefficients[length(mod.glm$coefficients)]
      
 #### MCMC quantities
 ## Checks
-  if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
-  if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE) 
-  if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
-  if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
-  if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
-  if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
-  if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
-  if(burnin!=round(burnin)) stop("burnin is not an integer.", call.=FALSE) 
-  if(n.sample!=round(n.sample)) stop("n.sample is not an integer.", call.=FALSE) 
-  if(thin!=round(thin)) stop("thin is not an integer.", call.=FALSE) 
+if(is.null(burnin)) stop("the burnin argument is missing", call.=FALSE)
+if(is.null(n.sample)) stop("the n.sample argument is missing", call.=FALSE)
+if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
+if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE) 
+if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
+if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
+if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
+if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+if(n.sample <= thin)  stop("thin is greater than n.sample.", call.=FALSE)
+if(burnin!=round(burnin)) stop("burnin is not an integer.", call.=FALSE) 
+if(n.sample!=round(n.sample)) stop("n.sample is not an integer.", call.=FALSE) 
+if(thin!=round(thin)) stop("thin is not an integer.", call.=FALSE) 
 
 ## Compute the blocking structure for beta     
 blocksize <- 5
@@ -286,7 +289,7 @@ W.triplet <- c(NA, NA, NA)
      {
           for(j in 1:n)
           {
-               if(W[i,j]==1)
+               if(W[i,j]>0)
                {
                W.triplet <- rbind(W.triplet, c(i,j, W[i,j]))     
                }else{}
@@ -683,9 +686,18 @@ number.cts <- sum(X.indicator==1)
  
 #### Shrink the lambda object to only include those levels used
 Z.used <- as.numeric(names(table(samples.Z)))
-Greal <- length(Z.used)     
-samples.lambda <- samples.lambda[ ,Z.used]    
-colnames(samples.lambda) <- Z.used
+Greal <- length(Z.used)
+    if(Greal==1)
+    {
+    samples.lambda <- samples.lambda[ ,Z.used]
+    samples.lambda <- matrix(samples.lambda, nrow=n.keep, ncol=1)
+    colnames(samples.lambda) <- Z.used
+    }else
+    {
+    samples.lambda <- samples.lambda[ ,Z.used]
+    colnames(samples.lambda) <- Z.used
+    }
+
      
      
 #### Create a summary object

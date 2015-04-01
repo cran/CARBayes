@@ -2,69 +2,83 @@
 \alias{S.CARdissimilarity}
 
 \title{
-Fit a generalised linear model with a set of spatially autocorrelated random effect following the localised conditional autoregressive (CAR) prior proposed by Lee and Mitchell (2012) to spatial data.
+Fit a spatial generalised linear mixed model to data, where the random effects 
+have a localised conditional autoregressive prior.
 }
 
 \description{
-The function fits a Bayesian hierarchical model with spatially correlated random effects to the data, whre the data likelihood can be binomial, Gaussian or Poisson. The random effects are modelled by a localised conditional autoregressive (CAR) model, which is a generalisation of that proposed by Lee and Mitchell (2012). The random effects in neighbouring areas (e.g. those that share a common border) are modelled as correlated or conditionally independent, depending on whether the populations living in the two areas are similar (correlated random effects) or very different (conditionally independent). The model represents the linear predictor  by a combination of covariates and a set of random effects. Inference is based on Markov chain Monte Carlo (McMC) simulation, using a combination of Gibbs sampling and Metropolis steps.
+Fit a spatial generalised linear mixed model to areal unit data, where the response
+variable can be binomial, Gaussian or Poisson. The linear predictor is modelled by
+known covariates and a vector of random effects. The latter are modelled by the 
+localised conditional autoregressive prior proposed by Lee and Mitchell (2012), 
+and further details are given in the vignette accompanying this package. Inference
+is conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. 
 }
 
 \usage{
 S.CARdissimilarity(formula, family, data=NULL,  trials=NULL, W, 
-Z, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, 
+Z, burnin, n.sample, thin=1, prior.mean.beta=NULL, 
 prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 }
 
 
 \arguments{
   \item{formula}{
-A formula for the covariate part of the model, using the same notation as for the lm() function. The offsets should also be included here using the offset() function.
+A formula for the covariate part of the model using the syntax of the
+lm() function. Offsets can be included here using the offset() function.
 }
   \item{family}{
-One of either 'binomial', 'gaussian' or 'poisson', which respectively specify a binomial likelihood model with a logistic link function, a Gaussian likelihood model with an identity link function, or a Poisson likelihood model with a log link function. 
+One of either `binomial', `gaussian' or `poisson', which respectively specify a 
+binomial likelihood model with a logistic link function, a Gaussian likelihood 
+model with an identity link function, or a Poisson likelihood model with a 
+log link function. 
 }
   \item{data}{
-A data.frame containing the  variables in the formula.
+An optional data.frame containing the  variables in the formula.
 }
   \item{trials}{
-A vector the same length as the response containing the total number of trials for each area.
+A vector the same length as the response containing the total number of trials 
+for each area. Only used if family=`binomial'. 
 }
   \item{W}{
-A binary n by n neighbourhood matrix (where n is the number of spatial units). The jkth element equals one if areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
+A binary n by n neighbourhood matrix (where n is the number of spatial units). 
+The jkth element equals one if areas (j, k) are spatially close (e.g. share a common
+border) and is zero otherwise. 
 }
   \item{Z}{
-A list, where each element is an n by n matrix of non-negative dissimilarity metrics. For details of their construction see the main help page for CARBayes.
+A list, where each element is an n by n matrix of non-negative dissimilarity metrics.
 }
   \item{burnin}{
-The number of MCMC samples to discard as the burnin period. Defaults to 0.
+The number of McMC samples to discard as the burnin period.
 }
   \item{n.sample}{
-The number of MCMC samples to generate. Defaults to 1,000.
+The number of McMC samples to generate.
 }
   \item{thin}{
-The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1.
+The level of thinning to apply to the McMC samples to reduce their temporal 
+autocorrelation. Defaults to 1.
 }
   \item{prior.mean.beta}{
-A vector of prior means for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector of zeros.
+A vector of prior means for the regression parameters beta (Gaussian priors are 
+assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
-A vector of prior variances for the regression parameters beta (Gaussian priors are assumed). Defaults to a vector with values 1000.
+A vector of prior variances for the regression parameters beta (Gaussian priors 
+are assumed). Defaults to a vector with values 1000.
+}  
+  \item{prior.nu2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
+prior for nu2. Defaults to c(0.001, 0.001) and only used if family=`Gaussian'.   
 }
-     \item{prior.nu2}{
-Only used for the Gaussian model. The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for nu2. Defaults to c(0.001, 0.001).  
-}
-  \item{prior.tau2}{
-The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) prior for tau2. Defaults to c(0.001, 0.001).
+     \item{prior.tau2}{
+The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
+prior for tau2. Defaults to c(0.001, 0.001).  
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
 }
 }
 
-
-\details{
-For further details about how to apply the function see the examples below and in the vignette.
-}
 
 
 
@@ -73,9 +87,16 @@ For further details about how to apply the function see the examples below and i
 \item{samples }{A list containing the McMC samples from the model.}
 \item{fitted.values }{A vector of fitted values for each area.}
 \item{residuals }{A vector of residuals for each area.}
-\item{modelfit }{Model fit criteria including the Deviance Information Criterion (DIC), the effective number of parameters in the model(p.d), and the Log Marginal Predictive Likelihood (LMPL).}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion 
+(DIC), the effective number of parameters in the model (p.d), and the Log Marginal 
+Predictive Likelihood (LMPL).}
 \item{accept }{The acceptance probabilities for the parameters.}
-\item{localised.structure }{A list containing two matrices: W.posterior contains posterior medians for each element wkj of the n by n neighbourhood matrix W; W.border.prob contains posterior probabilities that each wkj element of the n by n neighbourhood matrix W equals zero. This corresponds to the posterior probability of a boundary in the random effects surface. In both cases elements which correspond to two non-neighbouring areas have NA values.}
+\item{localised.structure }{A list containing two matrices: W.posterior contains 
+posterior medians for each element wkj of the n by n neighbourhood matrix W; 
+W.border.prob contains posterior probabilities that each wkj element of the n by n
+neighbourhood matrix W equals zero. This corresponds to the posterior probability
+of a boundary in the random effects surface. In both cases elements which correspond
+to two non-neighbouring areas have NA values.}
 \item{formula }{The formula for the covariate and offset part of the model.}
 \item{model }{A text string describing the model fit.}
 \item{X }{The design matrix of covariates.}
@@ -84,7 +105,8 @@ For further details about how to apply the function see the examples below and i
 
 
 \references{
-Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. Biostatistics, 13, 415-426.
+Lee, D. and R. Mitchell (2012). Boundary detection in disease mapping studies. 
+Biostatistics, 13, 415-426.
 }
 
 \author{
@@ -138,5 +160,5 @@ Z <- list(dissimilarity.matrix=dissimilarity.matrix)
 #### Run the localised smoothing model
 formula <- Y ~ 1
 \dontrun{model <- S.CARdissimilarity(formula=formula, family="binomial",
-trials=trials, W=W, Z=Z, burnin=5000, n.sample=10000)}
+trials=trials, W=W, Z=Z, burnin=20000, n.sample=100000)}
 }

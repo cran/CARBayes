@@ -2,11 +2,17 @@
 \alias{combine.data.shapefile}
 
 \title{
-Combine a data frame with a shapefile to create a SpatialPolygonsDataFrame object.
+Combines a data frame with a shapefile to create a SpatialPolygonsDataFrame object.
 }
 
 \description{
-This function combines a data frame with a shapefile and creates a SpatialPolygonsDataFrame object from the 'sp' package. The creation of this object allows the variables in the data frame to be plotted as a spatial map using the 'spplot()' function. For the function to work the row names in the data frame must be a subset of the names in the first column of the dbf file. See the main CARBayes help file for an example.
+This function combines a data frame with a shapefile to create a SpatialPolygonsDataFrame
+object from the `sp' package. The creation of this object allows the variables in
+the data frame to be mapped using the `spplot()' function, and the neighbourhood
+matrix W to be created using the `poly2nb' and `nb2mat' functions. An example is
+given in the vignette accompanying this package. The mapping of the data to the 
+shapefile is done by matching the rownames of the data frame to the first column
+in the dbf file.
 }
 
 \usage{
@@ -15,19 +21,25 @@ combine.data.shapefile(data, shp, dbf)
 
 \arguments{
 \item{data}{
-A data frame containing the variables you wish to map. Note, the row names of this data frame must appear in the .dbf file (see argument 3 below).
+A data frame containing the variables relating to the n areas you wish to map or 
+model. The row names of this data frame must appear in the first column of the 
+dbf file.
 }
   \item{shp}{
-The .shp part of a shapefile containing the polygons of the areas that the data relate to.
+The .shp part of a shapefile containing the polygons for each of the n areas that
+the data relate to.
 }
   \item{dbf}{
-The .dbf part of the shapefile containing a lookup table, whose first column includes the row names of the data frame. 
+The .dbf part of the shapefile containing a lookup table whose first column 
+should inlcude the n row names of the data frame. 
 }
 }
 
 
 \value{
-\item{SpatialPolygonsDataFrame }{A SpatialPolygonsDataFrame object from the 'sp' package, which has combined the data frame with the shapefile and allows the variables in the data frame to be plotted as a spatial map using the spplot() function.}
+\item{ }{A SpatialPolygonsDataFrame object from the `sp' 
+package containing the conbined data and shapefile object.
+}
 }
 
 \author{
@@ -35,5 +47,5 @@ Duncan Lee
 }
 
 \examples{
-## See the examples in the main help file for CARBayes.
+## See the vignette accompanying this package for an example of its use.
 }

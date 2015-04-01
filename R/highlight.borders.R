@@ -1,9 +1,8 @@
-highlight.borders <-
-function(border.locations, ID, shp, dbf)
+highlight.borders <- function(border.locations, spdata)
 {
 #### This function takes in an n by n matrix where values of one represent non-borders and
 #### values equal to zero represent borders. The function then links this matrix with a
-#### shapefile to identify the borders. The result is a spatialPoints object which can be
+#### spatialpolygonsdataframe object to identify the borders. The result is a spatialPoints object which can be
 #### plotted.
 
 ############################
@@ -13,18 +12,18 @@ n <- nrow(border.locations)
 border.locations[is.na(border.locations)] <- 2
 boundary.all <- array(c(NA, NA), c(1,2))
 colnames(boundary.all) <- c("X", "Y")
-     
+polygons <- spdata@polygons
+
+
      for(i in 1:n)
      {
           for(j in 1:n)
           {
                if(border.locations[i,j]==0 & i>j)
                {
-               #### Determine which pairs of shapefile points to compare    
-               ID1 <- which(dbf$dbf[ ,1]==ID[i]) 
-               ID2 <- which(dbf$dbf[ ,1]==ID[j])     
-               points1 <- shp$shp[[ID1]]$points     
-               points2 <- shp$shp[[ID2]]$points
+               #### Obtain the points from the spdata object    
+               points1 <- polygons[[i]]@Polygons[[1]]@coords     
+               points2 <- polygons[[j]]@Polygons[[1]]@coords
                     
                     
                #### Determine the points in common

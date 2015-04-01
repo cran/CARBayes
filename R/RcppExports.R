@@ -37,4 +37,3 @@ gaussiancarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2,
     .Call('CARBayes_gaussiancarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset)
 }
 
-

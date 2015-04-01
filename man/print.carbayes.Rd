@@ -3,10 +3,11 @@
 
 
 \title{
-Print a summary of the fitted model to the screen.
+Print a summary of a fitted carbayes model to the screen.
 }
 \description{
-This function takes a carbayes object and returns a summary of the fitted model.
+This function takes a fitted model object of type `carbayes'  and returns a 
+summary of it.
 }
 
 \usage{
@@ -17,7 +18,7 @@ This function takes a carbayes object and returns a summary of the fitted model.
 
 \arguments{
   \item{x}{
-A carbayes fitted model object
+A `carbayes' fitted model object
 }
   \item{\dots}{
 Ignored
@@ -28,5 +29,5 @@ Duncan Lee
 }
 
 \examples{
-## See the examples in the main help file for CARBayes.
+## See the vignette accompanying this package for an example of its use.
 }

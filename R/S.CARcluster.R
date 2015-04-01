@@ -1,4 +1,4 @@
-S.CARcluster <- function(formula, exposure=NULL, family,  data=NULL, G, trials=NULL, W, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.delta=NULL, verbose=TRUE)
+S.CARcluster <- function(formula, exposure=NULL, family,  data=NULL, G, trials=NULL, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.delta=NULL, verbose=TRUE)
 {
 #### This is a wrapper function that calls one of
 ## binomial.clusterCAR

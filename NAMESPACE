@@ -2,7 +2,6 @@ useDynLib(CARBayes)
 export(
      combine.data.shapefile,
 	highlight.borders,
-     print.carbayes,
      S.CARbym, 
      S.CARcluster,
      S.CARdissimilarity,
@@ -12,8 +11,10 @@ export(
      summarise.lincomb,
      summarise.samples
      )
+S3method(print, carbayes)
 import(MASS)
 import(Rcpp)
+import(CARBayesdata)
 importFrom(truncdist, rtrunc)
 importFrom(spam, as.spam,  chol.spam, diag, rowSums)
 importFrom(coda, mcmc)

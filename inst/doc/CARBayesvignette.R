@@ -1,13 +1,13 @@
 ### R code from vignette source 'CARBayesvignette.Rnw'
 
 ###################################################
-### code chunk number 1: CARBayesvignette.Rnw:186-187
+### code chunk number 1: CARBayesvignette.Rnw:194-195
 ###################################################
 library(CARBayes)
 
 
 ###################################################
-### code chunk number 2: CARBayesvignette.Rnw:192-196
+### code chunk number 2: CARBayesvignette.Rnw:200-204
 ###################################################
 library(shapefiles)
 library(sp)
@@ -16,14 +16,42 @@ library(spdep)
 
 
 ###################################################
-### code chunk number 3: CARBayesvignette.Rnw:245-247
+### code chunk number 3: CARBayesvignette.Rnw:209-210
 ###################################################
-data(spatialhousedata)
-housedata <- spatialhousedata@data
+library(CARBayesdata)
 
 
 ###################################################
-### code chunk number 4: CARBayesvignette.Rnw:297-306
+### code chunk number 4: CARBayesvignette.Rnw:246-249
+###################################################
+data(lipdata)
+data(lipdbf)
+data(lipshp)
+
+
+###################################################
+### code chunk number 5: CARBayesvignette.Rnw:254-256
+###################################################
+lipdbf$dbf <- lipdbf$dbf[ ,c(2,1)]
+data.combined <- combine.data.shapefile(data=lipdata, shp=lipshp, dbf=lipdbf)
+
+
+###################################################
+### code chunk number 6: CARBayesvignette.Rnw:262-264
+###################################################
+W.nb <- poly2nb(data.combined, row.names = rownames(lipdata))
+W.mat <- nb2mat(W.nb, style="B")
+
+
+###################################################
+### code chunk number 7: CARBayesvignette.Rnw:281-283
+###################################################
+data(propertydata.spatial)
+propertydata <- propertydata.spatial@data
+
+
+###################################################
+### code chunk number 8: CARBayesvignette.Rnw:327-336
 ###################################################
 northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), offset = c(220000,647000), 
 scale = 4000)
@@ -31,104 +59,106 @@ scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = c(225000
 scale = 10000, fill=c("transparent","black"))
 text1 <- list("sp.text", c(225000,649000), "0")
 text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(spatialhousedata, c("price"), sp.layout=list(northarrow, scalebar, text1, text2), 
-scales=list(draw = TRUE), at=seq(min(housedata$price)-1, max(housedata$price)+1, length.out=8), 
+spplot(propertydata.spatial, c("price"), sp.layout=list(northarrow, scalebar, text1, text2), 
+scales=list(draw = TRUE), at=seq(min(propertydata$price)-1, max(propertydata$price)+1, length.out=8), 
 col.regions=hsv(0,seq(0.05,1,length.out=7),1), col="transparent")
 
 
 ###################################################
-### code chunk number 5: CARBayesvignette.Rnw:321-323
+### code chunk number 9: CARBayesvignette.Rnw:351-353
 ###################################################
-housedata$logprice <- log(housedata$price)
-housedata$logdriveshop <- log(housedata$driveshop)
+propertydata$logprice <- log(propertydata$price)
+propertydata$logdriveshop <- log(propertydata$driveshop)
 
 
 ###################################################
-### code chunk number 6: CARBayesvignette.Rnw:328-331
+### code chunk number 10: CARBayesvignette.Rnw:358-361
 ###################################################
 library(splines)
 form <- logprice~ns(crime,3)+rooms+sales+factor(type) + logdriveshop
-model <- lm(formula=form, data=housedata)
+model <- lm(formula=form, data=propertydata)
 
 
 ###################################################
-### code chunk number 7: CARBayesvignette.Rnw:339-343
+### code chunk number 11: CARBayesvignette.Rnw:369-373
 ###################################################
-W.nb <- poly2nb(spatialhousedata, row.names = rownames(housedata))
+W.nb <- poly2nb(propertydata.spatial, row.names = rownames(propertydata))
 W.list <- nb2listw(W.nb, style="B")
 resid.model <- residuals(model)
 moran.mc(x=resid.model, listw=W.list, nsim=1000)
 
 
 ###################################################
-### code chunk number 8: CARBayesvignette.Rnw:356-360
+### code chunk number 12: CARBayesvignette.Rnw:394-397
 ###################################################
 W.mat <- nb2mat(W.nb, style="B")
-model.spatial <- S.CARleroux(formula=form, data=housedata, family="gaussian", 
+model.spatial <- S.CARleroux(formula=form, data=propertydata, family="gaussian", 
 W=W.mat, burnin=1000, n.sample=2000, verbose=FALSE)
-print(model.spatial)
 
 
 ###################################################
-### code chunk number 9: CARBayesvignette.Rnw:377-378
+### code chunk number 13: CARBayesvignette.Rnw:406-407
 ###################################################
 summary(model.spatial)
 
 
 ###################################################
-### code chunk number 10: CARBayesvignette.Rnw:388-389
+### code chunk number 14: CARBayesvignette.Rnw:417-418
 ###################################################
 summarise.samples(model.spatial$samples$beta, quantiles=c(0.5, 0.025, 0.975))
 
 
 ###################################################
-### code chunk number 11: CARBayesvignette.Rnw:394-396
+### code chunk number 15: CARBayesvignette.Rnw:423-425
 ###################################################
 crime.effect <- summarise.lincomb(model=model.spatial, columns=c(2,3,4), 
 quantiles=c(0.5, 0.025, 0.975), distribution=FALSE)
 
 
 ###################################################
-### code chunk number 12: CARBayesvignette.Rnw:414-417
+### code chunk number 16: CARBayesvignette.Rnw:445-450
 ###################################################
-plot(housedata$crime, crime.effect$quantiles[ ,1], pch=19, ylim=c(-0.55,0.05), xlab="Crime rate", ylab="Effect of crime")
-points(housedata$crime, crime.effect$quantiles[ ,2], pch=19, col="red")
-points(housedata$crime, crime.effect$quantiles[ ,3], pch=19, col="red")
+ord <- order(propertydata$crime)
+plot(propertydata$crime[ord], crime.effect$quantiles[ord ,1], pch=19, ylim=c(-0.55,0.05), xlab="Crime rate", ylab="Effect of crime", type="l")
+rug(propertydata$crime)
+lines(propertydata$crime[ord], crime.effect$quantiles[ord ,2], pch=19, col="red")
+lines(propertydata$crime[ord], crime.effect$quantiles[ord ,3], pch=19, col="red")
 
 
 ###################################################
-### code chunk number 13: CARBayesvignette.Rnw:439-442
+### code chunk number 17: CARBayesvignette.Rnw:476-479
 ###################################################
-data(spatialrespdata)
-respdata <- spatialrespdata@data
-head(respdata)
+data(respiratorydata.spatial)
+respiratorydata <- respiratorydata.spatial@data
+head(respiratorydata)
 
 
 ###################################################
-### code chunk number 14: CARBayesvignette.Rnw:448-452
+### code chunk number 18: CARBayesvignette.Rnw:485-489
 ###################################################
-respdata$SIR2010 <- respdata$observed2010 / respdata$expected2010
-spatialrespdata@data$SIR2010 <- respdata$SIR2010
-W.nb <- poly2nb(spatialrespdata, row.names = rownames(respdata))
+respiratorydata$SIR2010 <- respiratorydata$observed2010 / respiratorydata$expected2010
+respiratorydata.spatial@data$SIR2010 <- respiratorydata$SIR2010
+W.nb <- poly2nb(respiratorydata.spatial, row.names = rownames(respiratorydata))
 W.mat <- nb2mat(W.nb, style="B")
 
 
 ###################################################
-### code chunk number 15: CARBayesvignette.Rnw:460-467
+### code chunk number 19: CARBayesvignette.Rnw:497-504
 ###################################################
 northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), offset = c(220000,647000), scale = 4000)
 scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = c(225000,647000), scale = 10000, fill=c("transparent","black"))
 text1 <- list("sp.text", c(225000,649000), "0")
 text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(spatialrespdata, c("SIR2010"), sp.layout=list(northarrow, scalebar, text1, text2), 
-       scales=list(draw = TRUE), at=seq(min(respdata$SIR2010)-0.05, max(respdata$SIR2010)+0.05, length.out=8), 
+spplot(respiratorydata.spatial, c("SIR2010"), sp.layout=list(northarrow, scalebar, text1, text2), 
+       scales=list(draw = TRUE), at=seq(min(respiratorydata$SIR2010)-0.05, max(respiratorydata$SIR2010)+0.05, length.out=8), 
        col.regions=hsv(0,seq(0.05,1,length.out=7),1), col="transparent")
 
 
 ###################################################
-### code chunk number 16: CARBayesvignette.Rnw:486-488
+### code chunk number 20: CARBayesvignette.Rnw:523-526
 ###################################################
-Z.incomedep <- as.matrix(dist(cbind(respdata$incomedep2010, respdata$incomedep2010), 
-method="manhattan", diag=TRUE, upper=TRUE)) * W.mat / 2
+Z.incomedep <- as.matrix(dist(cbind(respiratorydata$incomedep2010, 
+respiratorydata$incomedep2010), method="manhattan", diag=TRUE, upper=TRUE)) * 
+W.mat / 2
 
 

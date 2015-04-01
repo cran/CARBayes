@@ -53,7 +53,6 @@ double quadform(NumericMatrix Wtriplet, NumericVector Wtripletsum, const int n_t
 double tau2_posteriorscale;
 double tau2_quadform = 0, tau2_phisq = 0;
 int row, col;
-int rowstart, rowend, rowtotal;
    
    
 // Compute the off diagonal elements of the quadratic form

@@ -1,4 +1,4 @@
-poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, burnin=0, n.sample=1000, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
+poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
 {
 #### Check on the verbose option
      if(is.null(verbose)) verbose=TRUE     
@@ -143,13 +143,19 @@ alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
      
 #### MCMC quantities
 ## Checks
-    if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
-    if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE)    
-    if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
-    if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
-    if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
-    if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
-    if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
+if(is.null(burnin)) stop("the burnin argument is missing", call.=FALSE)
+if(is.null(n.sample)) stop("the n.sample argument is missing", call.=FALSE)
+if(!is.numeric(burnin)) stop("burn-in is not a number", call.=FALSE)
+if(!is.numeric(n.sample)) stop("n.sample is not a number", call.=FALSE) 
+if(!is.numeric(thin)) stop("thin is not a number", call.=FALSE)
+if(n.sample <= 0) stop("n.sample is less than or equal to zero.", call.=FALSE)
+if(burnin < 0) stop("burn-in is less than zero.", call.=FALSE)
+if(thin <= 0) stop("thin is less than or equal to zero.", call.=FALSE)
+if(n.sample <= burnin)  stop("Burn-in is greater than n.sample.", call.=FALSE)
+if(n.sample <= thin)  stop("thin is greater than n.sample.", call.=FALSE)
+if(burnin!=round(burnin)) stop("burnin is not an integer.", call.=FALSE) 
+if(n.sample!=round(n.sample)) stop("n.sample is not an integer.", call.=FALSE) 
+if(thin!=round(thin)) stop("thin is not an integer.", call.=FALSE) 
 
 
 ## Compute the blocking structure for beta     
