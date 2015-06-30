@@ -4,56 +4,31 @@
 \docType{package}
 
 \title{
-Spatial Areal Unit Modelling
+Spatial Generalised Linear Mixed Models for Areal Unit Data
 }
 
 
 \description{
 Implements a class of spatial generalised linear mixed models for areal unit data, 
 with inference in a Bayesian setting using Markov chain Monte Carlo (McMC) 
-simulation. The spatial autocorrelation is modelled by  a set of random effects, 
-which are assigned a conditional autoregressive (CAR) prior distribution. A 
-number of different CAR priors are available for the random effects, and full 
-details are given in the vignette accompanying this package. The initial creation 
-of this package was supported by the Economic and Social Research Council (ESRC) 
-grant RES-000-22-4256, and on-going development is supported by the Engineering 
-and Physical Science Research Council (EPSRC) grant EP/J017442/1.
+simulation. The response variable can be binomial, Gaussian or Poisson. The 
+spatial autocorrelation is modelled by  a set of random effects, which are assigned 
+a conditional autoregressive (CAR) prior distribution. A number of different CAR 
+priors are available for the random effects, and full details are given in the 
+vignette accompanying this package. The initial creation of this package was supported 
+by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going 
+development is supported by the Engineering and Physical Science Research Council 
+(EPSRC) grant EP/J017442/1.
 }
 
 \details{
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 4.1\cr
-Date: \tab 2015-04-01\cr
+Version: \tab 4.2\cr
+Date: \tab 2015-06-30\cr
 License: \tab GPL (>= 2)\cr
 }
-
-The response variable for the class of generalised linear mixed models implmented
-here can be binomial, Gaussian or Poisson, and the mean function comprises  
-covariates and a set of random effects. A number of different prior distributions
-are available for the random effects, which represent different types of spatial 
-autocorrelation. These prior models are from the class of conditional autoregressive 
-(CAR) models, which capture spatial autocorrelation via a neighbourhood matrix W. 
-This matrix is typically binary(although non-binary matrices are allowed) and has
-a jkth element equal to one or zero, depending on whether areas j and k are 
-spatially close (typically chosen to mean sharing a common border). The following 
-random effects prior models are implemented in this package.
-
-An independent and identically distributed Gaussian prior.
-
-The intrinsic autoregressive (IAR) model proposed by Besag et al. (1991).
-
-The Besag-York-Mollie (BYM) model proposed by Besag et al. (1991).
-
-The proper CAR model proposed by Leroux et al. (1999).
-
-The localised CAR model proposed by Lee and Mitchell (2012).
-
-The localised CAR model proposed by Lee and Sarran (2014).
-
-More detailed descriptions of the methods are given by the references below and
-in the vignette accompanying this package. 
 }
 
 
@@ -72,8 +47,8 @@ Mathematics 43, 1-59.
 Lee, D. and Mitchell, R (2012). Boundary detection in disease mapping studies. 
 Biostatistics, 13, 415-426.
 
-Lee, D and Sarran, C  (2014). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies. arXiv:1412.4479.
+Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
+misalignment in long-term air pollution and health studies, Environmetrics, to appear.
 
 Leroux, B., Lei, X and Breslow, N (1999). Estimation of disease rates in small 
 areas: A new mixed model for spatial dependence, Chapter Statistical Models in 

@@ -190,7 +190,6 @@ proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
 proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
 chol.proposal.corr.beta <- chol(proposal.corr.beta) 
-tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-1)
 
 
 
@@ -203,6 +202,8 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-1)
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
     if(min(W)<0) stop("W has negative elements.", call.=FALSE)
     if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
+    if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
+
 
 ## Create the triplet object
 W.triplet <- c(NA, NA, NA)
@@ -231,6 +232,14 @@ temp <- 1
      temp <- temp + n.neighbours[i]
      }
      
+
+## Check for islands
+W.list<- mat2listw(W)
+W.nb <- W.list$neighbours
+W.islands <- n.comp.nb(W.nb)
+islands <- W.islands$comp.id
+n.islands <- max(W.islands$nc)
+tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)   
 
 
 
@@ -284,7 +293,10 @@ temp <- 1
     beta.offset <- X.standardised %*% beta + offset
     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
     phi <- temp1[[1]]
-    phi <- phi - mean(phi)
+    for(i in 1:n.islands)
+    {
+        phi[which(islands==i)] <- phi[which(islands==i)] - mean(phi[which(islands==i)])    
+    }
     accept[3] <- accept[3] + temp1[[2]]
     accept[4] <- accept[4] + n
     
@@ -338,10 +350,10 @@ temp <- 1
         accept <- c(0,0,0,0)
             
         #### beta tuning parameter
-            if(accept.beta > 70)
+            if(accept.beta > 40)
             {
             proposal.sd.beta <- 2 * proposal.sd.beta
-            }else if(accept.beta < 50)              
+            }else if(accept.beta < 20)              
             {
             proposal.sd.beta <- 0.5 * proposal.sd.beta
             }else
@@ -349,10 +361,10 @@ temp <- 1
             }
             
         #### phi tuning parameter
-            if(accept.phi > 40)
+            if(accept.phi > 50)
             {
             proposal.sd.phi <- 2 * proposal.sd.phi
-            }else if(accept.phi < 30)              
+            }else if(accept.phi < 40)              
             {
             proposal.sd.phi <- 0.5 * proposal.sd.phi
             }else
@@ -445,17 +457,18 @@ if(number.cts>0)
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p),rep(accept.beta, p))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+
 
 summary.hyper <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper <- c(summary.hyper, n.keep, accept.tau2)
+summary.hyper <- c(summary.hyper, n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[nrow(summary.results)] <- "tau2"
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
 
 #### Create the Fitted values and residuals

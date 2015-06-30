@@ -1,9 +1,6 @@
 summarise.lincomb <- function(model, columns=NULL, quantiles=0.5, distribution=FALSE)
 {
 #### Summarise a linear combination of the covariates
-
-#### Check for errors in the input
-     if(class(model)!="carbayes") stop("The model object is not from carbayes.", call.=FALSE)
 X <- model$X
 n <- nrow(X)
 p <- ncol(X)               

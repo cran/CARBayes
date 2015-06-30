@@ -68,12 +68,16 @@ combine.data.shapefile <-function(data, shp, dbf)
 
         if(sum(na.check)==n) stop("None of the rownames of the data object match the first column of the dbf object.", call.=FALSE)
 
-        datatrimmed <- data[na.check==0, ]
+        dataextend <- data.frame(rep(0, n), data)
+        datatrimmed <- dataextend[na.check==0, ]
+        datatrimmed2 <- data.frame(datatrimmed[ ,-1])
+        rownames(datatrimmed2) <- rownames(datatrimmed)
+        colnames(datatrimmed2) <- colnames(data)
         polygonstrimmed <- polygons[na.check==0]
         
                 
         # Merge the dataframe and polygons object
         poly <- SpatialPolygons(polygonstrimmed)
-        combined.data <- SpatialPolygonsDataFrame(poly, datatrimmed)
+        combined.data <- SpatialPolygonsDataFrame(poly, datatrimmed2)
         return(combined.data)
     }

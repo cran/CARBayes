@@ -41,12 +41,13 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
   \item{W}{
-A binary n by n neighbourhood matrix (where n is the number of spatial units). 
-The jkth element equals one if areas (j, k) are spatially close (e.g. share a common
-border) and is zero otherwise. 
+A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
+a binary specification is used, where the jkth element equals one if areas (j, k) 
+are spatially close (e.g. share a common border) and is zero otherwise. For this 
+model only the matrix must be binary.
 }
   \item{Z}{
-A list, where each element is an n by n matrix of non-negative dissimilarity metrics.
+A list, where each element is a K by K matrix of non-negative dissimilarity metrics.
 }
   \item{burnin}{
 The number of McMC samples to discard as the burnin period.
@@ -92,8 +93,8 @@ Logical, should the function update the user on its progress.
 Predictive Likelihood (LMPL).}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A list containing two matrices: W.posterior contains 
-posterior medians for each element wkj of the n by n neighbourhood matrix W; 
-W.border.prob contains posterior probabilities that each wkj element of the n by n
+posterior medians for each element w_kj of the K by K neighbourhood matrix W; 
+W.border.prob contains posterior probabilities that each w_kj element of the K by K
 neighbourhood matrix W equals zero. This corresponds to the posterior probability
 of a boundary in the random effects surface. In both cases elements which correspond
 to two non-neighbouring areas have NA values.}
@@ -122,18 +123,18 @@ Duncan Lee
 x.easting <- 1:10
 x.northing <- 1:10
 Grid <- expand.grid(x.easting, x.northing)
-n <- nrow(Grid)
+K <- nrow(Grid)
 
 #### Split the area into two groups between which there will be a boundary.
-groups <-rep(1, n) 
+groups <-rep(1, K) 
 groups[Grid$Var1>5] <- 2
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(n,n))
-W <-array(0, c(n,n))
-  for(i in 1:n)
+distance <-array(0, c(K,K))
+W <-array(0, c(K,K))
+  for(i in 1:K)
 	{
-		for(j in 1:n)
+		for(j in 1:K)
 		{
 		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
 		distance[i,j] <- sqrt(temp)
@@ -146,12 +147,12 @@ W <-array(0, c(n,n))
 phi <- mvrnorm(n=1, mu=groups, Sigma=0.2 * exp(-0.1 * distance))
 logit <- phi
 prob <- exp(logit) / (1 + exp(logit))
-trials <- rep(50,n)
-Y <- rbinom(n=n, size=trials, prob=prob)
+trials <- rep(50,K)
+Y <- rbinom(n=K, size=trials, prob=prob)
 
 
 #### Generate a dissimilarity metric
-dissimilarity <- cbind(groups) + rnorm(n, sd=0.2)
+dissimilarity <- cbind(groups) + rnorm(K, sd=0.2)
 dissimilarity.matrix <- as.matrix(dist(cbind(dissimilarity, dissimilarity), 
 method="manhattan", diag=TRUE, upper=TRUE)) * W/2
 

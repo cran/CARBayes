@@ -225,6 +225,8 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5*(n-1)
     if(sum(is.na(W))>0) stop("W has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
     if(!sum(names(table(W))==c(0,1))==2) stop("W has non-binary (zero and one) values.", call.=FALSE)
+    if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
+    if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
 
 ## Ensure the W matrix is symmetric
 Wnew <- array(0, c(n,n))
@@ -436,14 +438,15 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                #### Determine the acceptance probabilities
                accept.beta <- 100 * accept[1] / accept[2]
                accept.phi <- 100 * accept[3] / accept[4]
+               accept.alpha <- 100 * accept[5] / accept[6]
                accept.all <- accept.all + accept
                accept <- c(0,0,0,0,0,0)
             
                #### beta tuning parameter
-                    if(accept.beta > 70)
+                    if(accept.beta > 40)
                     {
                     proposal.sd.beta <- 2 * proposal.sd.beta
-                    }else if(accept.beta < 50)              
+                    }else if(accept.beta < 20)              
                     {
                     proposal.sd.beta <- 0.5 * proposal.sd.beta
                     }else
@@ -451,16 +454,26 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                     }
             
                #### phi tuning parameter
-                    if(accept.phi > 40)
+                    if(accept.phi > 50)
                     {
                     proposal.sd.phi <- 2 * proposal.sd.phi
-                    }else if(accept.phi < 30)              
+                    }else if(accept.phi < 40)              
                     {
                     proposal.sd.phi <- 0.5 * proposal.sd.phi
                     }else
                     {
                     }
                     }else
+                #### alpha tuning parameter
+                    if(accept.alpha > 50)
+                    {
+                    proposal.sd.alpha <- min(2 * proposal.sd.alpha, alpha.max/4)
+                    }else if(accept.alpha < 40)              
+                    {
+                    proposal.sd.alpha <- 0.5 * proposal.sd.alpha
+                    }else
+                    {
+                    }
                {   
                }
 
@@ -549,14 +562,15 @@ if(number.cts>0)
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+
 
 samples.alpha <- mcmc(samples.alpha)
 summary.alpha <- t(apply(samples.alpha, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q))
-colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q), effectiveSize(samples.alpha), geweke.diag(samples.alpha)$z)
+
 
 	if(!is.null(names(Z)))
  	{
@@ -572,17 +586,17 @@ colnames(summary.alpha) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
 	}
 
 
-summary.hyper <- array(NA, c(1 ,5))
+summary.hyper <- array(NA, c(1 ,7))
 summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper[1, 4:5] <- c(n.keep, accept.tau2)
+summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)
 alpha.min <- c(rep(NA, (p+1)), alpha.threshold)
 summary.results <- cbind(summary.results, alpha.min)
 rownames(summary.results)[(p+1)] <- c("tau2")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
-summary.results[ , 6] <- round(summary.results[ , 6], 4)
+summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
+summary.results[ , 8] <- round(summary.results[ , 8], 4)
 
      
 

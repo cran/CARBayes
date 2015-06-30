@@ -196,7 +196,8 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * n
      if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
      if(min(W)<0) stop("W has negative elements.", call.=FALSE)
      if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
-          
+    if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
+
 
 ## Create the triplet object
 W.triplet <- c(NA, NA, NA)
@@ -360,10 +361,10 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
           accept <- c(0,0,0,0,0,0)
                     
           #### beta tuning parameter
-               if(accept.beta > 70)
+               if(accept.beta > 40)
                {
                proposal.sd.beta <- 2 * proposal.sd.beta
-               }else if(accept.beta < 50)              
+               }else if(accept.beta < 20)              
                {
                proposal.sd.beta <- 0.5 * proposal.sd.beta
                }else
@@ -371,10 +372,10 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
                }
                     
           #### phi tuning parameter
-               if(accept.phi > 40)
+               if(accept.phi > 50)
                {
                proposal.sd.phi <- 2 * proposal.sd.phi
-               }else if(accept.phi < 30)              
+               }else if(accept.phi < 40)              
                {
                proposal.sd.phi <- 0.5 * proposal.sd.phi
                }else
@@ -382,10 +383,10 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
                }
                
           #### rho tuning parameter
-               if(accept.rho > 70)
+               if(accept.rho > 50)
                {
                proposal.sd.rho <- min(2 * proposal.sd.rho, 0.5)
-               }else if(accept.rho < 50)              
+               }else if(accept.rho < 40)              
                {
                proposal.sd.rho <- 0.5 * proposal.sd.rho
                }else
@@ -478,20 +479,21 @@ if(number.cts>0)
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+
           
-summary.hyper <- array(NA, c(2 ,5))
+summary.hyper <- array(NA, c(2 ,7))
 summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper[1, 4:5] <- c(n.keep, accept.tau2)
+summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 summary.hyper[2, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-summary.hyper[2, 4:5] <- c(n.keep, accept.rho)
+summary.hyper[2, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
           
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[(nrow(summary.results)-1):nrow(summary.results)] <- c("tau2", "rho")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
           
                    
 #### Create the Fitted values and residuals

@@ -165,6 +165,7 @@ nu2.posterior.shape <- prior.nu2[1] + 0.5*n
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
     if(min(W)<0) stop("W has negative elements.", call.=FALSE)
     if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
+    if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
 
 
 ## Create the triplet object
@@ -204,8 +205,6 @@ det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))
 
 #### Beta update quantities
 data.precision.beta <- t(X.standardised) %*% X.standardised
-data.var.beta <- solve(data.precision.beta)
-data.temp.beta <- data.var.beta %*% t(X.standardised)
 	if(length(prior.var.beta)==1)
 	{
 	prior.precision.beta <- 1 / prior.var.beta
@@ -215,9 +214,7 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
 	}
 
 
-  
-
-     
+ 
      
 ###########################
 #### Run the Bayesian model
@@ -238,12 +235,13 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
     ####################
     ## Sample from beta
     ####################
-    data.mean.beta <- data.temp.beta %*% (Y - phi - offset)
-    U <- chol((prior.precision.beta + data.precision.beta / nu2))
-    Uinv <- backsolve(U, diag(rep(1,p)))
-    fc.mean.beta <- Uinv %*% (t(Uinv) %*% (prior.precision.beta %*% prior.mean.beta + (data.precision.beta / nu2) %*% data.mean.beta))
-    beta <- fc.mean.beta + Uinv %*% rnorm(p)
-
+    fc.precision <- prior.precision.beta + data.precision.beta / nu2
+    fc.var <- solve(fc.precision)
+    beta.offset <- as.numeric(Y - offset - phi)
+    beta.offset2 <- t(X.standardised) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
+    fc.mean <- fc.var %*% beta.offset2
+    chol.var <- t(chol(fc.var))
+    beta <- fc.mean + chol.var %*% rnorm(p)        
     
 
     ##################
@@ -335,10 +333,10 @@ data.temp.beta <- data.var.beta %*% t(X.standardised)
           accept <- c(0,0)
                     
           #### rho tuning parameter
-               if(accept.rho > 70)
+               if(accept.rho > 50)
                {
                proposal.sd.rho <- min(2 * proposal.sd.rho, 0.5)
-               }else if(accept.rho < 50)              
+               }else if(accept.rho < 40)              
                {
                proposal.sd.rho <- 0.5 * proposal.sd.rho
                }else
@@ -390,7 +388,7 @@ DIC <- 2 * median(samples.deviance) - deviance.fitted
 CPO <- rep(NA, n)
      for(j in 1:n)
      {
-     CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=samples.nu2)))    
+     CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=sqrt(samples.nu2))))    
      }
 LMPL <- sum(log(CPO))       
      
@@ -428,22 +426,23 @@ if(number.cts>0)
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(100,p))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(100,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
-summary.hyper <- array(NA, c(3 ,5))
+
+summary.hyper <- array(NA, c(3 ,7))
 summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
-summary.hyper[1, 4:5] <- c(n.keep, 100)
+summary.hyper[1, 4:7] <- c(n.keep, 100, effectiveSize(samples.nu2), geweke.diag(samples.nu2)$z)
 summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper[2, 4:5] <- c(n.keep, 100)
+summary.hyper[2, 4:7] <- c(n.keep, 100, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 summary.hyper[3, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-summary.hyper[3, 4:5] <- c(n.keep, accept.rho)
+summary.hyper[3, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[(nrow(summary.results)-2):nrow(summary.results)] <- c("nu2", "tau2", "rho")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
 
 #### Create the Fitted values and residuals

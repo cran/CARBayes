@@ -19,7 +19,7 @@ highlight.borders(border.locations, spdata)
 
 \arguments{
   \item{border.locations}{
-An n by n matrix, where n is the number of areas, containing 3 distinct values: 
+A K by K matrix, where K is the number of areas, containing 3 distinct values: 
 NA for non-neighbouring areas; 0 for borders between neighbouring areas to be 
 highlighted on a map; and 1 for borders between neighbouring areas not to be 
 highlighted on a map.

@@ -42,9 +42,10 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
    \item{W}{
-A binary n by n neighbourhood matrix (where n is the number of spatial units). 
-The jkth element equals one if areas (j, k) are spatially close (e.g. share a common
-border) and is zero otherwise. 
+A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
+a binary specification is used, where the jkth element equals one if areas (j, k) 
+are spatially close (e.g. share a common border) and is zero otherwise. The matrix 
+can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
 The number of McMC samples to discard as the burnin period.
@@ -117,14 +118,14 @@ Duncan Lee
 x.easting <- 1:10
 x.northing <- 1:10
 Grid <- expand.grid(x.easting, x.northing)
-n <- nrow(Grid)
+K <- nrow(Grid)
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(n,n))
-W <-array(0, c(n,n))
-	for(i in 1:n)
+distance <-array(0, c(K,K))
+W <-array(0, c(K,K))
+	for(i in 1:K)
 	{
-		for(j in 1:n)
+		for(j in 1:K)
 		{
 		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
 		distance[i,j] <- sqrt(temp)
@@ -134,14 +135,14 @@ W <-array(0, c(n,n))
 	
 	
 #### Generate the covariates and response data
-x1 <- rnorm(n)
-x2 <- rnorm(n)
-theta <- rnorm(n, sd=0.05)
-phi <- mvrnorm(n=1, mu=rep(0,n), Sigma=0.4 * exp(-0.1 * distance))
+x1 <- rnorm(K)
+x2 <- rnorm(K)
+theta <- rnorm(K, sd=0.05)
+phi <- mvrnorm(n=1, mu=rep(0,K), Sigma=0.4 * exp(-0.1 * distance))
 logit <- x1 + x2 + theta + phi
 prob <- exp(logit) / (1 + exp(logit))
-trials <- rep(50,n)
-Y <- rbinom(n=n, size=trials, prob=prob)
+trials <- rep(50,K)
+Y <- rbinom(n=K, size=trials, prob=prob)
 
 
 #### Run the IAR model

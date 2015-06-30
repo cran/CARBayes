@@ -1,19 +1,70 @@
 print.carbayes <- function(x,...)
 {
-#### Print out the model fitted
-cat("\n#################\n")
-cat("#### Model fitted\n")
-cat("#################\n")
-cat(x$model)
-cat("Regression equation - ")
-print(x$formula)
+    if(class(x$localised.structure)=="list")
+    {
+        #### Print out the model fitted
+        cat("\n#################\n")
+        cat("#### Model fitted\n")
+        cat("#################\n")
+        cat(x$model)
+        cat("Regression equation - ")
+        print(x$formula)
+        
+        #### Print out the results
+        cat("\n############\n")
+        cat("#### Results\n")
+        cat("############\n")
+        cat("Posterior quantities and DIC\n\n")
+        print(x$summary.results)
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[3],"\n")
 
-#### Print out the results
-cat("\n############\n")
-cat("#### Results\n")
-cat("############\n")
-cat("Posterior quantiles and DIC\n\n")
-print(x$summary.results)
-cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "\n")
-return(invisible(x))
+        cat("\nThe number of stepchanges identified in the random effect surface\n")
+        temp <- x$localised.structure[[1]][!is.na(x$localised.structure[[1]])]
+        tab <- array(NA, c(1,2))
+        tab[1, ] <- c(sum(temp), length(temp)- sum(temp))
+        colnames(tab) <- c("no stepchange", "stepchange")
+        print(tab)
+    }else if(class(x$localised.structure)=="numeric")
+    {
+        #### Print out the model fitted
+        cat("\n#################\n")
+        cat("#### Model fitted\n")
+        cat("#################\n")
+        cat(x$model)
+        cat("Regression equation - ")
+        print(x$formula)
+        
+        #### Print out the results
+        cat("\n############\n")
+        cat("#### Results\n")
+        cat("############\n")
+        cat("Posterior quantities and DIC\n\n")
+        print(x$summary.results)
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[3],"\n")
+        cat("\nNumber of clusters with the number of data points in each one\n")
+        print(table(paste("group", x$localised.structure, sep="")))
+        
+    }else
+    {
+        #### Print out the model fitted
+        cat("\n#################\n")
+        cat("#### Model fitted\n")
+        cat("#################\n")
+        cat(x$model)
+        cat("Regression equation - ")
+        print(x$formula)
+        
+        #### Print out the results
+        cat("\n############\n")
+        cat("#### Results\n")
+        cat("############\n")
+        cat("Posterior quantities and DIC\n\n")
+        print(x$summary.results)
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[3],"\n")
+     }
+        
+return(invisible(x))        
 }
+
+
+

@@ -3,10 +3,10 @@ export(
      combine.data.shapefile,
 	highlight.borders,
      S.CARbym, 
-     S.CARcluster,
      S.CARdissimilarity,
      S.CARiar,
      S.CARleroux,
+     S.CARlocalised,
      S.independent,
      summarise.lincomb,
      summarise.samples
@@ -15,7 +15,10 @@ S3method(print, carbayes)
 import(MASS)
 import(Rcpp)
 import(CARBayesdata)
+import(stats)
 importFrom(truncdist, rtrunc)
 importFrom(spam, as.spam,  chol.spam, diag, rowSums)
-importFrom(coda, mcmc)
+importFrom(coda, mcmc, geweke.diag, effectiveSize)
 importFrom(sp, Polygon,  Polygons, SpatialPolygons, SpatialPolygonsDataFrame, SpatialPoints)
+importFrom(spdep, mat2listw, n.comp.nb)
+importFrom(utils, setTxtProgressBar, txtProgressBar)

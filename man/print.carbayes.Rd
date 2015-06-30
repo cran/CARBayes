@@ -6,8 +6,10 @@
 Print a summary of a fitted carbayes model to the screen.
 }
 \description{
-This function takes a fitted model object of type `carbayes'  and returns a 
-summary of it.
+This function takes a carbayes object and returns a summary of the fitted model.
+The summary includes posterior medians and 95 percent credible intervals, the
+number of samples, the acceptance rate, the effective number of independent samples 
+and the Geweke convergence diagnostic in the form of a Z-score.
 }
 
 \usage{
@@ -26,8 +28,4 @@ Ignored
 }
 \author{
 Duncan Lee
-}
-
-\examples{
-## See the vignette accompanying this package for an example of its use.
 }

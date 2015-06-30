@@ -1,27 +1,30 @@
-\name{S.CARcluster}
-\alias{S.CARcluster}
+\name{S.CARlocalised}
+\alias{S.CARlocalised}
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
 Fit a spatial generalised linear mixed model to data, where the random effects 
-have a localised clustered conditional autoregressive prior.
+have conditional autoregressive prior and are augmented with a piecewise constant 
+intercept term.
 }
 
 \description{
 Fit a spatial generalised linear mixed model to areal unit data, where the response
-variable can be binomial, Gaussian or Poisson. The linear predictor is modelled by
-known covariates and a vector of random effects. The latter are modelled by the 
-localised clustered conditional autoregressive prior proposed by Lee and Sarran
-(2014), and further details are given in the vignette accompanying this package. 
-Inference is conducted in a Bayesian setting using Markov chain Monte Carlo (McMC)
-simulation. 
+variable can be binomial or Poisson. Note, a Gaussian likelihood is not allowed 
+because of a lack of identifiability among the parameters. The linear predictor is 
+modelled by known covariates, a vector of random effects and a piecewise constant 
+intercept process. The random effects are modelled by an intrinsic CAR prior, while 
+the piecewise constant intercept process was proposed by Lee and Sarran (2015), and 
+allow neighbouring areas to have very different values. Further details are given 
+in the vignette accompanying this package. Inference is conducted in a Bayesian 
+setting using Markov chain Monte Carlo (McMC) simulation. 
 }
 
 \usage{
-S.CARcluster(formula, exposure=NULL, family, data=NULL, G, trials=NULL, W,
+S.CARlocalised(formula, exposure=NULL, family, data=NULL, G, trials=NULL, W,
 burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.nu2=NULL, prior.tau2=NULL,
-prior.delta=NULL, verbose=TRUE)
+prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL,prior.delta=NULL, 
+verbose=TRUE)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -32,16 +35,15 @@ lm() function. Offsets can be included here using the offset() function.
 }
   \item{exposure}{
 This optional argument allows a single covariate to have variation in its values 
-within an areal unit if the data are Poisson counts. The argument is a list object,
+within an areal unit if family=`poisson'. The argument is a list object,
 and each element of the list corresponds to a single areal unit. Each element in
 the list is a 2 column matrix, where the first column is the vector of values of 
 the covariate while the second column is a vector of weights for each value. 
 }
   \item{family}{
-One of either `binomial', `gaussian' or `poisson', which respectively specify a 
-binomial likelihood model with a logistic link function, a Gaussian likelihood 
-model with an identity link function, or a Poisson likelihood model with a 
-log link function. 
+One of either `binomial' or `poisson', which respectively specify a 
+binomial likelihood model with a logistic link function, or a Poisson likelihood 
+model with a log link function. 
 }
   \item{data}{
 An optional data.frame containing the  variables in the formula.
@@ -55,9 +57,10 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
    \item{W}{
-A binary n by n neighbourhood matrix (where n is the number of spatial units). 
-The jkth element equals one if areas (j, k) are spatially close (e.g. share a common
-border) and is zero otherwise. 
+A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
+a binary specification is used, where the jkth element equals one if areas (j, k) 
+are spatially close (e.g. share a common border) and is zero otherwise. The matrix 
+can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
 The number of McMC samples to discard as the burnin period.
@@ -85,10 +88,6 @@ multiplying the covariate with within area variation in its values. Defaults to 
 The prior variance for the regression parameter alpha (Gaussian priors are assumed) 
 multiplying the covariate with within area variation in its values. Defaults to 1000.
 }  
-  \item{prior.nu2}{
-The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for nu2. Defaults to c(0.001, 0.001) and only used if family=`Gaussian'.   
-}
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
 prior for tau2. Defaults to c(0.001, 0.001).  
@@ -120,8 +119,8 @@ Predictive Likelihood (LMPL).}
 }
 
 \references{
-Lee, D and Sarran, C  (2014). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies. arXiv:1412.4479.
+Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
+misalignment in long-term air pollution and health studies, Environmetrics, to appear.
 }
 
 \author{
@@ -138,18 +137,18 @@ Duncan Lee
 x.easting <- 1:10
 x.northing <- 1:10
 Grid <- expand.grid(x.easting, x.northing)
-n <- nrow(Grid)
+K <- nrow(Grid)
 
 #### Split the area into two groups between which there will be a boundary.
-groups <-rep(1, n) 
+groups <-rep(1, K) 
 groups[Grid$Var1>5] <- 2
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(n,n))
-W <-array(0, c(n,n))
-  for(i in 1:n)
+distance <-array(0, c(K,K))
+W <-array(0, c(K,K))
+  for(i in 1:K)
      {
-		for(j in 1:n)
+		for(j in 1:K)
 		{
 		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
 		distance[i,j] <- sqrt(temp)
@@ -162,12 +161,12 @@ W <-array(0, c(n,n))
 phi <- mvrnorm(n=1, mu=groups, Sigma=0.2 * exp(-0.1 * distance))
 logit <- phi
 prob <- exp(logit) / (1 + exp(logit))
-trials <- rep(50,n)
-Y <- rbinom(n=n, size=trials, prob=prob)
+trials <- rep(50,K)
+Y <- rbinom(n=K, size=trials, prob=prob)
 
 
 #### Run the localised smoothing model
 formula <- Y ~ 1
-\dontrun{model <- S.CARcluster(formula=formula, family="binomial", G=2,  
+\dontrun{model <- S.CARlocalised(formula=formula, family="binomial", G=2,  
 W=W,burnin=20000, n.sample=100000)}
 }

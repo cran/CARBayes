@@ -21,17 +21,17 @@ combine.data.shapefile(data, shp, dbf)
 
 \arguments{
 \item{data}{
-A data frame containing the variables relating to the n areas you wish to map or 
+A data frame containing the variables relating to the K areas you wish to map or 
 model. The row names of this data frame must appear in the first column of the 
 dbf file.
 }
   \item{shp}{
-The .shp part of a shapefile containing the polygons for each of the n areas that
+The .shp part of a shapefile containing the polygons for each of the K areas that
 the data relate to.
 }
   \item{dbf}{
 The .dbf part of the shapefile containing a lookup table whose first column 
-should inlcude the n row names of the data frame. 
+should inlcude the K row names of the data frame. 
 }
 }
 

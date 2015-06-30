@@ -1,19 +1,19 @@
 Package: CARBayes
 Type: Package
-Title: Spatial Areal Unit Modelling
-Version: 4.1
-Date: 2015-04-01
+Title: Spatial Generalised Linear Mixed Models for Areal Unit Data
+Version: 4.2
+Date: 2015-06-30
 Author: Duncan Lee
 Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
-Description: Implements a class of spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. The spatial autocorrelation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. A number of different CAR priors are available for the random effects, and full details are given in the vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development is supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1.
+Description: Implements a class of spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. The response variable can be binomial, Gaussian or Poisson. The spatial autocorrelation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. A number of different CAR priors are available for the random effects, and full details are given in the vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development is supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1.
 License: GPL (>= 2)
 Depends: MASS, R (>= 2.10.0), Rcpp (>= 0.10.6)
-Imports: CARBayesdata, coda, sp, spam, truncdist
+Imports: CARBayesdata, coda, sp, spam, spdep, stats, truncdist, utils
 Suggests: boot, deldir, foreign, grid, maptools, Matrix, nlme,
-        shapefiles, spdep, splines
+        shapefiles, splines
 LinkingTo: Rcpp
 LazyLoad: yes
-Packaged: 2015-04-01 05:52:43 UTC; duncanlee
 NeedsCompilation: yes
+Packaged: 2015-06-30 10:00:57 UTC; duncanlee
 Repository: CRAN
-Date/Publication: 2015-04-01 08:04:54
+Date/Publication: 2015-06-30 18:13:48

@@ -293,10 +293,10 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
         accept <- c(0,0,0,0)
             
         #### beta tuning parameter
-            if(accept.beta > 50)
+            if(accept.beta > 40)
             {
             proposal.sd.beta <- 2 * proposal.sd.beta
-            }else if(accept.beta < 70)              
+            }else if(accept.beta < 20)              
             {
             proposal.sd.beta <- 0.5 * proposal.sd.beta
             }else
@@ -304,7 +304,7 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
             }
             
         #### theta tuning parameter
-            if(accept.theta > 40)
+            if(accept.theta > 50)
             {
             proposal.sd.theta <- 2 * proposal.sd.theta
             }else if(accept.theta < 30)              
@@ -395,17 +395,18 @@ samples.beta.orig <- samples.beta
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
 summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta, p))
+summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept")
+colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+
 
 summary.hyper <- quantile(samples.sigma2, c(0.5, 0.025, 0.975))
-summary.hyper <- c(summary.hyper, n.keep, accept.sigma2)
+summary.hyper <- c(summary.hyper, n.keep, accept.sigma2, effectiveSize(samples.sigma2), geweke.diag(samples.sigma2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper)
 rownames(summary.results)[nrow(summary.results)] <- "sigma2"
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:5] <- round(summary.results[ , 4:5], 1)
+summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
 
 #### Create the Fitted values and residuals
