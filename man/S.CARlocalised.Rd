@@ -17,7 +17,8 @@ intercept process. The random effects are modelled by an intrinsic CAR prior, wh
 the piecewise constant intercept process was proposed by Lee and Sarran (2015), and 
 allow neighbouring areas to have very different values. Further details are given 
 in the vignette accompanying this package. Inference is conducted in a Bayesian 
-setting using Markov chain Monte Carlo (McMC) simulation. 
+setting using Markov chain Monte Carlo (McMC) simulation. Missing (NA) values are 
+not allowed in this model.
 }
 
 \usage{
@@ -31,7 +32,8 @@ verbose=TRUE)
 \arguments{
   \item{formula}{
 A formula for the covariate part of the model using the syntax of the
-lm() function. Offsets can be included here using the offset() function.
+lm() function. Offsets can be included here using the offset() function. The 
+response cannot contain missing (NA) values.
 }
   \item{exposure}{
 This optional argument allows a single covariate to have variation in its values 
@@ -120,7 +122,8 @@ Predictive Likelihood (LMPL).}
 
 \references{
 Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies, Environmetrics, to appear.
+misalignment in long-term air pollution and health studies, Environmetrics, 
+DOI 10.1002/env.2348.
 }
 
 \author{

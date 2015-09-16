@@ -14,7 +14,10 @@ because of a lack of identifiability among the parameters. The linear predictor 
 modelled by known covariates and a vector of random effects. The latter are modelled as 
 independent and identically distributed, and further  details are given in the 
 vignette accompanying this package. Inference is conducted in a Bayesian setting
-using Markov chain Monte Carlo (McMC) simulation. 
+using Markov chain Monte Carlo (McMC) simulation. Missing (NA) values are allowed in 
+the response. Missing (NA) values are allowed in the response, and posterior predictive 
+distributions are created for the missing values for predictive purposes. These are s
+aved in the `samples' argument in the output of the function and are denoted by `Y'.
 }
 
 
@@ -27,7 +30,8 @@ prior.mean.beta=NULL, prior.var.beta=NULL, prior.sigma2=NULL, verbose=TRUE)
 \arguments{
   \item{formula}{
 A formula for the covariate part of the model using the syntax of the
-lm() function. Offsets can be included here using the offset() function.
+lm() function. Offsets can be included here using the offset() function. The 
+response can contain missing (NA) values.
 }
   \item{family}{
 One of either `binomial' or `poisson', which respectively specify a 

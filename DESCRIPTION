@@ -1,8 +1,8 @@
 Package: CARBayes
 Type: Package
 Title: Spatial Generalised Linear Mixed Models for Areal Unit Data
-Version: 4.2
-Date: 2015-06-30
+Version: 4.3
+Date: 2015-09-15
 Author: Duncan Lee
 Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
 Description: Implements a class of spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. The response variable can be binomial, Gaussian or Poisson. The spatial autocorrelation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. A number of different CAR priors are available for the random effects, and full details are given in the vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development is supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1.
@@ -14,6 +14,6 @@ Suggests: boot, deldir, foreign, grid, maptools, Matrix, nlme,
 LinkingTo: Rcpp
 LazyLoad: yes
 NeedsCompilation: yes
-Packaged: 2015-06-30 10:00:57 UTC; duncanlee
+Packaged: 2015-09-15 13:22:07 UTC; duncanlee
 Repository: CRAN
-Date/Publication: 2015-06-30 18:13:48
+Date/Publication: 2015-09-16 12:47:02

@@ -1,5 +1,14 @@
 print.carbayes <- function(x,...)
 {
+#### Check for missingness
+    if(is.null(x$samples$Y))
+    {
+    n.miss <- 0    
+    }else
+    {
+    n.miss <- ncol(x$samples$Y)
+    }
+    
     if(class(x$localised.structure)=="list")
     {
         #### Print out the model fitted
@@ -9,6 +18,9 @@ print.carbayes <- function(x,...)
         cat(x$model)
         cat("Regression equation - ")
         print(x$formula)
+        cat("Number of missing observations - ")
+        cat(n.miss)
+        cat("\n")
         
         #### Print out the results
         cat("\n############\n")
@@ -33,6 +45,9 @@ print.carbayes <- function(x,...)
         cat(x$model)
         cat("Regression equation - ")
         print(x$formula)
+        cat("Number of missing observations - ")
+        cat(n.miss)
+        cat("\n")
         
         #### Print out the results
         cat("\n############\n")
@@ -53,6 +68,9 @@ print.carbayes <- function(x,...)
         cat(x$model)
         cat("Regression equation - ")
         print(x$formula)
+        cat("Number of missing observations - ")
+        cat(n.miss)
+        cat("\n")
         
         #### Print out the results
         cat("\n############\n")

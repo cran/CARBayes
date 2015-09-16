@@ -9,31 +9,31 @@ quadform <- function(Wtriplet, Wtripletsum, n_triplet, nsites, phi, theta, rho) 
     .Call('CARBayes_quadform', PACKAGE = 'CARBayes', Wtriplet, Wtripletsum, n_triplet, nsites, phi, theta, rho)
 }
 
-binomialcarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, phi_tune, rho, offset) {
-    .Call('CARBayes_binomialcarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, phi_tune, rho, offset)
+binomialcarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, phi_tune, rho, offset, missind) {
+    .Call('CARBayes_binomialcarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, phi_tune, rho, offset, missind)
 }
 
-binomialbetaupdate <- function(X, nsites, p, beta, proposal, offset, y, failures, prior_meanbeta, prior_varbeta) {
-    .Call('CARBayes_binomialbetaupdate', PACKAGE = 'CARBayes', X, nsites, p, beta, proposal, offset, y, failures, prior_meanbeta, prior_varbeta)
+binomialbetaupdate <- function(X, nsites, p, beta, proposal, offset, y, failures, prior_meanbeta, prior_varbeta, missind) {
+    .Call('CARBayes_binomialbetaupdate', PACKAGE = 'CARBayes', X, nsites, p, beta, proposal, offset, y, failures, prior_meanbeta, prior_varbeta, missind)
 }
 
-binomialindepupdate <- function(nsites, theta, sigma2, y, failures, theta_tune, offset) {
-    .Call('CARBayes_binomialindepupdate', PACKAGE = 'CARBayes', nsites, theta, sigma2, y, failures, theta_tune, offset)
+binomialindepupdate <- function(nsites, theta, sigma2, y, failures, theta_tune, offset, missind) {
+    .Call('CARBayes_binomialindepupdate', PACKAGE = 'CARBayes', nsites, theta, sigma2, y, failures, theta_tune, offset, missind)
 }
 
-poissonindepupdate <- function(nsites, theta, sigma2, y, theta_tune, offset) {
-    .Call('CARBayes_poissonindepupdate', PACKAGE = 'CARBayes', nsites, theta, sigma2, y, theta_tune, offset)
+poissonindepupdate <- function(nsites, theta, sigma2, y, theta_tune, offset, missind) {
+    .Call('CARBayes_poissonindepupdate', PACKAGE = 'CARBayes', nsites, theta, sigma2, y, theta_tune, offset, missind)
 }
 
-poissonbetaupdate <- function(X, nsites, p, beta, proposal, offset, y, prior_meanbeta, prior_varbeta) {
-    .Call('CARBayes_poissonbetaupdate', PACKAGE = 'CARBayes', X, nsites, p, beta, proposal, offset, y, prior_meanbeta, prior_varbeta)
+poissonbetaupdate <- function(X, nsites, p, beta, proposal, offset, y, prior_meanbeta, prior_varbeta, missind) {
+    .Call('CARBayes_poissonbetaupdate', PACKAGE = 'CARBayes', X, nsites, p, beta, proposal, offset, y, prior_meanbeta, prior_varbeta, missind)
 }
 
-poissoncarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset) {
-    .Call('CARBayes_poissoncarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset)
+poissoncarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset, missind) {
+    .Call('CARBayes_poissoncarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset, missind)
 }
 
-gaussiancarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset) {
-    .Call('CARBayes_gaussiancarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset)
+gaussiancarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset, missind) {
+    .Call('CARBayes_gaussiancarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset, missind)
 }
 

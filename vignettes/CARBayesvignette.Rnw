@@ -23,16 +23,16 @@
 
 %% almost as usual
 \author{Duncan Lee\\University of Glasgow }
-\title{\pkg{CARBayes}: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
+\title{\pkg{CARBayes} version 4.3: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
 
 %% for pretty printing and a nice hypersummary also set:
 \Plainauthor{Duncan Lee} %% comma-separated
-\Plaintitle{CARBayes: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
+\Plaintitle{CARBayes version 4.3: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
 \Shorttitle{\pkg{CARBayes}: Bayesian Conditional Autoregressive modelling} %% a short title (if necessary)
 
 %% an abstract and keywords
 \Abstract{
-This is a vignette for the \proglang{R} package \pkg{CARBayes} version 4.2, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. This vignette describes the class of models that can be implemented in CARBayes, and gives 3 worked examples of spatial data analysis using the package.
+This is a vignette for the \proglang{R} package \pkg{CARBayes} version 4.3, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. This vignette describes the class of models that can be implemented in CARBayes, and gives 3 worked examples of spatial data analysis using the package. The main change from the previous version is that CARBayes can now handle missing values in the response for almost all models. 
 }
 \Keywords{Bayesian inference, conditional autoregressive priors, \proglang{R} package \pkg{CARBayes}}
 \Plainkeywords{Bayesian inference, conditional autoregressive priors, R package CARBayes}
@@ -79,7 +79,7 @@ This section outlines the class of spatial generalised linear mixed models for a
 
 
 \subsection{Level 1 - data likelihood}
-The study region $\mathcal{S}$ is partitioned into $n$ non-overlapping areal units $\mathcal{S}=\{\mathcal{S}_{1},\ldots,\mathcal{S}_{K}\}$, which are linked to a corresponding set of responses $\mathbf{Y}=(Y_{1},\ldots,Y_{K})^{\mbox{T}}$, and a vector of known offsets $\mathbf{O}=(O_{1},\ldots,O_{K})^{\mbox{T}}$. The spatial pattern in the response is modelled by a matrix of covariates $X=(\mathbf{x}_{1}^{\mbox{T}},\ldots,\mathbf{x}_{K}^{\mbox{T}})^{\mbox{T}}$ and  a set of random effects $\bd{\phi}=(\phi_{1},\ldots,\phi_{K})$, the latter of which are included to model any spatial autocorrelation that remains in the data after the covariate effects have been accounted for. The vector of covariates for areal unit $\mathcal{S}_{k}$ are denoted by $\mathbf{x}_{k}^{\mbox{T}}=(1, x_{k1},\ldots,x_{kp})$, the first of which corresponds to an intercept term. The general model class that \pkg{CARBayes} can implement is a generalised linear mixed model for spatial areal unit data which is given by
+The study region $\mathcal{S}$ is partitioned into $n$ non-overlapping areal units $\mathcal{S}=\{\mathcal{S}_{1},\ldots,\mathcal{S}_{K}\}$, which are linked to a corresponding set of responses $\mathbf{Y}=(Y_{1},\ldots,Y_{K})^{\mbox{T}}$, and a vector of known offsets $\mathbf{O}=(O_{1},\ldots,O_{K})^{\mbox{T}}$. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance. The spatial pattern in the response is modelled by a matrix of covariates $X=(\mathbf{x}_{1}^{\mbox{T}},\ldots,\mathbf{x}_{K}^{\mbox{T}})^{\mbox{T}}$ and  a set of random effects $\bd{\phi}=(\phi_{1},\ldots,\phi_{K})$, the latter of which are included to model any spatial autocorrelation that remains in the data after the covariate effects have been accounted for. The vector of covariates for areal unit $\mathcal{S}_{k}$ are denoted by $\mathbf{x}_{k}^{\mbox{T}}=(1, x_{k1},\ldots,x_{kp})$, the first of which corresponds to an intercept term. The general model class that \pkg{CARBayes} can implement is a generalised linear mixed model for spatial areal unit data which is given by
 
 
 \begin{eqnarray}
@@ -206,7 +206,7 @@ library(spdep)
 
 
 \subsection{Functionality}
-\pkg{CARBayes} can fit the general exponential family Bayesian hierarchical model outlined in the previous section, where in most cases the response data can be binomial, Gaussian or Poisson. The models listed below can be implemented by the software.
+\pkg{CARBayes} can fit the general exponential family Bayesian hierarchical model outlined in the previous section, where in most cases the response data can be binomial, Gaussian or Poisson. The models listed below can be implemented by the software. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance.
 
 
 
@@ -549,9 +549,9 @@ The number and locations of these boundaries are summarised in the element of th
 \begin{CodeInput}
 border.locations <- model.dissimilarity$localised.structure$W.posterior
 risk.estimates <- model.dissimilarity$fitted.values / respiratorydata$expected2010
-respiratorydata.spatial@data <- risk.estimates
+respiratorydata.spatial@data$risk <- risk.estimates
 boundary.final <- highlight.borders(border.locations=border.locations, 
-ID=rownames(respiratorydata), shp=shp, dbf=dbf)
+spdata=respiratorydata.spatial)
 boundaries = list("sp.points", boundary.final, col="black", pch=19, cex=0.2)
 northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), 
 offset = c(220000,647000), scale = 4000)
@@ -559,7 +559,7 @@ scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(),
 offset = c(225000,647000),  scale = 10000, fill=c("transparent","black"))
 text1 <- list("sp.text", c(225000,649000), "0")
 text2 <- list("sp.text", c(230000,649000), "5000 m")
-spplot(respiratorydata.spatial, c("risk.estimates"), sp.layout=list(northarrow, scalebar, 
+spplot(respiratorydata.spatial, c("risk"), sp.layout=list(northarrow, scalebar, 
 text1, text2, boundaries), scales=list(draw = TRUE), 
 at=seq(min(risk.estimates)-0.1, max(risk.estimates)+0.1, length.out=8), 
 col.regions=hsv(0,seq(0.05,1,length.out=7),1), col="transparent")

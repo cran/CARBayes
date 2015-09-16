@@ -77,12 +77,20 @@ int.check <- n-sum(ceiling(trials)==floor(trials))
     if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
     if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
 
-    if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(Y)==floor(Y))
-    if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
-    if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
-    if(sum(Y>trials)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
+## Create the missing value indicator
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
+Y.miss <- Y
+Y.miss[which.miss==0] <- median(Y, na.rm=TRUE)
+failures.miss <- failures
+failures.miss[which.miss==0] <- median(failures, na.rm=TRUE)
+
+if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
+int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
+if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
+if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
+if(sum(Y>trials, na.rm=TRUE)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
+
 
 
 
@@ -180,6 +188,8 @@ samples.theta <- array(NA, c(n.keep, n))
 samples.sigma2 <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
+if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
+
 
 ## Metropolis quantities
 accept.all <- rep(0,4)
@@ -219,7 +229,7 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
        for(r in 1:n.beta.block)
        {
        proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-       prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, failures, prior.mean.beta, prior.var.beta)
+       prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y.miss, failures.miss, prior.mean.beta, prior.var.beta, which.miss)
             if(prob > runif(1))
             {
             beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -238,7 +248,7 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
     ## Sample from theta
     ####################
     beta.offset <- as.numeric(X.standardised %*% beta) + offset        
-    temp1 <- binomialindepupdate(nsites=n, theta=theta, sigma2=sigma2, y=Y, failures=failures, theta_tune=proposal.sd.theta, offset=beta.offset) 
+    temp1 <- binomialindepupdate(nsites=n, theta=theta, sigma2=sigma2, y=Y.miss, failures=failures.miss, theta_tune=proposal.sd.theta, offset=beta.offset, which.miss) 
     theta <- temp1[[1]]
     theta <- theta - mean(theta)    
     accept[3] <- accept[3] + temp1[[2]]
@@ -260,7 +270,7 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
     prob <- exp(logit)  / (1 + exp(logit))
     fitted <- trials * prob
     deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-    deviance <- -2 * sum(deviance.all)     
+    deviance <- -2 * sum(deviance.all, na.rm=TRUE)     
 
 
 
@@ -275,6 +285,7 @@ sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * n
         samples.sigma2[ele, ] <- sigma2
         samples.deviance[ele, ] <- deviance
         samples.fitted[ele, ] <- fitted
+        if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
         }else
         {
         }
@@ -353,7 +364,7 @@ median.theta <- apply(samples.theta, 2, median)
 median.logit <- as.numeric(X.standardised %*% median.beta) + median.theta + offset    
 median.prob <- exp(median.logit)  / (1 + exp(median.logit))
 fitted.median <- trials * median.prob
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
+deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted     
 
@@ -364,7 +375,7 @@ CPO <- rep(NA, n)
      {
      CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
      }
-LMPL <- sum(log(CPO))     
+LMPL <- sum(log(CPO), na.rm=TRUE)     
 
      
 
@@ -418,7 +429,14 @@ residuals <- as.numeric(Y) - fitted.values
 modelfit <- c(DIC, p.d, LMPL)
 names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Independent\n")
-samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted))
+    if(n.miss>0)
+    {
+        samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+    }else
+    {
+        samples <- list(beta=samples.beta.orig, theta=mcmc(samples.theta), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted))
+    }
+
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

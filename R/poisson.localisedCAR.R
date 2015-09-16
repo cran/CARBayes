@@ -33,7 +33,8 @@ if(int.check > 0) stop("the respons variable has non-integer values.", call.=FAL
 if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
 log.Y <- log(Y)
 log.Y[Y==0] <- -0.1  
-
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
 
 #### Offset variable
 ## Create the offset
@@ -308,7 +309,7 @@ temp <- 1
          for(r in 1:n.beta.block)
          {
              proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-             prob <- poissonbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, prior.mean.beta, prior.var.beta)
+             prob <- poissonbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, prior.mean.beta, prior.var.beta, which.miss)
              if(prob > runif(1))
              {
                  beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -328,7 +329,7 @@ temp <- 1
      ## Sample from phi
      ####################
      phi.offset <- regression.vec + offset  + lambda[Z]
-     temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset)
+     temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
      phi <- temp1[[1]]
           for(i in 1:G)
           {

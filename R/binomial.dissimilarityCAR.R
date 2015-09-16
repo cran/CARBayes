@@ -103,12 +103,20 @@ int.check <- n-sum(ceiling(trials)==floor(trials))
     if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
     if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
 
-    if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(Y)==floor(Y))
-    if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
-    if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
-    if(sum(Y>trials)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
+## Create the missing value indicator
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
+Y.miss <- Y
+Y.miss[which.miss==0] <- median(Y, na.rm=TRUE)
+failures.miss <- failures
+failures.miss[which.miss==0] <- median(failures, na.rm=TRUE)
+
+
+if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
+int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
+if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
+if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
+if(sum(Y>trials, na.rm=TRUE)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
 
 
 
@@ -205,7 +213,7 @@ samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
 samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
-
+if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
 
 ## Metropolis quantities
 accept <- rep(0,6)
@@ -326,7 +334,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                for(r in 1:n.beta.block)
                {
                proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-               prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, failures, prior.mean.beta, prior.var.beta)
+               prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y.miss, failures.miss, prior.mean.beta, prior.var.beta, which.miss)
                     if(prob > runif(1))
                     {
                     beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -345,7 +353,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
 		## Sample from phi
 		####################
           beta.offset <- as.numeric(X.standardised %*% beta) + offset        
-    	     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
+    	     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
           phi <- temp1[[1]]
           phi <- phi - mean(phi)
           accept[3] <- accept[3] + temp1[[2]]
@@ -408,7 +416,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     	     prob <- exp(logit)  / (1 + exp(logit))
           fitted <- trials * prob
           deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-          deviance <- -2 * sum(deviance.all)    
+          deviance <- -2 * sum(deviance.all, na.rm=TRUE)    
 
 
 
@@ -424,6 +432,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                samples.alpha[ele, ] <- alpha
                samples.deviance[ele, ] <- deviance
                samples.fitted[ele, ] <- fitted
+               if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])               
                }else
                {
                }
@@ -463,8 +472,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                     }else
                     {
                     }
-                    }else
-                #### alpha tuning parameter
+               #### alpha tuning parameter
                     if(accept.alpha > 50)
                     {
                     proposal.sd.alpha <- min(2 * proposal.sd.alpha, alpha.max/4)
@@ -474,6 +482,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                     }else
                     {
                     }
+                }else
                {   
                }
 
@@ -514,7 +523,7 @@ median.phi <- apply(samples.phi, 2, median)
 median.logit <- as.numeric(X.standardised %*% median.beta) + median.phi + offset    
 median.prob <- exp(median.logit)  / (1 + exp(median.logit))
 fitted.median <- trials * median.prob
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
+deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted     
    
@@ -526,7 +535,7 @@ CPO <- rep(NA, n)
      {
      CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
      }
-LMPL <- sum(log(CPO))   
+LMPL <- sum(log(CPO), na.rm=TRUE)   
      
      
 #### transform the parameters back to the origianl covariate scale.
@@ -637,7 +646,14 @@ W.border.prob <- array(NA, c(n,n))
 modelfit <- c(DIC, p.d, LMPL)
 names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
+    if(n.miss>0)
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+    }else
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
+    }
+
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=list(W.posterior=W.posterior, W.border.prob=W.border.prob),  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

@@ -68,13 +68,16 @@ X.indicator <- rep(NA, p)       # To determine which parameter estimates to tran
 #### Response variable
 ## Create the response
 Y <- model.response(frame)
-    
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
+Y.miss <- Y
+Y.miss[which.miss==0] <- median(Y, na.rm=TRUE)
+
 ## Check for errors
-    if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(Y)==floor(Y))
+int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
     if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
-    if(min(Y)<0) stop("the response variable has negative values.", call.=FALSE)
+    if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
 
 
 
@@ -170,6 +173,8 @@ samples.phi <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
+if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
+
 
 ## Metropolis quantities
 accept.all <- rep(0,4)
@@ -256,7 +261,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)
        for(r in 1:n.beta.block)
        {
        proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-       prob <- poissonbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, prior.mean.beta, prior.var.beta)
+       prob <- poissonbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y.miss, prior.mean.beta, prior.var.beta, which.miss)
             if(prob > runif(1))
             {
             beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -275,7 +280,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)
     ## Sample from phi
     ####################
     beta.offset <- X.standardised %*% beta + offset
-    temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
+    temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset, which.miss)
     phi <- temp1[[1]]
     for(i in 1:n.islands)
     {
@@ -300,7 +305,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)
     #########################
     fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
     deviance.all <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
-    deviance <- -2 * sum(deviance.all)  
+    deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
 
 
@@ -315,6 +320,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)
         samples.tau2[ele, ] <- tau2
         samples.deviance[ele, ] <- deviance
         samples.fitted[ele, ] <- fitted
+        if(n.miss>0) samples.Y[ele, ] <- rpois(n=n.miss, lambda=fitted[which.miss==0])
         }else
         {
         }
@@ -392,7 +398,7 @@ names(accept.final) <- c("beta", "phi", "tau2")
 median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
 fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
-deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
+deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted    
      
@@ -403,7 +409,7 @@ CPO <- rep(NA, n)
      {
      CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
      }
-LMPL <- sum(log(CPO))  
+LMPL <- sum(log(CPO), na.rm=TRUE)  
      
      
 #### transform the parameters back to the origianl covariate scale.
@@ -462,7 +468,13 @@ residuals <- as.numeric(Y) - fitted.values
 modelfit <- c(DIC, p.d, LMPL)
 names(modelfit) <- c("DIC", "p.d", "LMPL")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Intrinsic CAR\n")
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), fitted=mcmc(samples.fitted))
+    if(n.miss>0)
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+    }else
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), fitted=mcmc(samples.fitted))
+    }
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

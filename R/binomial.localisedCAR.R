@@ -24,7 +24,8 @@ frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)
 ## Create the response
 Y <- model.response(frame)
 failures <- trials - Y
-
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
 
 
 ## Check for errors
@@ -342,7 +343,7 @@ temp <- 1
      ## Sample from phi
      ####################
      phi.offset <- regression.vec + offset  + lambda[Z]
-     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset)
+     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
      phi <- temp1[[1]]
           for(i in 1:G)
           {

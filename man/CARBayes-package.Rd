@@ -25,8 +25,8 @@ development is supported by the Engineering and Physical Science Research Counci
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 4.2\cr
-Date: \tab 2015-06-30\cr
+Version: \tab 4.3\cr
+Date: \tab 2015-09-15\cr
 License: \tab GPL (>= 2)\cr
 }
 }
@@ -48,7 +48,8 @@ Lee, D. and Mitchell, R (2012). Boundary detection in disease mapping studies.
 Biostatistics, 13, 415-426.
 
 Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies, Environmetrics, to appear.
+misalignment in long-term air pollution and health studies, Environmetrics, 
+DOI 10.1002/env.2348.
 
 Leroux, B., Lei, X and Breslow, N (1999). Estimation of disease rates in small 
 areas: A new mixed model for spatial dependence, Chapter Statistical Models in 

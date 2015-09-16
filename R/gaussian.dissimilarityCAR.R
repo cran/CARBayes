@@ -94,9 +94,14 @@ alpha.threshold <- rep(NA,q)
 #### Response variable
 ## Create the response
 Y <- model.response(frame)
-    
+which.miss <- as.numeric(!is.na(Y))
+n.miss <- n - sum(which.miss)
+Y.miss <- Y
+Y.miss[which.miss==0] <- median(Y, na.rm=TRUE)
+Y.short <- Y[which.miss==1]
+X.short <- X.standardised[which.miss==1, ]
+
 ## Check for errors
-    if(sum(is.na(Y))>0) stop("the response has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
 
 
@@ -110,7 +115,7 @@ offset <- try(model.offset(frame), silent=TRUE)
     if(is.null(offset))  offset <- rep(0,n)
     if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
-
+offset.short <- offset[which.miss==1]
 
 
 #### Initial parameter values
@@ -174,7 +179,7 @@ samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
 samples.deviance <- array(NA, c(n.keep, 1))
 samples.fitted <- array(NA, c(n.keep, n))
-
+if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
 
      
 ## Metropolis quantities
@@ -182,7 +187,7 @@ accept <- c(0,0)
 accept.all <- c(0,0)
 proposal.sd.alpha <- 0.02 * alpha.max
 tau2.posterior.shape <- prior.tau2[1] + 0.5*(n-1)
-nu2.posterior.shape <- prior.nu2[1] + 0.5*n
+nu2.posterior.shape <- prior.nu2[1] + 0.5*(n-n.miss)  
 
 
 #### Checks for the original W matrix
@@ -269,7 +274,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
 
 
 #### Beta update quantities
-data.precision.beta <- t(X.standardised) %*% X.standardised
+data.precision.beta <- t(X.short) %*% X.short
 	if(length(prior.var.beta)==1)
 	{
 	prior.precision.beta <- 1 / prior.var.beta
@@ -301,29 +306,29 @@ data.precision.beta <- t(X.standardised) %*% X.standardised
 		####################
 		fc.precision <- prior.precision.beta + data.precision.beta / nu2
 		fc.var <- solve(fc.precision)
-		beta.offset <- as.numeric(Y - offset - phi)
-		beta.offset2 <- t(X.standardised) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
+		beta.offset <- as.numeric(Y.short - offset.short - phi[which.miss==1])
+		beta.offset2 <- t(X.short) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
 		fc.mean <- fc.var %*% beta.offset2
 		chol.var <- t(chol(fc.var))
 		beta <- fc.mean + chol.var %*% rnorm(p)  
 
+		
+		
 		##################
 		## Sample from nu2
 		##################
-          fitted.current <-  as.numeric(X.standardised %*% beta) + phi + offset
-          nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y - fitted.current)^2)
-          nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
-		
-
+           fitted.current <-  as.numeric(X.short %*% beta) + phi[which.miss==1] + offset.short
+          nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.short - fitted.current)^2)
+          nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale)) 
 
 		####################
 		## Sample from phi
 		####################
-          offset.phi <- (Y - as.numeric(X.standardised %*% beta) - offset) / nu2    
-          phi <- gaussiancarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi)
+          offset.phi <- (Y.miss - as.numeric(X.standardised %*% beta) - offset) / nu2    
+          phi <- gaussiancarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=n, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi, which.miss)
           phi <- phi - mean(phi)
 		
-    
+
     
 		##################
 		## Sample from tau2
@@ -377,7 +382,7 @@ data.precision.beta <- t(X.standardised) %*% X.standardised
     	     #########################
     	     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
           deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
-          deviance <- -2 * sum(deviance.all)  
+          deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
     	     ###################
     	     ## Save the results
@@ -392,6 +397,7 @@ data.precision.beta <- t(X.standardised) %*% X.standardised
                samples.alpha[ele, ] <- alpha
                samples.deviance[ele, ] <- deviance
                samples.fitted[ele, ] <- fitted
+               if(n.miss>0) samples.Y[ele, ] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))
                }else
                {
                }
@@ -454,7 +460,7 @@ median.beta <- apply(samples.beta, 2, median)
 median.phi <- apply(samples.phi, 2, median)
 fitted.median <- X.standardised %*% median.beta + median.phi + offset
 nu2.median <- median(samples.nu2)
-deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE))
+deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted    
    
@@ -465,7 +471,7 @@ CPO <- rep(NA, n)
      {
      CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=sqrt(samples.nu2))))    
      }
-LMPL <- sum(log(CPO))   
+LMPL <- sum(log(CPO), na.rm=TRUE)   
      
 
 #### transform the parameters back to the origianl covariate scale.
@@ -577,7 +583,14 @@ W.border.prob <- array(NA, c(n,n))
 modelfit <- c(DIC, p.d,  LMPL)
 names(modelfit) <- c("DIC", "p.d",  "LMPL")
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
+    if(n.miss>0)
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+    }else
+    {
+        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
+    }
+
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=list(W.posterior=W.posterior, W.border.prob=W.border.prob),  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 
