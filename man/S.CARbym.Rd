@@ -11,7 +11,7 @@ have a BYM conditional autoregressive prior.
 Fit a spatial generalised linear mixed model to areal unit data, where the response
 variable can be binomial, or Poisson. Note, a Gaussian likelihood is not allowed 
 because of a lack of identifiability among the parameters. The linear predictor is 
-modelled byknown covariates and a vector of random effects. The latter are modelled 
+modelled by known covariates and a vector of random effects. The latter are modelled 
 by the BYM conditional autoregressive prior proposed by Besag et al. (1991), and 
 further details are given in the vignette accompanying this package. Inference is 
 conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation.
@@ -91,8 +91,9 @@ Logical, should the function update the user on its progress.
 \item{fitted.values }{A vector of fitted values for each area.}
 \item{residuals }{A vector of residuals for each area.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
-(DIC), the effective number of parameters in the model (p.d), and the Log Marginal 
-Predictive Likelihood (LMPL).}
+(DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
+Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w).}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}

@@ -105,7 +105,10 @@ ptemp <- ncol(X)
     
     ## Compute a starting value for beta
     dat <- cbind(Y, failures)
-    beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
+    mod.glm <- glm(dat~X.standardised-1, offset=offset, family="quasibinomial")
+    beta.mean <- mod.glm$coefficients
+    beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
+    beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
     regression.vec <- X.standardised %*% beta
     }
 
@@ -161,16 +164,16 @@ theta.hat <- Y / trials
 theta.hat[theta.hat==0] <- 0.01
 theta.hat[theta.hat==1] <- 0.99
 res.temp <- log(theta.hat / (1 - theta.hat)) - regression.vec - offset
+res.sd <- sd(res.temp, na.rm=TRUE)/5
 Z <- sample(1:G, size=n, replace=TRUE)
 lambda <- sort(runif(G, min=min(res.temp), max=max(res.temp)))
 delta <- runif(1,1, min(2, prior.delta))
-phi <- rnorm(n=n, mean=rep(0,n), sd = sd(res.temp)/2)
+phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
     for(i in 1:G)
     {
     phi[which(Z==i)] <- phi[which(Z==i)] - mean(phi[which(Z==i)])
     }
-tau2 <- runif(1, min=0, max=var(res.temp))
-
+tau2 <- var(phi) / 10
 
 
 
@@ -230,6 +233,7 @@ samples.Z <- array(NA, c(n.keep, n))
 samples.lambda <- array(NA, c(n.keep, G))
 samples.delta <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
+samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
      
 if(!is.null(X))
@@ -321,7 +325,7 @@ temp <- 1
          for(r in 1:n.beta.block)
          {
              proposal.beta[beta.beg[r]:beta.fin[r]] <- proposal[beta.beg[r]:beta.fin[r]]
-             prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, failures, prior.mean.beta, prior.var.beta)
+             prob <- binomialbetaupdate(X.standardised, n, p, beta, proposal.beta, offset.temp, Y, failures, prior.mean.beta, prior.var.beta, which.miss)
              if(prob > runif(1))
              {
                  beta[beta.beg[r]:beta.fin[r]] <- proposal.beta[beta.beg[r]:beta.fin[r]]
@@ -427,11 +431,12 @@ temp <- 1
     #########################
     ## Calculate the deviance
     #########################
-    logit <- lambda[Z] + phi + regression.vec + offset
-    prob <- exp(logit)  / (1 + exp(logit))
-    fitted <- trials * prob
-    deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-    deviance <- -2 * sum(deviance.all)    
+     lp <- lambda[Z] + phi + regression.vec + offset
+     prob <- exp(lp)  / (1 + exp(lp))
+     fitted <- trials * prob
+     deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
+     like <- exp(deviance.all)
+     deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
          
          
@@ -447,6 +452,7 @@ temp <- 1
         samples.Z[ele, ] <- Z
         samples.delta[ele, ] <- delta
         samples.deviance[ele, ] <- deviance
+        samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
         
         if(!is.null(X)) samples.beta[ele, ] <- beta    
@@ -473,10 +479,10 @@ temp <- 1
             accept.beta <- 100 * accept[7] / accept[8]
             if(accept.beta > 40)
             {
-                proposal.sd.beta <- 2 * proposal.sd.beta
+                proposal.sd.beta <- proposal.sd.beta + 0.1 * proposal.sd.beta
             }else if(accept.beta < 20)              
             {
-                proposal.sd.beta <- 0.5 * proposal.sd.beta
+                proposal.sd.beta <- proposal.sd.beta - 0.1 * proposal.sd.beta
             }else
             {
             }    
@@ -491,10 +497,10 @@ temp <- 1
          #### phi tuning parameter
             if(accept.phi > 50)
             {
-            proposal.sd.phi <- 2 * proposal.sd.phi
+            proposal.sd.phi <- proposal.sd.phi + 0.1 * proposal.sd.phi
             }else if(accept.phi < 40)              
             {
-            proposal.sd.phi <- 0.5 * proposal.sd.phi
+            proposal.sd.phi <- proposal.sd.phi - 0.1 * proposal.sd.phi
             }else
             {
             }              
@@ -502,10 +508,10 @@ temp <- 1
          #### lambda tuning parameter
             if(accept.lambda > 40)
             {
-            proposal.sd.lambda <- 2 * proposal.sd.lambda
+            proposal.sd.lambda <- proposal.sd.lambda + 0.1 * proposal.sd.lambda
             }else if(accept.lambda < 20)              
             {
-            proposal.sd.lambda <- 0.5 * proposal.sd.lambda
+            proposal.sd.lambda <- proposal.sd.lambda - 0.1 * proposal.sd.lambda
             }else
             {
             }              
@@ -513,10 +519,10 @@ temp <- 1
         #### delta tuning parameter
             if(accept.delta > 50)
             {
-            proposal.sd.delta <- min(2 * proposal.sd.delta, prior.delta/6)
+            proposal.sd.delta <- min(proposal.sd.delta + 0.1 * proposal.sd.delta, prior.delta/6)
             }else if(accept.delta < 40)              
             {
-            proposal.sd.delta <- 0.5 * proposal.sd.delta
+            proposal.sd.delta <- proposal.sd.delta - 0.1 * proposal.sd.delta
             }else
             {
             }              
@@ -585,6 +591,12 @@ fitted.deviance <- dbinom(x=Y, size=trials, prob=median.prob)
 deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE))
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted     
+
+
+#### Watanabe-Akaike Information Criterion (WAIC)
+LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+WAIC <- -2 * (LPPD - p.w)
 
 
 #### Compute the Conditional Predictive Ordinate
@@ -663,18 +675,14 @@ residuals <- as.numeric(Y) - fitted.values
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, LMPL)
-names(modelfit) <- c("DIC", "p.d", "LMPL")   
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL") 
      
      
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects  model - Localised CAR model\n")
-     if(!is.null(X))
-     {
-         samples <- list(beta=mcmc(samples.beta.orig), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))          
-     }else
-     {
-         samples <- list(phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))
-     }
+if(is.null(X)) samples.beta.orig = NA
+
+samples <- list(beta=mcmc(samples.beta.orig), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))          
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=median.Z,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

@@ -1,4 +1,4 @@
-binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
+binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
 {
     #### Check on the verbose option
     if(is.null(verbose)) verbose=TRUE     
@@ -110,11 +110,19 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     #### Initial parameter values
     ## Regression parameters beta
     dat <- cbind(Y, failures)
-    beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
-    phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-    tau2 <- runif(1)
-    rho <- runif(1)  
+    mod.glm <- glm(dat~X.standardised-1, offset=offset, family="quasibinomial")
+    beta.mean <- mod.glm$coefficients
+    beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
+    beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
     
+    theta.hat <- Y / trials
+    theta.hat[theta.hat==0] <- 0.01
+    theta.hat[theta.hat==1] <- 0.99
+    res.temp <- log(theta.hat / (1 - theta.hat)) - X.standardised %*% beta.mean - offset
+    res.sd <- sd(res.temp, na.rm=TRUE)/5
+    phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
+    tau2 <- var(phi) / 10
+    if(!fix.rho) rho <- runif(1)
     
     
     #### Priors
@@ -183,13 +191,23 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     }     
     
     
+    
+    ## Check for errors on rho and fix.rho
+    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
+    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
+    if(fix.rho & !is.numeric(rho) ) stop("rho is not numeric.", call.=FALSE)  
+    if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
+    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)      
+
+    
     ## Matrices to store samples
     n.keep <- floor((n.sample - burnin)/thin)
     samples.beta <- array(NA, c(n.keep, p))
     samples.phi <- array(NA, c(n.keep, n))
     samples.tau2 <- array(NA, c(n.keep, 1))
-    samples.rho <- array(NA, c(n.keep, 1))
+    if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
     samples.deviance <- array(NA, c(n.keep, 1))
+    samples.like <- array(NA, c(n.keep, n))
     samples.fitted <- array(NA, c(n.keep, n))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
     
@@ -249,10 +267,18 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     Wstar <- diag(apply(W,1,sum)) - W
     Wstar.eigen <- eigen(Wstar)
     Wstar.val <- Wstar.eigen$values
-    det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))    
+    if(!fix.rho) det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))    
     
     
-    
+    ## Check for islands
+    W.list<- mat2listw(W)
+    W.nb <- W.list$neighbours
+    W.islands <- n.comp.nb(W.nb)
+    islands <- W.islands$comp.id
+    n.islands <- max(W.islands$nc)
+    if(rho==1) tau2.posterior.shape <- prior.tau2[1] + 0.5 * (n-n.islands)   
+
+        
     ###########################
     #### Run the Bayesian model
     ###########################
@@ -302,7 +328,14 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
         beta.offset <- X.standardised %*% beta + offset
         temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=n, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
         phi <- temp1[[1]]
-        phi <- phi - mean(phi)
+        if(rho<1)
+        {
+            phi <- phi - mean(phi)
+        }
+        else
+        {
+            phi[which(islands==1)] <- phi[which(islands==1)] - mean(phi[which(islands==1)])   
+        }
         accept[3] <- accept[3] + temp1[[2]]
         accept[4] <- accept[4] + n
         
@@ -319,6 +352,8 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
         ##################
         ## Sample from rho
         ##################
+        if(!fix.rho)
+        {
         proposal.rho <- rtrunc(n=1, spec="norm", a=0, b=1, mean=rho, sd=proposal.sd.rho)  
         temp3 <- quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, proposal.rho)
         det.Q.proposal <- 0.5 * sum(log((proposal.rho * Wstar.val + (1-proposal.rho))))              
@@ -337,17 +372,19 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
         {
         }              
         accept[6] <- accept[6] + 1           
-        
+        }else
+        {}
         
         
         #########################
         ## Calculate the deviance
         #########################
-        logit <- as.numeric(X.standardised %*% beta) + phi + offset    
-        prob <- exp(logit)  / (1 + exp(logit))
+        lp <- as.numeric(X.standardised %*% beta) + phi + offset
+        prob <- exp(lp)  / (1 + exp(lp))
         fitted <- trials * prob
         deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-        deviance <- -2 * sum(deviance.all, na.rm=TRUE)     
+        like <- exp(deviance.all)
+        deviance <- -2 * sum(deviance.all, na.rm=TRUE)
         
         
         
@@ -360,15 +397,16 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
             samples.beta[ele, ] <- beta
             samples.phi[ele, ] <- phi
             samples.tau2[ele, ] <- tau2
-            samples.rho[ele, ] <- rho
+            if(!fix.rho) samples.rho[ele, ] <- rho
             samples.deviance[ele, ] <- deviance
+            samples.like[ele, ] <- like
             samples.fitted[ele, ] <- fitted
             if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
         }else
         {
         }
-
-                
+        
+        
         ########################################
         ## Self tune the acceptance probabilties
         ########################################
@@ -379,16 +417,17 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
             accept.beta <- 100 * accept[1] / accept[2]
             accept.phi <- 100 * accept[3] / accept[4]
             accept.rho <- 100 * accept[5] / accept[6]
+            if(is.na(accept.rho)) accept.rho <- 45
             accept.all <- accept.all + accept
             accept <- c(0,0,0,0,0,0)
             
             #### beta tuning parameter
             if(accept.beta > 40)
             {
-                proposal.sd.beta <- 2 * proposal.sd.beta
+                proposal.sd.beta <- proposal.sd.beta + 0.1 * proposal.sd.beta
             }else if(accept.beta < 20)              
             {
-                proposal.sd.beta <- 0.5 * proposal.sd.beta
+                proposal.sd.beta <- proposal.sd.beta - 0.1 * proposal.sd.beta
             }else
             {
             }
@@ -396,21 +435,21 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
             #### phi tuning parameter
             if(accept.phi > 50)
             {
-                proposal.sd.phi <- 2 * proposal.sd.phi
+                proposal.sd.phi <- proposal.sd.phi + 0.1 * proposal.sd.phi
             }else if(accept.phi < 40)              
             {
-                proposal.sd.phi <- 0.5 * proposal.sd.phi
+                proposal.sd.phi <- proposal.sd.phi - 0.1 * proposal.sd.phi
             }else
             {
-            }              
+            }
             
             #### rho tuning parameter
             if(accept.rho > 50)
             {
-                proposal.sd.rho <- min(2 * proposal.sd.rho, 0.5)
+                proposal.sd.rho <- min(proposal.sd.rho + 0.1 * proposal.sd.rho, 0.5)
             }else if(accept.rho < 40)              
             {
-                proposal.sd.rho <- 0.5 * proposal.sd.rho
+                proposal.sd.rho <- proposal.sd.rho - 0.1 * proposal.sd.rho
             }else
             {
             }
@@ -443,7 +482,13 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     ## Compute the acceptance rates
     accept.beta <- 100 * accept.all[1] / accept.all[2]
     accept.phi <- 100 * accept.all[3] / accept.all[4]
-    accept.rho <- 100 * accept.all[5] / accept.all[6]
+    if(!fix.rho)
+    {
+        accept.rho <- 100 * accept.all[5] / accept.all[6]
+    }else
+    {
+        accept.rho <- NA    
+    }
     accept.tau2 <- 100
     accept.final <- c(accept.beta, accept.phi, accept.rho, accept.tau2)
     names(accept.final) <- c("beta", "phi", "rho", "tau2")
@@ -457,6 +502,12 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
     p.d <- median(samples.deviance) - deviance.fitted
     DIC <- 2 * median(samples.deviance) - deviance.fitted     
+    
+    
+    #### Watanabe-Akaike Information Criterion (WAIC)
+    LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+    p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+    WAIC <- -2 * (LPPD - p.w)
     
     
     #### Compute the Conditional Predictive Ordinate
@@ -512,8 +563,16 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     summary.hyper <- array(NA, c(2 ,7))
     summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
     summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
-    summary.hyper[2, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-    summary.hyper[2, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
+    if(!fix.rho)
+    {
+        summary.hyper[2, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
+        summary.hyper[2, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
+    }else
+    {
+        summary.hyper[2, 1:3] <- c(rho, rho, rho)
+        summary.hyper[2, 4:7] <- rep(NA, 4)
+    }
+    
     
     summary.results <- rbind(summary.beta, summary.hyper)
     rownames(summary.results)[(nrow(summary.results)-1):nrow(summary.results)] <- c("tau2", "rho")
@@ -528,17 +587,13 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     
     
     ## Compile and return the results
-    modelfit <- c(DIC, p.d, LMPL)
-    names(modelfit) <- c("DIC", "p.d", "LMPL")
+    modelfit <- c(DIC, p.d, WAIC, p.w, LMPL)
+    names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL")
     model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Leroux CAR\n")
-        if(n.miss>0)
-        {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-        }else
-        {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted))
-        }
+    if(fix.rho) samples.rho=NA
+    if(n.miss==0) samples.Y = NA
     
+    samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
     results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
     class(results) <- "carbayes"
     

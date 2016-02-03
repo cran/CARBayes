@@ -23,16 +23,17 @@
 
 %% almost as usual
 \author{Duncan Lee\\University of Glasgow }
-\title{\pkg{CARBayes} version 4.3: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
+\title{\pkg{CARBayes} version 4.4: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
 
 %% for pretty printing and a nice hypersummary also set:
 \Plainauthor{Duncan Lee} %% comma-separated
-\Plaintitle{CARBayes version 4.3: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
+\Plaintitle{CARBayes version 4.4: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
 \Shorttitle{\pkg{CARBayes}: Bayesian Conditional Autoregressive modelling} %% a short title (if necessary)
 
 %% an abstract and keywords
 \Abstract{
-This is a vignette for the \proglang{R} package \pkg{CARBayes} version 4.3, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. This vignette describes the class of models that can be implemented in CARBayes, and gives 3 worked examples of spatial data analysis using the package. The main change from the previous version is that CARBayes can now handle missing values in the response for almost all models. 
+This is a vignette for the \proglang{R} package \pkg{CARBayes} version 4.4, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. This vignette describes the class of models that can be implemented in CARBayes, and gives 3 worked examples of spatial data analysis using the package. Version 4.4 has two main changes from version 4.3. Firstly, the three functions \code{S.CARiar()}, \code{S.independent()} and \code{S.CARleroux()} have been merged into \code{S.CARleroux()}, as the latter is a generalisation of the other two. This has been achieved by adding two additional arguments to \code{S.CARleroux()}, \code{fix.rho} (logical) and \code{rho} (numeric). The old model \code{S.independent()} can be obtained by setting (\code{fix.rho=TRUE, rho=0}), which corresponds to independent random effects. Similarly,  the old model \code{S.CARiar()} corresponding to the intrinsic CAR model can be obtained by setting (\code{fix.rho=TRUE, rho=1}). The second change is that the \code{modelfit} component of the  fitted model object now additionally returns the  Watanabe-Akaike Information Criterion (WAIC) and an estimate of the estimated number of effective parameters (p.w).
+ 
 }
 \Keywords{Bayesian inference, conditional autoregressive priors, \proglang{R} package \pkg{CARBayes}}
 \Plainkeywords{Bayesian inference, conditional autoregressive priors, R package CARBayes}
@@ -78,63 +79,78 @@ The aim of this vignette is to present the software \pkg{CARBayes}, by outlining
 This section outlines the class of spatial generalised linear mixed models for areal unit data that can be implemented in the \pkg{CARBayes} software. Inference for all models is set in a Bayesian framework, and is based on Markov chain Monte Carlo (McMC) simulation.
 
 
-\subsection{Level 1 - data likelihood}
-The study region $\mathcal{S}$ is partitioned into $n$ non-overlapping areal units $\mathcal{S}=\{\mathcal{S}_{1},\ldots,\mathcal{S}_{K}\}$, which are linked to a corresponding set of responses $\mathbf{Y}=(Y_{1},\ldots,Y_{K})^{\mbox{T}}$, and a vector of known offsets $\mathbf{O}=(O_{1},\ldots,O_{K})^{\mbox{T}}$. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance. The spatial pattern in the response is modelled by a matrix of covariates $X=(\mathbf{x}_{1}^{\mbox{T}},\ldots,\mathbf{x}_{K}^{\mbox{T}})^{\mbox{T}}$ and  a set of random effects $\bd{\phi}=(\phi_{1},\ldots,\phi_{K})$, the latter of which are included to model any spatial autocorrelation that remains in the data after the covariate effects have been accounted for. The vector of covariates for areal unit $\mathcal{S}_{k}$ are denoted by $\mathbf{x}_{k}^{\mbox{T}}=(1, x_{k1},\ldots,x_{kp})$, the first of which corresponds to an intercept term. The general model class that \pkg{CARBayes} can implement is a generalised linear mixed model for spatial areal unit data which is given by
+\subsection{Level 1 - Data structure and likelihood}
+The study region $\mathcal{S}$ is partitioned into $n$ non-overlapping areal units $\mathcal{S}=\{\mathcal{S}_{1},\ldots,\mathcal{S}_{K}\}$, which are linked to a corresponding set of responses $\mathbf{Y}=(Y_{1},\ldots,Y_{K})$, and a vector of known offsets $\mathbf{O}=(O_{1},\ldots,O_{K})$. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance. The spatial pattern in the response is modelled by a matrix of covariates $\mathbf{X}=(\mathbf{x}_{1},\ldots,\mathbf{x}_{K})$ and  a spatial structure component $\bd{\psi}=(\psi_{1},\ldots,\psi_{K})$, the latter of which is included to model any spatial autocorrelation that remains in the data after the covariate effects have been accounted for. The vector of covariates for areal unit $\mathcal{S}_{k}$ are denoted by $\mathbf{x}_{k}^{\top}=(1, x_{k1},\ldots,x_{kp})$, the first of which corresponds to an intercept term. The general model class that \pkg{CARBayes} can implement is a generalised linear mixed model for spatial areal unit data which is given by
 
 
 \begin{eqnarray}
 Y_{k}|\mu_{k}&\sim&f(y_{k}|\mu_{k},\nu^{2})~~~~\mbox{for }k=1,\ldots,K,\label{equation likelihood}\\
-g(\mu_{k})&=&\mathbf{x}_{k}^{\mbox{T}}\bd{\beta} + \phi_{k} + O_{k}.\nonumber
+g(\mu_{k})&=& O_{k} + \mathbf{x}_{k}^{\top}\bd{\beta} + \psi_{k} ,\nonumber\\
+\bd{\beta}&\sim&\mbox{N}(\bd{\mu}_{\beta}, \bd{\Sigma}_{\beta}).\nonumber
 \end{eqnarray}
 
 
-The responses $Y_{k}$ come from an exponential family of distributions $f(y_{k}|\mu_{k}, \nu^{2})$, and in  \pkg{CARBayes} these can be the binomial, Gaussian or Poisson families. The expected value of $Y_{k}$ is denoted by $\E(Y_{k})=\mu_{k}$, while $\nu^{2}$ is an additional scale parameter that is required if the Gaussian family is used. The expected values of the responses are related to the linear predictor via an invertible link function $g(.)$, which in this software is one of the logit (binomial family), identity (Gaussian family) and natural log (Poisson family) functions. The vector of regression parameters are denoted by $\bd{\beta}=(\beta_{0},\ldots,\beta_{p})$, and non-linear covariate effects can be incorporated into the above model by including natural cubic spline or polynomial basis functions of the covariates in $X$.
+The responses $Y_{k}$ come from an exponential family of distributions $f(y_{k}|\mu_{k}, \nu^{2})$, and in  \pkg{CARBayes} these can be the binomial, Gaussian or Poisson families. The expected value of $Y_{k}$ is denoted by $\E(Y_{k})=\mu_{k}$, while $\nu^{2}$ is an additional scale parameter that is required if the Gaussian family is used. The expected values of the responses are related to the linear predictor via an invertible link function $g(.)$, which in this software is one of the logit (binomial family), identity (Gaussian family) and natural log (Poisson family) functions. Thus \pkg{CARBayes} can fit the following likelihood models:
+
+\begin{itemize}
+\item \textbf{Binomial - } $Y_{k}~\sim~\mbox{Binomial}(n_{k}, \theta_{k})$ and $\ln(\theta_{k}/(1-\theta_{k}))~=~\mathbf{x}_{k}^{\top}\bd{\beta} + O_{k} + \psi_{k}$. 
+
+\item \textbf{Gaussian - } $Y_{k}~\sim~\mbox{N}(\mu_{k}, \nu^{2})$ and $\mu_{k}~=~\mathbf{x}_{k}^{\top}\bd{\beta} + O_{k} + \psi_{k}$. 
+
+\item \textbf{Poisson - } $Y_{k}~\sim~\mbox{Poisson}(\mu_{k})$ and $\ln(\mu_{k})~=~\mathbf{x}_{k}^{\top}\bd{\beta} + O_{k} + M_{k}$. 
+\end{itemize}
+
+In the binomial model above $n_k$ is the number of trials in the $k$th area. The vector of regression parameters are denoted by $\bd{\beta}=(\beta_{0},\ldots,\beta_{p})$, and non-linear covariate effects can be incorporated into the above model by including natural cubic spline or polynomial basis functions of the covariates in $\mathbf{X}$. A multivariate Gaussian prior is assumed for $\bd{\beta}$, and the mean $\bd{\mu}_{\beta}$ and diagonal variance matrix $\bd{\Sigma}_{\beta}$ can be chosen by the user. Default values specified by the software are a constant zero-mean vector and diagonal elements of  $\bd{\Sigma}_{\beta}$ equal to 1000. The scale parameter $\nu^2$ for the Gaussian likelihood is assigned a conjugate inverse-gamma prior distribution,  where the default specification is $\nu^{2}\sim\mbox{Inverse-Gamma}(0.001, 0.001)$. \pkg{CARBayes} can implement a number of different spatial random effects models, and they are summarised below.
 
 
 
-\subsection{Level 2 - prior distributions}
-An independent Gaussian prior is specified for each regression parameter  $\beta_{j}$, that is $\beta_j\sim\mbox{N}(m_j,v_j)$  for $j=0,\ldots,p$, and the default values specified by the software are $(m_j=0, v_j=1000)$. The scale parameter $\nu^2$ for the Gaussian likelihood is assigned a conjugate inverse-gamma prior distribution,  where the default specification is $\nu^{2}\sim\mbox{Inverse-Gamma}(0.001, 0.001)$. \pkg{CARBayes} can implement a number of different random effects models, and they are summarised below.
+\subsection{Level 2 - Spatial models for the random effects}
+\pkg{CARBayes} can fit four different spatial structure models for $\bd{\psi}$, which are outlined below.
+
+\begin{itemize}
+\item \code{S.CARbym()} - fits the convolution or Besag-York-Mollie (BYM) CAR model outlined in \cite{besag1991}.
+
+\item \code{S.CARleroux()} - fits the CAR model proposed by \cite{leroux1999}. This model can also fit the intrinsic CAR model proposed by \cite{besag1991}, as well as a model with independent random effects. 
+
+\item \code{S.CARdissimilarity()} - fits the localised spatial autocorrelation model proposed by \cite{lee2012}.
+
+\item \code{S.CARlocalised()} - fits the localised spatial autocorrelation model proposed by \cite{lee2015}.
+\end{itemize}
 
 
-\subsubsection{Independence priors}
-The simplest prior for the random effects that can be specified is the independence prior:
+The spatial structure component $\psi$ in each of the above models includes a set of random effects $\bd{\phi}=(\phi_{1},\ldots,\phi_{K})$, which come from a conditional autoregressive model. These models are a special case of a Gaussian Markov Random Field (GMRF), and can be written in the general form $\bd{\phi}\sim\mbox{N}(\mathbf{0},\tau^{2}\mathbf{Q}^{-1})$, where $\mathbf{Q}$ is a precision matrix that may be singular (intrinsic model). This matrix controls the spatial autocorrelation structure of the random effects, and is based on a non-negative symmetric $K\times K$ neighbourhood or weight matrix $\mathbf{W}$. A binary specification based on geographical contiguity is most commonly used, where $w_{kj}=1$ if areal units $(\mathcal{S}_k, \mathcal{S}_j)$ share a common border (denoted $k\sim j$), and is zero otherwise. This specification forces $(\phi_k, \phi_j)$ relating to geographically adjacent areas (that is where $w_{kj}=1$) to be autocorrelated, whereas random effects relating to non-contiguous areal units are conditionally independent given the values of the remaining random effects. A binary specification is not necessary in \pkg{CARBayes}, as the only requirement is that $\mathbf{W}$ is non-negative and symmetric. However, each area must have at least one positive element $w_{kj}$, so that the row sums of the $\mathbf{W}$ matrix are not allowed to contain zeros. CAR priors are commonly specified as a set of $K$ univariate full conditional distributions $f(\phi_{k}|\bd{\phi}_{-k})$ for $k=1,\ldots,K$ (where $\bd{\phi}_{-k}=(\phi_{1},\ldots,\phi_{k-1},\phi_{k+1},\ldots,\phi_{n})$), rather than via the multivariate specification described above. We outline the four models that \pkg{CARBayes} will fit below.\\
+
+
+\subsubsection{Globally smooth CAR models}
+\code{S.CARbym()}\\
+The  convolution or Besag-York-Mollie (BYM) CAR model outlined in \cite{besag1991} was the first to be proposed, and contans two sets of random effects, spatially autocorrelated and independent. It has the following form. 
+
 
 \begin{eqnarray}
-\theta_{k}&\sim&\mbox{N}(0, \sigma^{2}),\label{equation independent}\\
-\sigma^{2}&\sim&\mbox{Inverse-Gamma}(a, b),\nonumber
-\end{eqnarray}
-
-
- where $\theta_{k}$ replaces $\phi_{k}$ in the data likelihood  (\ref{equation likelihood}). The variance parameter is assigned a conjugate inverse-gamma prior distribution,  where the default specification is $\sigma^{2}\sim\mbox{Inverse-Gamma}(0.001, 0.001)$. This random effects prior is appropriate if the covariates included in model (\ref{equation likelihood}) have removed all of the spatial structure in the response, leaving the random effects to account for the possible effects of over-dispersion (for binomial and Poisson models). However, for most data sets there is likely to be residual spatial autocorrelation, in which case one of the global or local CAR priors described below is more appropriate.
- 
-\subsubsection{Global smoothing CAR priors}
-Three different globally smooth conditional autoregressive priors  for modelling spatial autocorrelation are available in the  \pkg{CARBayes} package, the intrinsic and BYM models (both \cite{besag1991}), as well as the alternative  developed by \cite{leroux1999}. Each model is a special case of a Gaussian Markov Random Field (GMRF), and can be written in the general form $\bd{\phi}\sim\mbox{N}(\mathbf{0},\tau^{2}\mathbf{Q}^{-1})$, where $\mathbf{Q}$ is a precision matrix that may be singular (intrinsic model). This matrix controls the spatial autocorrelation structure of the random effects, and is based on a non-negative symmetric $K\times K$ neighbourhood or weight matrix $\mathbf{W}$. A binary specification based on geographical contiguity is most commonly used, where $w_{kj}=1$ if areal units $(\mathcal{S}_k, \mathcal{S}_j)$ share a common border (denoted $k\sim j$), and is zero otherwise. This specification forces $(\phi_k, \phi_j)$ relating to geographically adjacent areas (that is where $w_{kj}=1$) to be autocorrelated, whereas random effects relating to non-contiguous areal units are conditionally independent given the values of the remaining random effects. A binary specification is not necessary in \pkg{CARBayes}, as the only requirement is that $\mathbf{W}$ is non-negative and symmetric. However, each area must have at least one positive element $w_{kj}$, so that the row sums of the $\mathbf{W}$ matrix are not allowed to contain zeros.\\
-
-
-CAR priors are commonly specified as a set of $K$ univariate full conditional distributions $f(\phi_{k}|\bd{\phi}_{-k})$ for $k=1,\ldots,K$ (where $\bd{\phi}_{-k}=(\phi_{1},\ldots,\phi_{k-1},\phi_{k+1},\ldots,\phi_{n})$), rather than via the multivariate specification described above. The first CAR prior to be proposed was the intrinsic model (\cite{besag1991}), which is given by
-
-
-\begin{eqnarray}
+\psi_k&=&\phi_{k} + \theta_k,\label{equation intrinsic}\\
 \phi_{k}| \bd{\phi}_{-k},\mathbf{W},\tau^2&\sim&\mbox{N}\left(\frac{\sum_{i=1}^{K}w_{ki}\phi_{i}}{\sum_{i=1}^{K}w_{ki}},~
-\frac{\tau^{2}}{\sum_{i=1}^{K}w_{ki}}\right),\label{equation intrinsic}\\
-\tau^{2}&\sim&\mbox{Inverse-Gamma}(a, b).\nonumber
+\frac{\tau^{2}}{\sum_{i=1}^{K}w_{ki}}\right),\nonumber\\
+\theta_k&\sim&\mbox{N}(0, \sigma^2),\nonumber\\
+\tau^{2}, \sigma^2&\sim&\mbox{Inverse-Gamma}(a, b).\nonumber
 \end{eqnarray}
 
-The conditional expectation is the average of the random effects in neighbouring areas, while the conditional variance is inversely proportional to the number of neighbours. The latter is appropriate because if the random effects are strongly spatially autocorrelated, then the more neighbours an area has the more information there is from its neighbours about the value of its random effect. In common with the other variance parameters the default prior specification for $\tau^{2}$ has $a=b=0.001$. The limitation with this model is that it can only represent strong spatial autocorrelation, and is well known to produce random effects that are overly smooth. Therefore, the same authors proposed an extension to allow for both weak and strong spatial autocorrelation, by replacing $\phi_{k}$ in (\ref{equation likelihood}) with $\theta_{k}+\phi_{k}$, which are respectively defined by (\ref{equation independent}) and (\ref{equation intrinsic}). This model is known as the BYM or convolution model, and is the most commonly used conditional autoregressive model in practice. However, it requires two random effects to be estimated for each data point, whereas only their sum is identifiable from the data. Therefore in \pkg{CARBayes} only McMC samples for the sum $re_k=\phi_k+\theta_k$ are returned to the user. \\
+The $\bd{\theta}=(\theta_{1},\ldots,\theta_{K})$ random effects are independent with zero mean and a constant variance, while the spatial autocorrelation is modelled via $\bd{\phi}$. For this latter set the conditional expectation is the average of the random effects in neighbouring areas, while the conditional variance is inversely proportional to the number of neighbours. The latter is appropriate because if the random effects are strongly spatially autocorrelated, then the more neighbours an area has the more information there is from its neighbours about the value of its random effect. In common with the other variance parameters the default prior specification for ($\tau^{2},\sigma^2$) has $a=b=0.001$. This model is known as the BYM or convolution model, and is the most commonly used conditional autoregressive model in practice. However, it requires two random effects to be estimated for each data point, whereas only their sum is identifiable from the data. Therefore in \pkg{CARBayes} only McMC samples for the sum $\psi_k=\phi_k+\theta_k$ are returned to the user. \\
 
+\code{S.CARleroux()}\\
 As a result of this limitation \cite{leroux1999} proposed an alternative CAR prior for modelling varying strengths of spatial autocorrelation, using only a single set of random effects. Their model  is given by
 
 \begin{eqnarray}
+\psi_k&=&\phi_k\label{equation leroux}\\
 \phi_{k}| \bd{\phi}_{-k},\mathbf{W},\tau^2, \rho&\sim&\mbox{N}\left(\frac{\rho\sum_{i=1}^{K}w_{ki}\phi_{i}}{\rho\sum_{i=1}^{K}w_{ki} + 1-\rho},~
-\frac{\tau^{2}}{\rho\sum_{i=1}^{K}w_{ki} + 1-\rho}\right),\label{equation leroux}\\
+\frac{\tau^{2}}{\rho\sum_{i=1}^{K}w_{ki} + 1-\rho}\right),\nonumber\\
 \tau^{2}&\sim&\mbox{Inverse-Gamma}(a, b),\nonumber\\
 \rho&\sim&\mbox{Uniform}(0,1),\nonumber
 \end{eqnarray}
 
-where $\rho$ is a spatial autocorrelation parameter, with $\rho=0$ corresponding to independence, while $\rho=1$ corresponds to strong spatial autocorrelation.  A uniform prior on the unit interval is specified for $\rho$ while the usual inverse gamma prior is adopted for $\tau^{2}$. For (\ref{equation leroux})  when $\rho=1$ the intrinsic model give by (\ref{equation intrinsic}) is obtained, while when $\rho=0$ the random effects are independent and have the prior given by (\ref{equation independent}). These global CAR models were compared in a review by \cite{lee2011}, who concluded  that the model proposed by \cite{leroux1999} was the most appealing from both theoretical and practical  standpoints.
+where $\rho$ is a spatial autocorrelation parameter, with $\rho=0$ corresponding to independence, while $\rho=1$ corresponds to strong spatial autocorrelation.  A uniform prior on the unit interval is specified for $\rho$ while the usual inverse gamma prior is adopted for $\tau^{2}$. The value of $\rho$ can be fixed in the interval $[0,1]$ when fitting the model rather than being estimated from the data, which in particular allows 2 special cases to be fitted. Fixing $\rho=1$ in the above results in the intrinsic CAR model (corresponding to the model for $\bd{\phi}$ in (\ref{equation intrinsic})), which was available via a separate function (\code{S.CARiar()}) in older versions of \pkg{CARBayes}. Additionally, fixing $\rho=0$ in the above corresponds to independence (corresponding to the model for $\bd{\theta}$ in (\ref{equation intrinsic})), which was available via a separate function (\code{S.independent()}) in older versions of \pkg{CARBayes}. These global CAR models were compared in a review by \cite{lee2011}, who concluded  that the model proposed by \cite{leroux1999} was the most appealing from both theoretical and practical  standpoints.\\
 
 
-\subsubsection{Localised smoothing CAR priors}
+\subsubsection{Locally smooth CAR models}
 The CAR priors described above enforce a single global level of spatial smoothing for the set of random effects, which for model (\ref{equation leroux}) is controlled by $\rho$. This is illustrated by the partial autocorrelation structure implied by that model, which for $(\phi_k, \phi_j)$ is given by
 
 \begin{equation}
@@ -145,7 +161,7 @@ The CAR priors described above enforce a single global level of spatial smoothin
 For non-neighbouring areal units (where $w_{kj}=0)$ the random effects are conditionally independent, while for neighbouring areal units (where $w_{kj}=1$) their partial autocorrelation is controlled by $\rho$. However, this representation of spatial smoothness is likely to be overly simplistic in practice, as the random effects surface is likely to include sub-regions of smooth evolution as well as boundaries where abrupt step changes occur.  A number of approaches have been proposed for modelling this localised spatial autocorrelation, and \pkg{CARBayes} can implement the proposals of \cite{lee2012} and \cite{lee2015} which are both summarised below.\\
 
 
-
+\code{S.CARdissimilarity()}\\ 
 The paper by \cite{lee2012} proposes a method for capturing such localised spatial autocorrelation, including the identification of boundaries in the random effects surface. The underlying idea is to model the elements of $\mathbf{W}$ corresponding to geographically adjacent areal units as binary random quantities, rather than assuming they are fixed at one. Conversely, if areal units $(\mathcal{S}_{k},\mathcal{S}_{j})$ do not share a common border then $w_{kj}$ is fixed at zero. From (\ref{equation partialcorrelation}), it is straightforward to see that if $w_{kj}$ is estimated as one then $(\phi_k, \phi_j)$ are spatially autocorrelated, and are smoothed over in the modelling process. In contrast, if $w_{kj}$ is estimated as zero then no smoothing is imparted between $(\phi_k, \phi_j)$, as they are modelled as conditionally independent. In this case a boundary is said to exist in the random effects surface between areal units $(\mathcal{S}_{k},\mathcal{S}_{j})$. We note that if covariates are excluded from (\ref{equation likelihood}) then any boundaries identified also relate to the mean surface $\bd{\mu}=(\mu_1,\ldots,\mu_K)$ in the absence of an offset term, because it has the same spatial structure as the random effects as $g(\mu_k)=\beta_0 + \phi_k$.\\
 
 The model proposed by \cite{lee2012}  is based on the Poisson log-linear specification of (\ref{equation likelihood}) and the CAR prior (\ref{equation leroux}), with the restriction that $\rho$ is fixed at 0.99 (\pkg{CARBayes} can also fit binomial and Gaussian specifications). This restriction on $\rho$ was made by \cite{lee2012} to ensure that the random effects exhibit strong spatial smoothing globally, which can be altered locally by estimating $\{w_{kj}|k\sim j\}$. They model each $w_{kj}$ as a function of the dissimilarity between areal units $(\mathcal{S}_{k},\mathcal{S}_{j})$, because large differences in the response are likely to occur where neighbouring populations are very different. This dissimilarity is captured by $q$ non-negative dissimilarity metrics $\mathbf{z}_{kj}=(z_{kj1},\ldots,z_{kjq})$, which could include social or physical factors, such as the absolute difference in smoking rates, or the proportion of the shared border that is blocked by a physical barrier (such as a river or railway line) and cannot be crossed. Using these measures of dissimilarity, $\{w_{kj}|k\sim j\}$ are collectively modelled as
@@ -159,28 +175,20 @@ w_{kj}(\bd{\alpha})&=&\left\{ \begin{array}{ll}
 
 The $q$ regression parameters $\bd{\alpha}=(\alpha_{1},\ldots,\alpha_{q})$ determine the effects of the dissimilarity metrics on $\{w_{kj}|k\sim j\}$, and if $\alpha_i<-\ln(0.5)/\max\{z_{kji}\}$, then the $i$th dissimilarity metric has not solely identified any  boundaries because $\exp(-\alpha_i z_{kji})>0.5$ for all $k\sim j$. The aim of \cite{lee2012} was to identify the locations of any boundaries (abrupt step changes) in disease risk surfaces, so the available covariates were used to construct dissimilarity metrics rather than being incorporated into the linear predictor. In contrast, if the aim of the analysis was to explain the spatial pattern in the response, then covariates would be included in (\ref{equation likelihood}), and only metrics directly describing the dissimilarity between two areas, such as the existence of a physical boundary or the distance between the areas centroids, would be included in (\ref{equation binary neighbourhood}).\\
 
-
-The above approch allows for localised spatial autocorrelation by modelling the elements in $\mathbf{W}$, which can reduce the partial autocorrelations between certain pairs of adjacent random effects. An alternative is to augment a set of spatially smooth random effects with a piecewise constant intercept or cluster model, thus allowing large jumps in the mean surface between adjacent areal units in different clusters. One such model was proposed by \cite{lee2015}, and partitions the $K$ areal units into a maximum of $G$ clusters each with their own intercept term $(\lambda_{1},\ldots,\lambda_{G})$. The mean function for this model is given by
+\code{S.CARlocalised()}\\
+The above approch allows for localised spatial autocorrelation by modelling the elements in $\mathbf{W}$, which can reduce the partial autocorrelations between certain pairs of adjacent random effects. An alternative is to augment the set of spatially smooth random effects with a piecewise constant intercept or cluster model, thus allowing large jumps in the mean surface between adjacent areal units in different clusters. One such model was proposed by \cite{lee2015}, and partitions the $K$ areal units into a maximum of $G$ clusters each with their own intercept term $(\lambda_{1},\ldots,\lambda_{G})$. The  model is given by
 
 
 \begin{eqnarray}
-g(\mu_k) & = &\mathbf{x}_{k}^{\mbox{T}}\bd{\beta} + \phi_{k} + \lambda_{Z_{k}} + O_{k},\label{equation cluster}\\
+\psi_k & = & \phi_{k} + \lambda_{Z_{k}},\label{equation cluster}\\
 \phi_{k}| \bd{\phi}_{-k}, \mathbf{W}, \tau^2&\sim&\mbox{N}\left(\frac{\sum_{i=1}^{K}w_{ki}\phi_{i}}{\sum_{i=1}^{K}w_{ki}},\frac{\tau^{2}}{\sum_{i=1}^{K}w_{ki}}\right),\nonumber\\
 \tau^{2}&\sim&\mbox{Inverse-Gamma}(0.001, 0.001),\nonumber\\
 \lambda_i & \sim & \mbox{Uniform}(\lambda_{i-1}, \lambda_{i+1})\hspace{1cm}\mbox{for }i=1,\ldots,G,\nonumber\\
 f(Z_{k})&=&\frac{\exp(-\delta(Z_{k}-G^{*})^{2})}{\sum_{r=1}^{G}\exp(-\delta(r-G^{*})^{2})},\nonumber\\
-\delta&\sim&\mbox{Uniform}(1, M=10).\nonumber\\
+\delta&\sim&\mbox{Uniform}(1, M=10).\nonumber
 \end{eqnarray}
 
-The cluster means $(\lambda_{1},\ldots,\lambda_{G})$ are ordered so that $\lambda_{1}<\lambda_{2}<\ldots<\lambda_{G}$, which prevents the label switching problem common in mixture models. Thus in the above $\lambda_{0}=-\infty$ and $\lambda_{G+1}=\infty$.  Area $k$ is assigned to one of the $G$ intercepts by $Z_{k}\in\{1,\ldots,G\}$, and $G$ is the maximum number of different intercept terms. Here we penalise $Z_{k}$ towards the middle intercept value, so that the extreme intercept classes (e.g. $1$ or $G$) may be empty. This is achieved by the penalty term $\delta(Z_{k}-G^{*})^{2}$ in the prior for $Z_{k}$, where $G^{*}=(G+1)/2$ if $G$ is odd and $G^{*}=G/2$ if $G$ is even is the middle of the intercept terms. A weakly informative uniform prior with a large range is specified for the penalty parameter $\delta$, so that the data play the dominant role in estimating its value. We note that we do not put any spatial smoothing constraints on the indicator vector $\mathbf{Z}$, because similar random effect values can occur at opposite ends of the study region. The clustering is thus inherently non-spatial, and the spatial autocorrelation is accounted for by the CAR prior for $\bd{\phi}$.  The \pkg{CARBayes} package can fit binomial and Poisson variants of this model. Note, a Gaussian likelihood is not allowed because of a lack of identifiability among the parameters.\\
-
-The Poisson variant of this model has the option to allow for ecological bias, by changing the form of the mean function. Assume that one of the covariates (now called the exposure) is spatially misaligned with the response data (counts), as the former is available at more than one (point) location within each areal unit. Therefore, areal unit $k$ has  $q_{k}$ different values (exposures) $\mathbf{w}_{k}=(w_{k1},\ldots,w_{k q_{k}})$, and hence there is variation within an areal unit for which only a single response variable (count) exists. Furthermore, the population may be unevenly distributed within each areal unit, and the proportions of the population corresponding to each of the $q_{k}$ expospures within areal unit $k$ are denoted by $\mathbf{p}_{k}=(p_{k1},\ldots,p_{k q_{k}})$, where $\sum_{i=1}^{q_{k}}p_{ki}=1$. Then an appropriate model is given by:
-
-\begin{equation}
-\mu_{k}~=~\exp(\mathbf{x}_{k}^{\mbox{T}}\bd{\beta} + \phi_{k} + \lambda_{Z_{k}} + O_{k})\sum_{i=1}^{q_{k}}p_{ki}\exp(w_{ki}\alpha)\label{equation aggregate},
-\end{equation}
-
-and further details can be found in \cite{lee2015}.
+The cluster means $(\lambda_{1},\ldots,\lambda_{G})$ are ordered so that $\lambda_{1}<\lambda_{2}<\ldots<\lambda_{G}$, which prevents the label switching problem common in mixture models. Thus in the above $\lambda_{0}=-\infty$ and $\lambda_{G+1}=\infty$.  Area $k$ is assigned to one of the $G$ intercepts by $Z_{k}\in\{1,\ldots,G\}$, and $G$ is the maximum number of different intercept terms. Here we penalise $Z_{k}$ towards the middle intercept value, so that the extreme intercept classes (e.g. $1$ or $G$) may be empty. This is achieved by the penalty term $\delta(Z_{k}-G^{*})^{2}$ in the prior for $Z_{k}$, where $G^{*}=(G+1)/2$ if $G$ is odd and $G^{*}=G/2$ if $G$ is even is the middle of the intercept terms. A weakly informative uniform prior with a large range is specified for the penalty parameter $\delta$, so that the data play the dominant role in estimating its value. We note that we do not put any spatial smoothing constraints on the indicator vector $\mathbf{Z}$, because similar random effect values can occur at opposite ends of the study region. The clustering is thus inherently non-spatial, and the spatial autocorrelation is accounted for by the CAR prior for $\bd{\phi}$.  The \pkg{CARBayes} package can fit binomial and Poisson variants of this model. Note, a Gaussian likelihood is not allowed because of a lack of identifiability among the parameters.
 
 %%%%%%%%%%%%%%
 %%%% Section 3
@@ -194,7 +202,7 @@ and further details can be found in \cite{lee2015}.
 library(CARBayes)
 @
 
-Note, the packages listed in the previous paragraph are automatically loaded upon loading \pkg{CARBayes}, but only for use within the package. However, a complete spatial analysis will typically also include the creation of the neighbourhood matrix $\mathbf{W}$ from a shapefile, the production of spatial maps of the fitted values and residuals, and tests for the presence of spatial autocorrelation. To achieve these tasks the following packages should be loaded separately into \proglang{R} using the code:
+Note, that certain functionality from the packages listed in the previous paragraph are automatically loaded upon loading \pkg{CARBayes}, but only for use within the package. However, a complete spatial analysis will typically also include the creation of the neighbourhood matrix $\mathbf{W}$ from a shapefile, the production of spatial maps of the fitted values and residuals, and tests for the presence of spatial autocorrelation. To achieve these tasks the following packages should be loaded separately into \proglang{R} using the code:
 
 <<>>=
 library(shapefiles)
@@ -206,25 +214,10 @@ library(spdep)
 
 
 \subsection{Functionality}
-\pkg{CARBayes} can fit the general exponential family Bayesian hierarchical model outlined in the previous section, where in most cases the response data can be binomial, Gaussian or Poisson. The models listed below can be implemented by the software. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance.
+\pkg{CARBayes} can fit the general exponential family Bayesian hierarchical model outlined in the previous section, where in most cases the response data can be binomial, Gaussian or Poisson. The models listed below can be implemented by the software. Missing, \code{NA}, values are allowed in the repsonse $\mathbf{Y}$ except for the \code{S.CARlocalised()} function which does not allow them due to model complexity and corresponding poor predictive performance.\\
 
 
-
-\begin{enumerate}
-\item \code{S.independent()} - the independent random effects model  given by (\ref{equation independent}), with the likelihood model (\ref{equation likelihood}). Note, a Gaussian likelihood is not allowed because of a lack of identifiability among the parameters.
-
-\item \code{S.CARiar()} - the intrinsic autoregressive model proposed by \cite{besag1991} and given by (\ref{equation intrinsic}), with the likelihood model (\ref{equation likelihood}).
-
-\item \code{S.CARbym()} - the BYM model proposed by \cite{besag1991} and  given by a linear combination of  (\ref{equation independent}) and  (\ref{equation intrinsic}), with the likelihood model (\ref{equation likelihood}). Note, a Gaussian likelihood is not allowed because of a lack of identifiability among the parameters.
-
-\item \code{S.CARleroux()} - the CAR prior proposed by \cite{leroux1999} and given by (\ref{equation leroux}), with the likelihood model (\ref{equation likelihood}).
-
-\item \code{S.CARdissimilarity()} - the local spatial smoothing model proposed by \cite{lee2012} and given by  (\ref{equation leroux}) and  (\ref{equation binary neighbourhood}), with the likelihood model (\ref{equation likelihood}).
-
-\item \code{S.CARlocalised()} - the CAR model with a piecewise constant intercept component given by (\ref{equation cluster}). Note, a Gaussian likelihood is not allowed because of a lack of identifiability among the parameters.
-\end{enumerate}
-
-The linear predictor for each of the Bayesian hierarchical models is specified as an \proglang{R}  \code{formula} object, in common with the \code{glm()}  and \code{gam()} functions. To fit non-linear functions the function \code{ns()} can be used in the \code{formula} object, but the \pkg{splines} library needs to be loaded. The spatial neighbourhood information required to run the CAR models needs to be provided as an $n\times n$ neighbourhood matrix $\mathbf{W}$, which is simpler to construct than the series of list objects required by the \proglang{BUGS} software. A full list of arguments for each function can be found in the manual accompanying the package. \pkg{CARBayes} contains two further functions \code{combine.data.shapefile()} and \code{highlight.borders()}, which aid in plotting spatial maps of the data, and their use is illustrated below. Additionally, two furhter functions allow the posterior samples (\code{summarise.samples()}) and linear combinations of the covariate component (\code{summarise.lincomb()}), for example to summarise non-linear relationships, to be summarised. Finally, the data in the worked examples in the rest of this vignette are available in the \pkg{CARByesdata} package, which is also avaialable from CRAN.
+The linear predictor for each of the Bayesian hierarchical models is specified as an \proglang{R}  \code{formula} object, in common with the \code{glm()}  and \code{gam()} functions. To fit non-linear functions the function \code{ns()} can be used in the \code{formula} object, but the \pkg{splines} library needs to be loaded. The spatial neighbourhood information required to run the CAR models needs to be provided as an $n\times n$ neighbourhood matrix $\mathbf{W}$, which is simpler to construct than the series of list objects required by the \proglang{BUGS} software. A full list of arguments for each function can be found in the manual accompanying the package. \pkg{CARBayes} contains two further functions \code{combine.data.shapefile()} and \code{highlight.borders()}, which aid in creating $\mathbf{W}$ and plotting spatial maps of the data, and their use is illustrated below. Additionally, two furhter functions allow the posterior samples (\code{summarise.samples()}) and linear combinations of the covariate component (\code{summarise.lincomb()}), for example to summarise non-linear relationships, to be summarised. Finally, the data in the worked examples in the rest of this vignette are available in the \pkg{CARByesdata} package, which is also avaialable from CRAN.
 
 
 
@@ -399,7 +392,7 @@ print(model.spatial)
 \end{CodeInput}
 
 
- Inference for this model is based on 10,000 McMC samples, following a burnin period of 10,000 and the remaining 100,000 samples being thinned by 10 to reduced their autocorrelation. When the function finished running the command \code{print(model.spatial)} produces a summary of the results. The first part of the output is a description of the model that was fitted, including the likelihood and random effects specifications, as well as the covariates included in the linear predictor. The second part summarises selected parameters, including posterior medians and 95 percent credible intervals, the number of samples, the acceptance rate, the effective number of independent samples and the Geweke convergence diagnostic in the form of a Z-score. Finnally, model fit criteria are given, including the Deviance Information Criteria (DIC, \cite{spiegelhalter2002}) and the Log Marginal Predictive Likelihood (LMPL, \cite{congdon2005}).\\
+ Inference for this model is based on 10,000 McMC samples, following a burnin period of 10,000 and the remaining 100,000 samples being thinned by 10 to reduced their autocorrelation. When the function finished running the command \code{print(model.spatial)} produces a summary of the results. The first part of the output is a description of the model that was fitted, including the likelihood and random effects specifications, as well as the covariates included in the linear predictor. The second part summarises selected parameters, including posterior medians and 95 percent credible intervals, the number of samples, the acceptance rate, the effective number of independent samples and the Geweke convergence diagnostic in the form of a Z-score. Finnally, model fit criteria are given, including the Deviance Information Criteria (DIC, \cite{spiegelhalter2002}), the Log Marginal Predictive Likelihood (LMPL, \cite{congdon2005}) and the Watanabe-Akaike Information Criterion (WAIC, \cite{watanabe2010}).\\
  
  
 \subsubsection{Model output}
@@ -410,7 +403,7 @@ summary(model.spatial)
 @
 
 
-The first element of this list is a summary table of results, which is what is printed by the \code{print()} function. The next element is a list containing matrices of the thinned and post burnin-in McMC samples for each set of parameters.  For example, \code{model.spatial$samples$beta} is a matrix containing the McMC samples for all the regression parameters. The next two elements in the list \code{fitted.values}  and \code{residuals} are vectors of fitted values and residuals from the model, while \code{modelfit} gives a selection of model fit criteria. These criteria include the Deviance Information Criterion (DIC, \cite{spiegelhalter2002}) and the Log Marginal Predictive Likelihood (LMPL, \cite{congdon2005}). For further details about Bayesian modelling and model fit criteria see \cite{gelman2003}. The item \code{accept} contains the acceptance rates for the model, while \code{localised.structure} is \code{NULL} for this model and is used for compatabiltiy with the other functions in the package. Finally, the \code{formula} and \code{model} are text strings describing the formula used and the model fit, while \code{X} gives the design matrix corresponding to the \code{formula} object.
+The first element of this list is a summary table of results, which is what is printed by the \code{print()} function. The next element is a list containing matrices of the thinned and post burnin-in McMC samples for each set of parameters.  For example, \code{model.spatial$samples$beta} is a matrix containing the McMC samples for all the regression parameters. The next two elements in the list \code{fitted.values}  and \code{residuals} are vectors of fitted values and residuals from the model, while \code{modelfit} gives a selection of model fit criteria. These criteria include the Deviance Information Criterion (DIC), the log Marginal Predictive Likelihood (LMPL) and the Watanabe-Akaike Information Criterion (WAIC). For further details about Bayesian modelling and model fit criteria see \cite{gelman2003}. The item \code{accept} contains the acceptance rates for the model, while \code{localised.structure} is \code{NULL} for this model and is used for compatabiltiy with the other functions in the package. Finally, the \code{formula} and \code{model} are text strings describing the formula used and the model fit, while \code{X} gives the design matrix corresponding to the \code{formula} object.
 
 
 \subsection{Inference}
@@ -581,7 +574,7 @@ The result of these commands are displayed in Figure \ref{figure_boundary}, whic
 
 
 \section{Discussion}
-This vignette has illustrated the \proglang{R} package \pkg{CARBayes}, which can fit a number of commonly used conditional autoregressive models to spatial areal unit data, as well as the localised spatial smoothing model proposed by \cite{lee2012}. The response data can be binomial, Gaussian or Poisson, with the canonical link functions logit, the identity and natural log respectively. The availability of areal unit data has grown dramatically in recent times, due to the launch of freely available online databases such as Neighbourhood Statistics in the UK (see \emph{http://www.neighbourhood.statistics.gov.uk} and \emph{http://www.sns.gov.uk/}), and Surveillance Epidemiology and End Results (SEER, \emph{http://seer.cancer.gov/}) in the USA. This increased availability of spatial data has fuelled a growth of modelling in this area, leading to the need for user friendly software such as \pkg{CARBayes} for use by both statisticians and non-statisticians alike.\\
+This vignette has illustrated the \proglang{R} package \pkg{CARBayes}, which can fit a number of commonly used conditional autoregressive models to spatial areal unit data, as well as the localised spatial smoothing models proposed by \cite{lee2012} and \cite{lee2015}. The response data can be binomial, Gaussian or Poisson, with the canonical link functions logit, the identity and natural log respectively. The availability of areal unit data has grown dramatically in recent times, due to the launch of freely available online databases such as Neighbourhood Statistics in the UK (see \emph{http://www.neighbourhood.statistics.gov.uk} and \emph{http://www.sns.gov.uk/}), and Surveillance Epidemiology and End Results (SEER, \emph{http://seer.cancer.gov/}) in the USA. This increased availability of spatial data has fuelled a growth of modelling in this area, leading to the need for user friendly software such as \pkg{CARBayes} for use by both statisticians and non-statisticians alike.\\
 
 A number of other software packages can also  fit conditional autoregressive models to spatial data, including \proglang{BUGS}, \proglang{BayesX} and \proglang{R} packages \pkg{CARramps}, \pkg{hSDM}, \pkg{INLA}, \pkg{spatcounts} and \pkg{spdep}. However, these software packages either can only fit a limited selection of CAR models, or require a degree of programming which may be beyond some users of spatial data. Thus a gap in the market exists for user friendly software that can fit a wide class of CAR models, which was the motivation behind the \pkg{CARBayes} software. The user friendly features of \pkg{CARBayes} have been illustrated by the two worked examples presented in Sections 4 and 5, which include: (i) models can be implemented using a single function call; (ii) the spatial information required by the models is straightforward to create from a shapefile; (iii) only a small number of arguments are required to run a \emph{default} analysis; and (iv) the software reports on the progress of model fitting, and produces a summary table of the results when it has finished. Finally, this software now has a sister spatio-temporal modelling package called \pkg{CARBayesST}, which can fit a range of spatio-temporal areal unit models based on CAR priors. These models include similar models to those proposed by \cite{bernardinelli1995} and \cite{knorrheld2000b}.
 

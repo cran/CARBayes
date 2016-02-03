@@ -119,10 +119,16 @@ offset.short <- offset[which.miss==1]
 
 
 #### Initial parameter values
-beta <- lm(Y~X.standardised-1, offset=offset)$coefficients
-nu2 <- runif(1)
-phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-tau2 <- runif(1)
+mod.glm <- lm(Y~X.standardised-1, offset=offset)
+beta.mean <- mod.glm$coefficients
+beta.sd <- sqrt(diag(summary(mod.glm)$cov.unscaled)) * summary(mod.glm)$sigma
+beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
+
+res.temp <- Y - X.standardised %*% beta.mean - offset
+res.sd <- sd(res.temp, na.rm=TRUE)/5
+phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
+tau2 <- var(phi) / 10
+nu2 <- tau2
 alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q))) 
 
 
@@ -178,6 +184,7 @@ samples.nu2 <- array(NA, c(n.keep, 1))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
 samples.deviance <- array(NA, c(n.keep, 1))
+samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
 if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
 
@@ -381,9 +388,11 @@ data.precision.beta <- t(X.short) %*% X.short
     	     ## Calculate the deviance
     	     #########################
     	     fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-          deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
-          deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
+    	     deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
+    	     like <- exp(deviance.all)
+    	     deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
+    	     
     	     ###################
     	     ## Save the results
     	     ###################
@@ -396,6 +405,7 @@ data.precision.beta <- t(X.short) %*% X.short
                samples.tau2[ele, ] <- tau2
                samples.alpha[ele, ] <- alpha
                samples.deviance[ele, ] <- deviance
+               samples.like[ele, ] <- like
                samples.fitted[ele, ] <- fitted
                if(n.miss>0) samples.Y[ele, ] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))
                }else
@@ -417,10 +427,10 @@ data.precision.beta <- t(X.short) %*% X.short
 		        #### alpha tuning parameter
 		            if(accept.alpha > 50)
 		            {
-		            proposal.sd.alpha <- min(2 * proposal.sd.alpha, alpha.max/4)
+		            proposal.sd.alpha <- min(proposal.sd.alpha + 0.1 * proposal.sd.alpha, alpha.max/4)
 		            }else if(accept.alpha < 40)              
 		            {
-		            proposal.sd.alpha <- 0.5 * proposal.sd.alpha
+		            proposal.sd.alpha <- proposal.sd.alpha - 0.1 * proposal.sd.alpha
 		            }else
 		            {
 		            }
@@ -465,6 +475,12 @@ p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted    
    
    
+#### Watanabe-Akaike Information Criterion (WAIC)
+LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+WAIC <- -2 * (LPPD - p.w)
+
+
 #### Compute the Conditional Predictive Ordinate
 CPO <- rep(NA, n)
      for(j in 1:n)
@@ -580,17 +596,12 @@ W.border.prob <- array(NA, c(n,n))
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d,  LMPL)
-names(modelfit) <- c("DIC", "p.d",  "LMPL")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL")
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     
-    if(n.miss>0)
-    {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-    }else
-    {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
-    }
+if(n.miss==0) samples.Y = NA
 
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=list(W.posterior=W.posterior, W.border.prob=W.border.prob),  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

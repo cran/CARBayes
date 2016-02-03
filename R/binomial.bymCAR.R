@@ -109,11 +109,21 @@ offset <- try(model.offset(frame), silent=TRUE)
 #### Initial parameter values
 ## Regression parameters beta
 dat <- cbind(Y, failures)
-beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
-phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-theta <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-tau2 <- runif(1)
-sigma2 <- runif(1)
+mod.glm <- glm(dat~X.standardised-1, offset=offset, family="quasibinomial")
+beta.mean <- mod.glm$coefficients
+beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
+beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
+
+theta.hat <- Y / trials
+theta.hat[theta.hat==0] <- 0.01
+theta.hat[theta.hat==1] <- 0.99
+res.temp <- log(theta.hat / (1 - theta.hat)) - X.standardised %*% beta.mean - offset
+res.sd <- sd(res.temp, na.rm=TRUE)/5
+phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
+tau2 <- var(phi) / 10
+theta <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
+sigma2 <- var(theta) / 10
+
 
 
 #### Priors
@@ -193,6 +203,7 @@ samples.re <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.sigma2 <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
+samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
 if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
 
@@ -336,11 +347,12 @@ temp <- 1
     #########################
     ## Calculate the deviance
     #########################
-    logit <- as.numeric(X.standardised %*% beta) + phi + theta + offset    
-    prob <- exp(logit)  / (1 + exp(logit))
+    lp <- as.numeric(X.standardised %*% beta) + phi + theta + offset
+    prob <- exp(lp)  / (1 + exp(lp))
     fitted <- trials * prob
     deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-    deviance <- -2 * sum(deviance.all, na.rm=TRUE)      
+    like <- exp(deviance.all)
+    deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
 
     ###################
@@ -354,6 +366,7 @@ temp <- 1
         samples.tau2[ele, ] <- tau2
         samples.sigma2[ele, ] <- sigma2
         samples.deviance[ele, ] <- deviance
+        samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
         if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
         }else
@@ -377,10 +390,10 @@ temp <- 1
         #### beta tuning parameter
             if(accept.beta > 40)
             {
-            proposal.sd.beta <- 2 * proposal.sd.beta
+            proposal.sd.beta <- proposal.sd.beta + 0.1 * proposal.sd.beta
             }else if(accept.beta < 20)              
             {
-            proposal.sd.beta <- 0.5 * proposal.sd.beta
+            proposal.sd.beta <- proposal.sd.beta - 0.1 * proposal.sd.beta
             }else
             {
             }
@@ -388,20 +401,20 @@ temp <- 1
         #### phi tuning parameter
             if(accept.phi > 50)
             {
-            proposal.sd.phi <- 2 * proposal.sd.phi
+            proposal.sd.phi <- proposal.sd.phi + 0.1 * proposal.sd.phi
             }else if(accept.phi < 40)              
             {
-            proposal.sd.phi <- 0.5 * proposal.sd.phi
+            proposal.sd.phi <- proposal.sd.phi - 0.1 * proposal.sd.phi
             }else
             {
             }
         #### theta tuning parameter
             if(accept.theta > 50)
             {
-            proposal.sd.theta <- 2 * proposal.sd.theta
+            proposal.sd.theta <- proposal.sd.theta + 0.1 * proposal.sd.theta
             }else if(accept.theta < 40)              
             {
-            proposal.sd.theta <- 0.5 * proposal.sd.theta
+            proposal.sd.theta <- proposal.sd.theta - 0.1 * proposal.sd.theta
             }else
             {
             }
@@ -450,6 +463,12 @@ fitted.median <- trials * median.prob
 deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted     
+
+
+#### Watanabe-Akaike Information Criterion (WAIC)
+LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+WAIC <- -2 * (LPPD - p.w)
 
 
 #### Compute the Conditional Predictive Ordinate
@@ -517,17 +536,12 @@ residuals <- as.numeric(Y) - fitted.values
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, LMPL)
-names(modelfit) <- c("DIC", "p.d", "LMPL")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - BYM CAR\n")
-    if(n.miss>0)
-    {
-        samples <- list(beta=samples.beta.orig, re=mcmc(samples.re), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-    }else
-    {
-        samples <- list(beta=samples.beta.orig, re=mcmc(samples.re), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted))
-    }
+if(n.miss==0) samples.Y = NA
 
+samples <- list(beta=samples.beta.orig, psi=mcmc(samples.re), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

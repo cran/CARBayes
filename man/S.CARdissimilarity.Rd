@@ -93,8 +93,9 @@ Logical, should the function update the user on its progress.
 \item{fitted.values }{A vector of fitted values for each area.}
 \item{residuals }{A vector of residuals for each area.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
-(DIC), the effective number of parameters in the model (p.d), and the Log Marginal 
-Predictive Likelihood (LMPL).}
+(DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
+Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w).}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A list containing two matrices: W.posterior contains 
 posterior medians for each element w_kj of the K by K neighbourhood matrix W; 

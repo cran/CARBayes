@@ -4,10 +4,8 @@ export(
 	highlight.borders,
      S.CARbym, 
      S.CARdissimilarity,
-     S.CARiar,
      S.CARleroux,
      S.CARlocalised,
-     S.independent,
      summarise.lincomb,
      summarise.samples
      )

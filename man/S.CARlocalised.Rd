@@ -3,9 +3,8 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 
 \title{
-Fit a spatial generalised linear mixed model to data, where the random effects 
-have conditional autoregressive prior and are augmented with a piecewise constant 
-intercept term.
+Fit a spatial generalised linear mixed model to data, where a set of spatially 
+smooth random effects  are augmented with a piecewise constant intercept process.
 }
 
 \description{
@@ -22,7 +21,7 @@ not allowed in this model.
 }
 
 \usage{
-S.CARlocalised(formula, exposure=NULL, family, data=NULL, G, trials=NULL, W,
+S.CARlocalised(formula, family, data=NULL, G, trials=NULL, W,
 burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
 prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL,prior.delta=NULL, 
 verbose=TRUE)
@@ -34,13 +33,6 @@ verbose=TRUE)
 A formula for the covariate part of the model using the syntax of the
 lm() function. Offsets can be included here using the offset() function. The 
 response cannot contain missing (NA) values.
-}
-  \item{exposure}{
-This optional argument allows a single covariate to have variation in its values 
-within an areal unit if family=`poisson'. The argument is a list object,
-and each element of the list corresponds to a single areal unit. Each element in
-the list is a 2 column matrix, where the first column is the vector of values of 
-the covariate while the second column is a vector of weights for each value. 
 }
   \item{family}{
 One of either `binomial' or `poisson', which respectively specify a 
@@ -110,8 +102,9 @@ Logical, should the function update the user on its progress.
 \item{fitted.values }{A vector of fitted values for each area.}
 \item{residuals }{A vector of residuals for each area.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
-(DIC), the effective number of parameters in the model (p.d), and the Log Marginal 
-Predictive Likelihood (LMPL).}
+(DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
+Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w).}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A vector giving the posterior median of which cluster 
 (group) each area is in.}
@@ -122,8 +115,8 @@ Predictive Likelihood (LMPL).}
 
 \references{
 Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies, Environmetrics, 
-DOI 10.1002/env.2348.
+misalignment in long-term air pollution and health studies, Environmetrics, , 26, 
+477-487.
 }
 
 \author{
@@ -170,6 +163,6 @@ Y <- rbinom(n=K, size=trials, prob=prob)
 
 #### Run the localised smoothing model
 formula <- Y ~ 1
-\dontrun{model <- S.CARlocalised(formula=formula, family="binomial", G=2,  
-W=W,burnin=20000, n.sample=100000)}
+\dontrun{model <- S.CARlocalised(formula=formula, family="binomial", trials=trials,
+G=2, W=W,burnin=20000, n.sample=100000)}
 }

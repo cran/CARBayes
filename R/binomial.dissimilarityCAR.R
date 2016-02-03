@@ -133,10 +133,19 @@ offset <- try(model.offset(frame), silent=TRUE)
 
 
 #### Initial parameter values
-dat <- cbind(Y, trials-Y)
-beta <- glm(dat~X.standardised-1, offset=offset, family=binomial)$coefficients
-phi <- rnorm(n=n, mean=rep(0,n), sd=rep(0.1, n))
-tau2 <- runif(1)
+dat <- cbind(Y, failures)
+mod.glm <- glm(dat~X.standardised-1, offset=offset, family="quasibinomial")
+beta.mean <- mod.glm$coefficients
+beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
+beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
+
+theta.hat <- Y / trials
+theta.hat[theta.hat==0] <- 0.01
+theta.hat[theta.hat==1] <- 0.99
+res.temp <- log(theta.hat / (1 - theta.hat)) - X.standardised %*% beta.mean - offset
+res.sd <- sd(res.temp, na.rm=TRUE)/5
+phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
+tau2 <- var(phi) / 10
 alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
 
 
@@ -212,6 +221,7 @@ samples.phi <- array(NA, c(n.keep, n))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
 samples.deviance <- array(NA, c(n.keep, 1))
+samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
 if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
 
@@ -412,11 +422,12 @@ det.Q <- sum(log(diag(chol.spam(Q))))
           #########################
     	     ## Calculate the deviance
     	     #########################
-    	     logit <- as.numeric(X.standardised %*% beta) + phi + offset    
-    	     prob <- exp(logit)  / (1 + exp(logit))
-          fitted <- trials * prob
-          deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
-          deviance <- -2 * sum(deviance.all, na.rm=TRUE)    
+    	     lp <- as.numeric(X.standardised %*% beta) + phi + offset
+    	     prob <- exp(lp)  / (1 + exp(lp))
+    	     fitted <- trials * prob
+    	     deviance.all <- dbinom(x=Y, size=trials, prob=prob, log=TRUE)
+    	     like <- exp(deviance.all)
+    	     deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
 
 
 
@@ -431,6 +442,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                samples.tau2[ele, ] <- tau2
                samples.alpha[ele, ] <- alpha
                samples.deviance[ele, ] <- deviance
+               samples.like[ele, ] <- like
                samples.fitted[ele, ] <- fitted
                if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])               
                }else
@@ -454,10 +466,10 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                #### beta tuning parameter
                     if(accept.beta > 40)
                     {
-                    proposal.sd.beta <- 2 * proposal.sd.beta
+                    proposal.sd.beta <- proposal.sd.beta + 0.1 * proposal.sd.beta
                     }else if(accept.beta < 20)              
                     {
-                    proposal.sd.beta <- 0.5 * proposal.sd.beta
+                    proposal.sd.beta <- proposal.sd.beta - 0.1 * proposal.sd.beta
                     }else
                     {
                     }
@@ -465,20 +477,20 @@ det.Q <- sum(log(diag(chol.spam(Q))))
                #### phi tuning parameter
                     if(accept.phi > 50)
                     {
-                    proposal.sd.phi <- 2 * proposal.sd.phi
+                    proposal.sd.phi <- proposal.sd.phi + 0.1 * proposal.sd.phi
                     }else if(accept.phi < 40)              
                     {
-                    proposal.sd.phi <- 0.5 * proposal.sd.phi
+                    proposal.sd.phi <- proposal.sd.phi - 0.1 * proposal.sd.phi
                     }else
                     {
                     }
                #### alpha tuning parameter
                     if(accept.alpha > 50)
                     {
-                    proposal.sd.alpha <- min(2 * proposal.sd.alpha, alpha.max/4)
+                    proposal.sd.alpha <- min(proposal.sd.alpha + 0.1 * proposal.sd.alpha, alpha.max/4)
                     }else if(accept.alpha < 40)              
                     {
-                    proposal.sd.alpha <- 0.5 * proposal.sd.alpha
+                    proposal.sd.alpha <- proposal.sd.alpha - 0.1 * proposal.sd.alpha
                     }else
                     {
                     }
@@ -527,6 +539,11 @@ deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted     
    
+
+#### Watanabe-Akaike Information Criterion (WAIC)
+LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+WAIC <- -2 * (LPPD - p.w)
 
 
 #### Compute the Conditional Predictive Ordinate
@@ -643,17 +660,12 @@ W.border.prob <- array(NA, c(n,n))
 
 
 ## Compile and return the results
-modelfit <- c(DIC, p.d, LMPL)
-names(modelfit) <- c("DIC", "p.d", "LMPL")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Localised CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")
-    if(n.miss>0)
-    {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-    }else
-    {
-        samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted))
-    }
+if(n.miss==0) samples.Y = NA
 
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), alpha=mcmc(samples.alpha), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=list(W.posterior=W.posterior, W.border.prob=W.border.prob),  formula=formula, model=model.string, X=X)
 class(results) <- "carbayes"
 

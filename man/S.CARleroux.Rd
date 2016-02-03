@@ -13,18 +13,21 @@ Fit a spatial generalised linear mixed model to areal unit data, where the respo
 variable can be binomial, Gaussian or Poisson. The linear predictor is modelled by
 known covariates and a vector of random effects. The latter are modelled by the 
 conditional autoregressive prior proposed by Leroux et al. (1999), and further 
-details are given in the vignette accompanying this package. Inference is conducted
+details are given in the vignette accompanying this package. Independent
+random effects can be obtained by setting (fix.rho=TRUE, rho=0) similar to the old
+function S.independent(), while the intrinsic CAR model can be obtained by setting
+(fix.rho=TRUE, rho=1) similar to the old function S.CARiar(). Inference is conducted
 in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. Missing (NA) 
 values are allowed in the response, and posterior predictive distributions are 
 created for the missing values for predictive purposes. These are saved in the
-`samples' argument in the output of the function and are denoted by `Y'.
+`samples' argument in the output of the function and are denoted by `Y'. 
 }
 
 
 \usage{
 S.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin, 
 n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
+prior.nu2=NULL, prior.tau2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -78,6 +81,15 @@ prior for nu2. Defaults to c(0.001, 0.001) and only used if family=`Gaussian'.
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
 prior for tau2. Defaults to c(0.001, 0.001).  
 }
+     \item{fix.rho}{
+Logical, should the spatial dependence parameter rho be fixed rather than being estimated
+in the model.
+}
+     \item{rho}{
+The value that the spatial dependence parameter is set to if fix.rho=TRUE. Must be in the
+interval [0, 1], where 0 corresponds to independence while 1 corresponds to fitting the
+intrinsic CAR prior.
+}
   \item{verbose}{
 Logical, should the function update the user on its progress.  
 }
@@ -92,8 +104,9 @@ Logical, should the function update the user on its progress.
 \item{fitted.values }{A vector of fitted values for each area.}
 \item{residuals }{A vector of residuals for each area.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
-(DIC), the effective number of parameters in the model (p.d), and the Log Marginal 
-Predictive Likelihood (LMPL).}
+(DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
+Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w).}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}
