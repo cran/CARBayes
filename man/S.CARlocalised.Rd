@@ -64,7 +64,7 @@ The number of McMC samples to generate.
 }
   \item{thin}{
 The level of thinning to apply to the McMC samples to reduce their temporal 
-autocorrelation. Defaults to 1.
+autocorrelation. Defaults to 1 (no thinning).
 }
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are 
@@ -84,7 +84,7 @@ multiplying the covariate with within area variation in its values. Defaults to 
 }  
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for tau2. Defaults to c(0.001, 0.001).  
+prior for tau2. Defaults to c(1, 0.01).  
 }
      \item{prior.delta}{
 The prior maximum for the cluster smoothing parameter delta. Defaults to 10.  

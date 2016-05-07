@@ -2,6 +2,7 @@ useDynLib(CARBayes)
 export(
      combine.data.shapefile,
 	highlight.borders,
+	 MVS.CARleroux,
      S.CARbym, 
      S.CARdissimilarity,
      S.CARleroux,
@@ -20,3 +21,5 @@ importFrom(coda, mcmc, geweke.diag, effectiveSize)
 importFrom(sp, Polygon,  Polygons, SpatialPolygons, SpatialPolygonsDataFrame, SpatialPoints)
 importFrom(spdep, mat2listw, n.comp.nb)
 importFrom(utils, setTxtProgressBar, txtProgressBar)
+importFrom(matrixcalc, is.symmetric.matrix, is.positive.definite)
+importFrom(MCMCpack, riwish)

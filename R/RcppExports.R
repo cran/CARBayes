@@ -37,3 +37,15 @@ gaussiancarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2,
     .Call('CARBayes_gaussiancarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, rho, nu2, offset, missind)
 }
 
+binomialmcarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, nvar, phi, Y, failures, phioffset, denoffset, Sigma, Sigmainv, rho, cholsigma, rand, missind) {
+    .Call('CARBayes_binomialmcarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, nvar, phi, Y, failures, phioffset, denoffset, Sigma, Sigmainv, rho, cholsigma, rand, missind)
+}
+
+poissonmcarupdate <- function(Wtriplet, Wbegfin, Wtripletsum, nsites, nvar, phi, Y, phioffset, denoffset, Sigma, Sigmainv, rho, cholsigma, rand, missind) {
+    .Call('CARBayes_poissonmcarupdate', PACKAGE = 'CARBayes', Wtriplet, Wbegfin, Wtripletsum, nsites, nvar, phi, Y, phioffset, denoffset, Sigma, Sigmainv, rho, cholsigma, rand, missind)
+}
+
+rcpp_hello_world <- function() {
+    .Call('CARBayes_rcpp_hello_world', PACKAGE = 'CARBayes')
+}
+

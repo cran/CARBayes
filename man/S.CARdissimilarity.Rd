@@ -61,7 +61,7 @@ The number of McMC samples to generate.
 }
   \item{thin}{
 The level of thinning to apply to the McMC samples to reduce their temporal 
-autocorrelation. Defaults to 1.
+autocorrelation. Defaults to 1 (no thinning).
 }
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are 
@@ -73,11 +73,11 @@ are assumed). Defaults to a vector with values 1000.
 }  
   \item{prior.nu2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for nu2. Defaults to c(0.001, 0.001) and only used if family=`Gaussian'.   
+prior for nu2. Defaults to c(1, 0.01) and only used if family=`Gaussian'.   
 }
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for tau2. Defaults to c(0.001, 0.001).  
+prior for tau2. Defaults to c(1, 0.01).  
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  

@@ -15,12 +15,14 @@ known covariates and a vector of random effects. The latter are modelled by the
 conditional autoregressive prior proposed by Leroux et al. (1999), and further 
 details are given in the vignette accompanying this package. Independent
 random effects can be obtained by setting (fix.rho=TRUE, rho=0) similar to the old
-function S.independent(), while the intrinsic CAR model can be obtained by setting
-(fix.rho=TRUE, rho=1) similar to the old function S.CARiar(). Inference is conducted
-in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. Missing (NA) 
-values are allowed in the response, and posterior predictive distributions are 
-created for the missing values for predictive purposes. These are saved in the
-`samples' argument in the output of the function and are denoted by `Y'. 
+function S.independent(), in which case the neighbourhood matrix W is not part of 
+the model. In this case enter a fake W matrix that is a K by K matrix of zeros, 
+where K is the number of data points. Similarly, the intrinsic CAR model can be 
+obtained by setting (fix.rho=TRUE, rho=1) similar to the old function S.CARiar(). 
+Inference is conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) 
+simulation. Missing (NA) values are allowed in the response, and posterior predictive 
+distributions are created for the missing values for predictive purposes. These are 
+saved in the`samples' argument in the output of the function and are denoted by `Y'. 
 }
 
 
@@ -63,7 +65,7 @@ The number of McMC samples to generate.
 }
   \item{thin}{
 The level of thinning to apply to the McMC samples to reduce their temporal 
-autocorrelation. Defaults to 1.
+autocorrelation. Defaults to 1 (no thinning).
 }
   \item{prior.mean.beta}{
 A vector of prior means for the regression parameters beta (Gaussian priors are 
@@ -75,11 +77,11 @@ are assumed). Defaults to a vector with values 1000.
 }  
   \item{prior.nu2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for nu2. Defaults to c(0.001, 0.001) and only used if family=`Gaussian'.   
+prior for nu2. Defaults to c(1, 0.01) and only used if family=`Gaussian'.   
 }
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-prior for tau2. Defaults to c(0.001, 0.001).  
+prior for tau2. Defaults to c(1, 0.01).  
 }
      \item{fix.rho}{
 Logical, should the spatial dependence parameter rho be fixed rather than being estimated
@@ -88,7 +90,8 @@ in the model.
      \item{rho}{
 The value that the spatial dependence parameter is set to if fix.rho=TRUE. Must be in the
 interval [0, 1], where 0 corresponds to independence while 1 corresponds to fitting the
-intrinsic CAR prior.
+intrinsic CAR prior. Note, if rho=0 then the W matrix is not included in the model
+so enter a K by K matrix of zeros instead.
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  

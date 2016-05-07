@@ -134,7 +134,7 @@ alpha <- runif(n=q, min=rep(0,q), max=(alpha.max/(2+q)))
 ## Put in default priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    if(is.null(prior.tau2)) prior.tau2 <- c(0.001, 0.001)
+    if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
     
 ## Checks    
     if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
@@ -223,7 +223,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5*(n-1)
     if(sum(is.na(W))>0) stop("W has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
     if(!sum(names(table(W))==c(0,1))==2) stop("W has non-binary (zero and one) values.", call.=FALSE)
-    if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
+    if(!is.symmetric.matrix(W)) stop("W is not symmetric.", call.=FALSE)
     if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
 
 
@@ -306,7 +306,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
 ## Start timer
      if(verbose)
      {
-     cat("Collecting", n.sample, "samples\n", sep = " ")
+         cat("Generating", n.keep, "post burnin and thinned (if requested) samples\n", sep = " ")
      progressBar <- txtProgressBar(style = 3)
      percentage.points<-round((1:100/100)*n.sample)
      }else

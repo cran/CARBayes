@@ -105,6 +105,10 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
     
+    ## Check for errors on rho and fix.rho
+    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
+    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
+    if(fix.rho & !is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
     
     
     #### Initial parameter values
@@ -123,13 +127,14 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     phi <- rnorm(n=n, mean=rep(0,n), sd=res.sd)
     tau2 <- var(phi) / 10
     if(!fix.rho) rho <- runif(1)
-    
+    if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
+    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
     
     #### Priors
     ## Put in default priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    if(is.null(prior.tau2)) prior.tau2 <- c(0.001, 0.001)
+    if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
     
     
     ## Checks    
@@ -189,15 +194,6 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
             n.beta.block <- length(beta.beg)
         }
     }     
-    
-    
-    
-    ## Check for errors on rho and fix.rho
-    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
-    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
-    if(fix.rho & !is.numeric(rho) ) stop("rho is not numeric.", call.=FALSE)  
-    if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
-    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)      
 
     
     ## Matrices to store samples
@@ -231,8 +227,22 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     if(sum(is.na(W))>0) stop("W has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(W)) stop("W has non-numeric values.", call.=FALSE)
     if(min(W)<0) stop("W has negative elements.", call.=FALSE)
-    if(sum(W!=t(W))>0) stop("W is not symmetric.", call.=FALSE)
-    if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
+    if(!is.symmetric.matrix(W)) stop("W is not symmetric.", call.=FALSE)
+    
+    if(fix.rho & rho==0)
+    {
+    ## Set up a dummy W matrix to use in the code as it will not affect the results
+     W <- array(0, c(n,n))
+        for(r in 2:n)
+        {
+        W[(r-1), r] <- 1   
+        W[r, (r-1)] <- 1
+        }
+    }else
+    {
+        if(min(apply(W, 1, sum))==0) stop("W has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
+    }
+       
     
     
     ## Create the triplet object
@@ -264,10 +274,14 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     
     
     ## Create the determinant     
-    Wstar <- diag(apply(W,1,sum)) - W
-    Wstar.eigen <- eigen(Wstar)
-    Wstar.val <- Wstar.eigen$values
-    if(!fix.rho) det.Q <-  0.5 * sum(log((rho * Wstar.val + (1-rho))))    
+    if(!fix.rho)
+    {
+        Wstar <- diag(apply(W,1,sum)) - W
+        Wstar.eigen <- eigen(Wstar)
+        Wstar.val <- Wstar.eigen$values
+        det.Q <- 0.5 * sum(log((rho * Wstar.val + (1-rho))))    
+    }else
+    {} 
     
     
     ## Check for islands
@@ -285,7 +299,7 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
     ## Start timer
     if(verbose)
     {
-        cat("Collecting", n.sample, "samples\n", sep = " ")
+        cat("Generating", n.keep, "post burnin and thinned (if requested) samples\n", sep = " ")
         progressBar <- txtProgressBar(style = 3)
         percentage.points<-round((1:100/100)*n.sample)
     }else
@@ -331,8 +345,7 @@ binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, 
         if(rho<1)
         {
             phi <- phi - mean(phi)
-        }
-        else
+        }else
         {
             phi[which(islands==1)] <- phi[which(islands==1)] - mean(phi[which(islands==1)])   
         }

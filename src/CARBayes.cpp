@@ -14,7 +14,8 @@ using namespace Rcpp;
 // poissoncarupdate - update random effects in the poisson model
 // poissonindepupdate - update the independent effects in the poisson model
 // gaussiancarupdate - update random effects in the Gaussian model
-
+// binomialmcarupdate - update random effects in the binomial MCAR model
+// poissonmcarupdate - update random effects in the poisson MCAR model
 
 // [[Rcpp::export]]
 NumericVector linpredcompute(NumericMatrix X, const int nsites, const int p, 
@@ -419,4 +420,153 @@ phinew = phi;
 
 
 return phinew;
+}
+
+
+
+// [[Rcpp::export]]
+List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                        NumericVector Wtripletsum,const int nsites,  const int nvar, NumericMatrix phi, 
+                        NumericMatrix Y, NumericMatrix failures, NumericMatrix phioffset, 
+                        NumericVector denoffset, NumericMatrix Sigma, NumericMatrix Sigmainv, double rho, 
+                        NumericMatrix cholsigma, NumericMatrix rand, NumericMatrix missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    NumericMatrix fcprec(nvar, nvar);
+    int rowstart=0, rowend=0, accept=0;
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector diffcurrent(nvar), diffprop(nvar);        
+    NumericVector quadcurrent(nvar), quadprop(nvar);  
+    NumericVector pold(nvar), pnew(nvar);
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    
+    //  Update each random effect in turn
+    for(int j = 0; j < nsites; j++)
+    {      
+    // Calculate the prior precision and propose a new value
+            for(int r=0; r<nvar; r++)
+            {
+            fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
+            propphi[r] = phi(j,r) + sum(cholsigma(r,_) * rand(j,_));
+            }
+            
+      // Calculate the prior mean
+      rowstart = Wbegfin(j,0) - 1;
+      rowend = Wbegfin(j,1);
+      sumphi = rep(0,nvar);
+      for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
+      fcmean = rho * sumphi / denoffset[j]; 
+      
+      // Prior ratio
+      diffcurrent = phi(j,_) - fcmean;
+      diffprop = propphi - fcmean;
+            for(int r=0; r<nvar; r++)
+            {
+            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+            quadprop[r] = sum(diffprop * fcprec(_,r));  
+            }
+      oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
+      newpriorbit = 0.5 * sum(quadprop * diffprop);      
+      
+      // Likelihood ratio
+      pold = exp(phioffset(j,_) + phi(j,_)) / (1 + exp(phioffset(j,_) + phi(j,_)));
+      pnew = exp(phioffset(j,_) + propphi) / (1 + exp(phioffset(j,_) + propphi));
+      oldlikebit = sum(missind(j,_) * (Y(j,_) * log(pold) + failures(j,_) * log(1 - pold)));
+      newlikebit = sum(missind(j,_) * (Y(j,_) * log(pnew) + failures(j,_) * log(1 - pnew)));
+
+      // Accept or reject the value
+      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+            if(runif(1)[0] <= acceptance) 
+            {
+             phi(j,_) = propphi;
+             accept = accept + 1;
+            }
+            else
+            { 
+            }
+    }     
+            
+            
+    // Return the results
+    List out(2);
+    out[0] = phi;
+    out[1] = accept;
+    return out;
+}
+
+
+
+
+
+
+// [[Rcpp::export]]
+List poissonmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                        NumericVector Wtripletsum,const int nsites,  const int nvar, NumericMatrix phi, 
+                        NumericMatrix Y, NumericMatrix phioffset, 
+                        NumericVector denoffset, NumericMatrix Sigma, NumericMatrix Sigmainv, double rho, 
+                        NumericMatrix cholsigma, NumericMatrix rand, NumericMatrix missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    NumericMatrix fcprec(nvar, nvar);
+    int rowstart=0, rowend=0, accept=0;
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector diffcurrent(nvar), diffprop(nvar);        
+    NumericVector quadcurrent(nvar), quadprop(nvar);  
+    NumericVector lpold(nvar), lpnew(nvar);
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    
+    //  Update each random effect in turn
+    for(int j = 0; j < nsites; j++)
+    {      
+        // Calculate the prior precision and propose a new value
+        for(int r=0; r<nvar; r++)
+        {
+            fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
+            propphi[r] = phi(j,r) + sum(cholsigma(r,_) * rand(j,_));
+        }
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = rep(0,nvar);
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
+        fcmean = rho * sumphi / denoffset[j]; 
+        
+        // Prior ratio
+        diffcurrent = phi(j,_) - fcmean;
+        diffprop = propphi - fcmean;
+        for(int r=0; r<nvar; r++)
+        {
+            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+            quadprop[r] = sum(diffprop * fcprec(_,r));  
+        }
+        oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
+        newpriorbit = 0.5 * sum(quadprop * diffprop);      
+        
+        // Likelihood ratio
+        lpold = phioffset(j,_) + phi(j,_);
+        lpnew = phioffset(j,_) + propphi;
+        oldlikebit = sum(missind(j,_) * (Y(j,_) * lpold - exp(lpold)));
+        newlikebit = sum(missind(j,_) * (Y(j,_) * lpnew - exp(lpnew)));
+
+        // Accept or reject the value
+        acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            phi(j,_) = propphi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }     
+    
+    
+    // Return the results
+    List out(2);
+    out[0] = phi;
+    out[1] = accept;
+    return out;
 }
