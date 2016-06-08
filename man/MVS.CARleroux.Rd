@@ -64,7 +64,7 @@ for each area. Only used if family=`binomial'.
     can be non-binary, but each row must contain at least one non-zero entry.
 }
 \item{burnin}{
-    The number of McMC samples to discard as the burnin period.
+    The number of McMC samples to discard as the burn-in period.
 }
 \item{n.sample}{
     The number of McMC samples to generate.
@@ -110,8 +110,10 @@ Logical, should the function update the user on its progress.
 \value{
 \item{summary.results }{A summary table of the parameters.}
 \item{samples }{A list containing the McMC samples from the model.}
-\item{fitted.values }{A vector of fitted values for each area.}
-\item{residuals }{A vector of residuals for each area.}
+\item{fitted.values }{A vector of fitted values for each area and response variable
+in the same order as the data vectors.}
+\item{residuals }{A vector of fitted values for each area and response variable
+in the same order as the data vectors.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
@@ -126,6 +128,10 @@ Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Crite
 \references{
 Gelfand, A and Vounatsou, P (2003). Proper multivariate conditional autoregressive
 models for spatial data analysis, Biostatistics, 4, 11-25.
+
+Kavanagh, L., D. Lee, and G. Pryce (2016). Is Poverty Decentralising? Quantifying 
+Uncertainty in the Decentralisation of Urban Poverty, Annals of the American 
+Association of Geographers, to appear.
 
 Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small 
 areas: A new mixed model for spatial dependence, Chapter Statistical Models in 

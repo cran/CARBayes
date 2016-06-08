@@ -57,7 +57,7 @@ are spatially close (e.g. share a common border) and is zero otherwise. The matr
 can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
-The number of McMC samples to discard as the burnin period.
+The number of McMC samples to discard as the burn-in period.
 }
   \item{n.sample}{
 The number of McMC samples to generate.

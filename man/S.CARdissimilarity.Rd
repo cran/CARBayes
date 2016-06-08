@@ -54,7 +54,7 @@ model only the matrix must be binary.
 A list, where each element is a K by K matrix of non-negative dissimilarity metrics.
 }
   \item{burnin}{
-The number of McMC samples to discard as the burnin period.
+The number of McMC samples to discard as the burn-in period.
 }
   \item{n.sample}{
 The number of McMC samples to generate.

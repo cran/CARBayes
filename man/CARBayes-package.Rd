@@ -19,16 +19,16 @@ model for multivariate spatial data. Full details are given in the vignette acco
 this package. The initial creation of this package was supported by the Economic and 
 Social Research Council (ESRC) grant RES-000-22-4256, and on-going development was 
 supported by the Engineering and Physical Science Research Council (EPSRC) grant 
-EP/J017442/1. Version 4.5 has one main change from version 4.4, namely the introduction 
-of an MCAR model for multivariate spatial data, for details see the vignette.
+EP/J017442/1. Version 4.6 has one minor change from version 4.5, namely the removal
+of errors in the R code in the vignette.
 }
 
 \details{
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 4.5\cr
-Date: \tab 2016-05-05\cr
+Version: \tab 4.6\cr
+Date: \tab 2016-06-08\cr
 License: \tab GPL (>= 2)\cr
 }
 }
@@ -48,6 +48,10 @@ Mathematics 43, 1-59.
 
 Gelfand, A and Vounatsou, P (2003). Proper multivariate conditional autoregressive
 models for spatial data analysis, Biostatistics, 4, 11-25.
+
+Kavanagh, L., D. Lee, and G. Pryce (2016). Is Poverty Decentralising? Quantifying 
+Uncertainty in the Decentralisation of Urban Poverty, Annals of the American 
+Association of Geographers, to appear.
 
 Lee, D. and Mitchell, R (2012). Boundary detection in disease mapping studies. 
 Biostatistics, 13, 415-426.
