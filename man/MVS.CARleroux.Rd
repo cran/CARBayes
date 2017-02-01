@@ -22,7 +22,7 @@
     matrix W is not part of the model. In this case enter a fake W matrix that is a 
     K by K matrix of zeros, where K is the number of spatial units. Similarly, the 
     intrinsic MCAR model can be obtained by setting (fix.rho=TRUE, rho=1). Inference 
-    is conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation. 
+    is conducted in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation. 
     Missing (NA) values are allowed in the response, and posterior predictive 
     distributions are created for the missing values for predictive purposes. These are 
     saved in the`samples' argument in the output of the function and are denoted by `Y'. 
@@ -64,13 +64,13 @@ for each area. Only used if family=`binomial'.
     can be non-binary, but each row must contain at least one non-zero entry.
 }
 \item{burnin}{
-    The number of McMC samples to discard as the burn-in period.
+    The number of MCMC samples to discard as the burn-in period.
 }
 \item{n.sample}{
-    The number of McMC samples to generate.
+    The number of MCMC samples to generate.
 }
 \item{thin}{
-    The level of thinning to apply to the McMC samples to reduce their temporal 
+    The level of thinning to apply to the MCMC samples to reduce their temporal 
     autocorrelation. Defaults to 1 (no thinning).
 }
 \item{prior.mean.beta}{
@@ -109,15 +109,17 @@ Logical, should the function update the user on its progress.
 
 \value{
 \item{summary.results }{A summary table of the parameters.}
-\item{samples }{A list containing the McMC samples from the model.}
+\item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A vector of fitted values for each area and response variable
 in the same order as the data vectors.}
-\item{residuals }{A vector of fitted values for each area and response variable
-in the same order as the data vectors.}
+\item{residuals }{A matrix with 3 columns where each column is a type of 
+        residual and each row relates to an area. The types are "response" (raw), 
+        "pearson", and "deviance".}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
-Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w).}
+Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
+loglikelihood.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}
@@ -131,7 +133,7 @@ models for spatial data analysis, Biostatistics, 4, 11-25.
 
 Kavanagh, L., D. Lee, and G. Pryce (2016). Is Poverty Decentralising? Quantifying 
 Uncertainty in the Decentralisation of Urban Poverty, Annals of the American 
-Association of Geographers, to appear.
+Association of Geographers, 106, 1286-1298.
 
 Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small 
 areas: A new mixed model for spatial dependence, Chapter Statistical Models in 
@@ -150,6 +152,8 @@ Duncan Lee
 ##################################################
 #### Run the model on simulated data on a lattice
 ##################################################
+#### Load other libraries required
+library(MASS)
 
 #### Set up a square lattice region
 x.easting <- 1:10
@@ -158,17 +162,9 @@ Grid <- expand.grid(x.easting, x.northing)
 K <- nrow(Grid)
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(K,K))
+distance <- as.matrix(dist(Grid))
 W <-array(0, c(K,K))
-for(i in 1:K)
-{
-    for(j in 1:K)
-    {
-    temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
-    distance[i,j] <- sqrt(temp)
-    if(temp==1)  W[i,j] <- 1 
-    }	
-}
+W[distance==1] <-1 
 K <- nrow(W)
 
 #### Generate the correlation structures

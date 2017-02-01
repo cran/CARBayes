@@ -12,7 +12,7 @@ variable can be binomial, Gaussian or Poisson. The linear predictor is modelled 
 known covariates and a vector of random effects. The latter are modelled by the 
 localised conditional autoregressive prior proposed by Lee and Mitchell (2012), 
 and further details are given in the vignette accompanying this package. Inference
-is conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation.
+is conducted in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation.
 Missing (NA) values are allowed in the response, and posterior predictive distributions
 are created for the missing values for predictive purposes. These are saved in the
 `samples' argument in the output of the function and are denoted by `Y'.
@@ -20,7 +20,7 @@ are created for the missing values for predictive purposes. These are saved in t
 
 \usage{
 S.CARdissimilarity(formula, family, data=NULL,  trials=NULL, W, 
-Z, burnin, n.sample, thin=1, prior.mean.beta=NULL, 
+Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, 
 prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
 }
 
@@ -53,14 +53,18 @@ model only the matrix must be binary.
   \item{Z}{
 A list, where each element is a K by K matrix of non-negative dissimilarity metrics.
 }
-  \item{burnin}{
-The number of McMC samples to discard as the burn-in period.
+  \item{W.binary}{
+Logical, should the estimated neighbourhood neighbourhood have only binary (0,1) 
+values.
+}
+    \item{burnin}{
+The number of MCMC samples to discard as the burn-in period.
 }
   \item{n.sample}{
-The number of McMC samples to generate.
+The number of MCMC samples to generate.
 }
   \item{thin}{
-The level of thinning to apply to the McMC samples to reduce their temporal 
+The level of thinning to apply to the MCMC samples to reduce their temporal 
 autocorrelation. Defaults to 1 (no thinning).
 }
   \item{prior.mean.beta}{
@@ -89,20 +93,24 @@ Logical, should the function update the user on its progress.
 
 \value{
 \item{summary.results }{A summary table of the parameters.}
-\item{samples }{A list containing the McMC samples from the model.}
+\item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A vector of fitted values for each area.}
-\item{residuals }{A vector of residuals for each area.}
+\item{residuals }{A matrix with 3 columns where each column is a type of 
+        residual and each row relates to an area. The types are "response" (raw), 
+        "pearson", and "deviance".}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
-Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w).}
+Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
+loglikelihood.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A list containing two matrices: W.posterior contains 
 posterior medians for each element w_kj of the K by K neighbourhood matrix W; 
 W.border.prob contains posterior probabilities that each w_kj element of the K by K
 neighbourhood matrix W equals zero. This corresponds to the posterior probability
-of a boundary in the random effects surface. In both cases elements which correspond
-to two non-neighbouring areas have NA values.}
+of a boundary in the random effects surface. The latter is only present if 
+W.binary=TRUE, otherwise it is missing (NA). In all cases W elements that
+correspond to two non-neighbouring areas have NA values.}
 \item{formula }{The formula for the covariate and offset part of the model.}
 \item{model }{A text string describing the model fit.}
 \item{X }{The design matrix of covariates.}
@@ -123,6 +131,8 @@ Duncan Lee
 ###########################################################
 #### Run the model on simulated data - localised CAR model
 ###########################################################
+#### Load other libraries required
+library(MASS)
 
 #### Set up a square lattice region
 x.easting <- 1:10
@@ -135,18 +145,9 @@ groups <-rep(1, K)
 groups[Grid$Var1>5] <- 2
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(K,K))
+distance <- as.matrix(dist(Grid))
 W <-array(0, c(K,K))
-  for(i in 1:K)
-	{
-		for(j in 1:K)
-		{
-		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
-		distance[i,j] <- sqrt(temp)
-			if(temp==1)  W[i,j] <- 1 
-		}	
-	}
-	
+W[distance==1] <-1 	
 	
 #### Generate the response data
 phi <- mvrnorm(n=1, mu=groups, Sigma=0.2 * exp(-0.1 * distance))
@@ -166,5 +167,5 @@ Z <- list(dissimilarity.matrix=dissimilarity.matrix)
 #### Run the localised smoothing model
 formula <- Y ~ 1
 \dontrun{model <- S.CARdissimilarity(formula=formula, family="binomial",
-trials=trials, W=W, Z=Z, burnin=20000, n.sample=100000)}
+trials=trials, W=W, Z=Z, W.binary=TRUE, burnin=20000, n.sample=100000)}
 }

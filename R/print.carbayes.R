@@ -1,7 +1,7 @@
-print.carbayes <- function(x,...)
+print.CARBayes <- function(x,...)
 {
 #### Check for missingness
-    if(is.null(x$samples$Y))
+    if(length(x$samples$Y)==1)
     {
     n.miss <- 0    
     }else
@@ -30,12 +30,16 @@ print.carbayes <- function(x,...)
         print(x$summary.results)
         cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[5],"\n")
 
-        cat("\nThe number of stepchanges identified in the random effect surface\n")
-        temp <- x$localised.structure[[1]][!is.na(x$localised.structure[[1]])]
-        tab <- array(NA, c(1,2))
-        tab[1, ] <- c(sum(temp)/2, length(temp)/2- sum(temp)/2)
-        colnames(tab) <- c("no stepchange", "stepchange")
-        print(tab)
+            if(length(x$localised.structure[[2]])>1)
+            {
+            cat("\nThe number of stepchanges identified in the random effect surface\n")
+            temp <- x$localised.structure[[1]][!is.na(x$localised.structure[[1]])]
+            tab <- array(NA, c(1,2))
+            tab[1, ] <- c(sum(temp)/2, length(temp)/2- sum(temp)/2)
+            colnames(tab) <- c("no stepchange", "stepchange")
+            print(tab)
+            }else
+            {}
     }else if(class(x$localised.structure)=="numeric")
     {
         #### Print out the model fitted

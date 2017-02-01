@@ -6,7 +6,7 @@ Summarise a matrix of Markov chain Monte Carlo samples.
 }
 
 \description{
-This function takes in a matrix of Markov chain Monte Carlo (McMC) samples from 
+This function takes in a matrix of Markov chain Monte Carlo (MCMC) samples from 
 a `carbayes' model object, such as a set of parameters or fitted values, and 
 calculates posterior quantiles and exceeedence probabilities. The latter are 
 probabilities of the form P(quantity > c|data), where c is a threshold chosen by
@@ -19,10 +19,10 @@ summarise.samples(samples, columns=NULL, quantiles=0.5, exceedences=NULL)
 
 \arguments{
   \item{samples}{
-A matrix of McMC samples obtained from a `carbayes' model object.
+A matrix of MCMC samples obtained from a `carbayes' model object.
 }
   \item{columns}{
-A vector of column numbers stating which columns in the matrix of McMC samples 
+A vector of column numbers stating which columns in the matrix of MCMC samples 
 summaries are required for. Defaults to all columns.
 }
  \item{quantiles}{

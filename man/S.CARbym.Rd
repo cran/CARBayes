@@ -14,7 +14,7 @@ because of a lack of identifiability among the parameters. The linear predictor 
 modelled by known covariates and a vector of random effects. The latter are modelled 
 by the BYM conditional autoregressive prior proposed by Besag et al. (1991), and 
 further details are given in the vignette accompanying this package. Inference is 
-conducted in a Bayesian setting using Markov chain Monte Carlo (McMC) simulation.
+conducted in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation.
 Missing (NA) values are allowed in the response, and posterior predictive distributions
 are created for the missing values for predictive purposes. These are saved in the
 `samples' argument in the output of the function and are denoted by `Y'.
@@ -53,13 +53,13 @@ are spatially close (e.g. share a common border) and is zero otherwise. The matr
 can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
-The number of McMC samples to discard as the burn-in period.
+The number of MCMC samples to discard as the burn-in period.
 }
   \item{n.sample}{
-The number of McMC samples to generate.
+The number of MCMC samples to generate.
 }
   \item{thin}{
-The level of thinning to apply to the McMC samples to reduce their temporal 
+The level of thinning to apply to the MCMC samples to reduce their temporal 
 autocorrelation. Defaults to 1 (no thinning).
 }
   \item{prior.mean.beta}{
@@ -87,13 +87,16 @@ Logical, should the function update the user on its progress.
 
 \value{
 \item{summary.results }{A summary table of the parameters.}
-\item{samples }{A list containing the McMC samples from the model.}
+\item{samples }{A list containing the MCMC samples from the model.}
 \item{fitted.values }{A vector of fitted values for each area.}
-\item{residuals }{A vector of residuals for each area.}
+\item{residuals }{A matrix with 3 columns where each column is a type of 
+        residual and each row relates to an area. The types are "response" (raw), 
+        "pearson", and "deviance".}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
-Marginal Predictive Likelihood (LMPL), and the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w).}
+Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
+(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
+loglikelihood.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}
@@ -119,6 +122,8 @@ Duncan Lee
 ##################################################
 #### Run the model on simulated data on a lattice
 ##################################################
+#### Load other libraries required
+library(MASS)
 
 #### Set up a square lattice region
 x.easting <- 1:10
@@ -127,18 +132,9 @@ Grid <- expand.grid(x.easting, x.northing)
 K <- nrow(Grid)
 
 #### set up distance and neighbourhood (W, based on sharing a common border) matrices
-distance <-array(0, c(K,K))
+distance <- as.matrix(dist(Grid))
 W <-array(0, c(K,K))
-  for(i in 1:K)
-	{
-		for(j in 1:K)
-		{
-		temp <- (Grid[i,1] - Grid[j,1])^2 + (Grid[i,2] - Grid[j,2])^2
-		distance[i,j] <- sqrt(temp)
-			if(temp==1)  W[i,j] <- 1 
-		}	
-	}
-	
+W[distance==1] <-1 	
 	
 #### Generate the covariates and response data
 x1 <- rnorm(K)

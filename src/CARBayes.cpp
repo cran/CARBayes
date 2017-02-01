@@ -7,10 +7,12 @@ using namespace Rcpp;
 
 // linpredcompute - computing the linear predictor for covariates.
 // quadform - computing quadratic forms phi %*% Q %*% theta.
-// binomialbetaupdate - update regression parameters in the binomial model
+// binomialbetaupdateMALA - update regression parameters in the binomial model using MALA
+// binomialbetaupdateRW - update regression parameters in the binomial model using RW
 // binomialcarupdate - update random effects in the binomial model
 // binomialindepupdate - update the independent effects in the binomial model
-// poissonbetaupdate - update regression parameters in the poisson model
+// poissonbetaupdateMALA - update regression parameters in the poisson model using MALA
+// poissonbetaupdateRW - update regression parameters in the poisson model using RW
 // poissoncarupdate - update random effects in the poisson model
 // poissonindepupdate - update the independent effects in the poisson model
 // gaussiancarupdate - update random effects in the Gaussian model
@@ -82,60 +84,77 @@ return tau2_posteriorscale;
 
 
 
-
 // [[Rcpp::export]]
 List binomialcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
-     NumericVector Wtripletsum,const int nsites, NumericVector phi, double tau2, 
-     const NumericVector y, const NumericVector failures, const double phi_tune, 
-     double rho, NumericVector offset, NumericVector missind)
+                       NumericVector Wtripletsum,const int nsites, NumericVector phi, double tau2, 
+                       const NumericVector y, const NumericVector failures, NumericVector trials, const double phi_tune, 
+                       double rho, NumericVector offset, NumericVector missind)
 {
-// Update the spatially correlated random effects 
-//Create new objects
-int accept=0, rowstart=0, rowend=0;
-double acceptance, sumphi;
-double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
-double priorvardenom, priormean, priorvar;
-double propphi, pold, pnew;
-NumericVector phinew(nsites);
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0, rowstart=0, rowend=0;
+    double acceptance, acceptance1, acceptance2,  sumphi, mala_old, mala_new;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double priorvardenom, priormean, priorvar;
+    double propphi, pold, pnew, proposal_var;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
 
+        for(int j = 0; j < nsites; j++)
+        {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom;  
+        
+        // Different updates depending on whether the y[j] is missing or not.
+            if(missind[j]==1)
+            {
+            // propose a value
+            proposal_var = priorvar * phi_tune;
+            mala_old = phinew[j] + 0.5 * proposal_var * (y[j] - (trials[j] * exp(phinew[j] + offset[j])) / (1 + exp(phinew[j] + offset[j])) - (phinew[j] - priormean) /priorvar);
+            propphi = rnorm(1, mala_old, sqrt(proposal_var))[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+            oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+            pold = exp(offset[j] + phinew[j]) / (1 + exp(offset[j] + phinew[j]));
+            pnew = exp(offset[j] + propphi) / (1 + exp(offset[j] + propphi));
+            oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
+            newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
+            acceptance1 = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
 
-//  Update each random effect in turn
-phinew = phi;
-     for(int j = 0; j < nsites; j++)
-     {
-     // Calculate prior variance
-     priorvardenom = rho * Wtripletsum[j] + 1 - rho;
-     priorvar = tau2 / priorvardenom;
-     
-     // Calculate the prior mean
-     rowstart = Wbegfin(j,0) - 1;
-     rowend = Wbegfin(j,1);
-     sumphi = 0;
-          for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
-     priormean = rho * sumphi / priorvardenom; 
-      
-      // propose a value  
-      propphi = rnorm(1, phinew[j], sqrt(priorvar*phi_tune))[0];
-      
-      // Accept or reject it
-      newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
-      oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
-      pold = exp(offset[j] + phinew[j]) / (1 + exp(offset[j] + phinew[j]));
-      pnew = exp(offset[j] + propphi) / (1 + exp(offset[j] + propphi));
-      oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
-      newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
-      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
-          if(runif(1)[0] <= acceptance) 
-          {
-          phinew[j] = propphi;
-          accept = accept + 1;
-          }
-          else
-          { 
-          }
+            // Proposal distribution ratio
+            mala_new = propphi + 0.5 * proposal_var * (y[j] - (trials[j] * exp(propphi + offset[j])) / (1 + exp(propphi + offset[j])) - (propphi - priormean) /priorvar);
+            acceptance2 = exp(-(0.5 / proposal_var) * (pow((phinew[j] - mala_new),2) - pow((propphi-mala_old),2)));
+            acceptance = acceptance1 * acceptance2;
+            
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                phinew[j] = propphi;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+            phinew[j] = rnorm(1, priormean, sqrt(priorvar))[0];    
+        }
     }
 
-
+// Return the results
 List out(2);
 out[0] = phinew;
 out[1] = accept;
@@ -143,53 +162,184 @@ return out;
 }
 
 
+
 // [[Rcpp::export]]
-double binomialbetaupdate(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
-               NumericVector proposal, NumericVector offset, NumericVector y, 
-               NumericVector failures, NumericVector prior_meanbeta,
-               NumericVector prior_varbeta, NumericVector missind)
+List binomialbetaupdateMALA(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
+                            NumericVector offset, NumericVector y,  NumericVector failures,
+                            NumericVector trials, NumericVector prior_meanbeta, 
+                            NumericVector prior_varbeta, NumericVector missind, const int nblock,
+                            double beta_tune, List block_list)
 {
-// Compute the acceptance probability for beta
-//Create new objects
-double acceptance, oldlikebit=0, newlikebit=0, likebit, priorbit=0;
-NumericVector lp_current(nsites), lp_proposal(nsites), p_current(nsites), p_proposal(nsites);
-
-
-// Create the log likelihood acceptance probability component
-lp_current = linpredcompute(X, nsites, p, beta, offset);
-lp_proposal = linpredcompute(X, nsites, p, proposal, offset);     
-     for(int j = 0; j < nsites; j++)     
-     {
-     p_current[j] = exp(lp_current[j]) / (1 + exp(lp_current[j]));
-     p_proposal[j] = exp(lp_proposal[j]) / (1 + exp(lp_proposal[j]));
-     oldlikebit = oldlikebit + missind[j] * (y[j] * log(p_current[j]) + failures[j] * log((1-p_current[j])));
-     newlikebit = newlikebit + missind[j] * (y[j] * log(p_proposal[j]) + failures[j] * log((1-p_proposal[j])));
-     }
-likebit = newlikebit - oldlikebit;
-
-
-// Create the prior acceptance component
-     for(int j = 0; j < p; j++)     
-     {
-     priorbit = priorbit + 0.5 * pow((beta[j]-prior_meanbeta[j]),2) / prior_varbeta[j] - 0.5 * pow((proposal[j]-prior_meanbeta[j]),2) / prior_varbeta[j];
-     }
-
-
-// Compute the acceptance probability and return the value
-acceptance = exp(likebit + priorbit);
-return acceptance;
+    // Compute the acceptance probability for beta
+    //Create new objects
+    int accept=0;
+    double oldlikebit=0, newlikebit=0, likebit, priorbit=0;
+    double acceptance;
+    NumericVector lp_current(nsites), lp_proposal(nsites), p_current(nsites), p_proposal(nsites), mala_temp1(nsites);
+    
+    // Create two beta vectors
+    NumericVector beta_old(p);
+    NumericVector beta_new(p);
+    for(int g=0; g<p; g++)
+    {
+        beta_old[g] = beta[g];
+        beta_new[g] = beta[g];
+    }
+    
+    // Update each block in turn
+    for(int r=0; r<nblock; r++)
+    {
+        // Determine the block to update
+        IntegerVector idx = block_list[r];
+        int len = block_list[(nblock+r)];
+        
+        // Propose a value
+        lp_current = linpredcompute(X, nsites, p, beta_old, offset);
+        mala_temp1 = missind * (y -  trials * exp(lp_current) / (1 + exp(lp_current)));
+        NumericVector mala_temp2(len), mala_old(len);
+        for(int g=0; g<len; g++)
+        {
+            mala_temp2[g] = sum(X(_,idx[g]) * mala_temp1);
+            mala_old[g] = beta_old[idx[g]] + 0.5 * pow(beta_tune,2) * (-(beta_old[idx[g]] - prior_meanbeta[idx[g]]) / prior_varbeta[idx[g]] + mala_temp2[g]); 
+            beta_new[idx[g]] = rnorm(1, mala_old[g], beta_tune)[0];
+        }
+        
+        // Compute the acceptance ratio - full conditionals  
+        oldlikebit = 0;
+        newlikebit=0;
+        lp_proposal = linpredcompute(X, nsites, p, beta_new, offset);     
+        for(int j = 0; j < nsites; j++)     
+        {
+            p_current[j] = exp(lp_current[j]) / (1 + exp(lp_current[j]));
+            p_proposal[j] = exp(lp_proposal[j]) / (1 + exp(lp_proposal[j]));
+            oldlikebit = oldlikebit + missind[j] * (y[j] * log(p_current[j]) + failures[j] * log((1-p_current[j])));
+            newlikebit = newlikebit + missind[j] * (y[j] * log(p_proposal[j]) + failures[j] * log((1-p_proposal[j])));
+        }
+        likebit = newlikebit - oldlikebit;
+        
+        
+        for(int g = 0; g < len; g++)     
+        {
+            priorbit = priorbit + 0.5 * pow((beta_old[idx[g]]-prior_meanbeta[idx[g]]),2) / prior_varbeta[idx[g]] - 0.5 * pow((beta_new[idx[g]]-prior_meanbeta[idx[g]]),2) / prior_varbeta[idx[g]];
+        }
+        
+        // Compute the acceptance ratio - proposal distributions
+        mala_temp1 = missind * (y -  trials * exp(lp_proposal) / (1 + exp(lp_proposal)));
+        NumericVector mala_new(len);
+        double prop_accept=0;
+        for(int g=0; g<len; g++)
+        {
+            mala_temp2[g] = sum(X(_,idx[g]) * mala_temp1);
+            mala_new[g] = beta_new[idx[g]] + 0.5 * pow(beta_tune,2) * (-(beta_new[idx[g]] - prior_meanbeta[idx[g]]) / prior_varbeta[idx[g]] + mala_temp2[g]); 
+            prop_accept = prop_accept +   pow((beta_new[idx[g]] - mala_old[g]), 2) -  pow((beta_old[idx[g]] - mala_new[g]), 2); 
+        }
+        
+        // Accept or reject hte proposal      
+        acceptance = exp(0.5 * prop_accept / pow(beta_tune,2) + likebit + priorbit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            for(int g=0; g<len; g++)
+            {
+                beta_old[idx[g]] = beta_new[idx[g]];  
+            }
+            accept = accept + 1;
+        }
+        else
+        { 
+            for(int g=0; g<len; g++)
+            {
+                beta_new[idx[g]] = beta_old[idx[g]];  
+            }   
+        }
+    }
+    
+    
+    // Compute the acceptance probability and return the value
+    //acceptance = exp(likebit + priorbit);
+    List out(2);
+    out[0] = beta_new;
+    out[1] = accept;
+    return out;    
 }
+
+
+
+
+// [[Rcpp::export]]
+List binomialbetaupdateRW(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
+                            NumericVector offset, NumericVector y,  NumericVector failures,
+                            NumericVector prior_meanbeta, NumericVector prior_varbeta, 
+                            NumericVector missind, double beta_tune)
+{
+    // Compute the acceptance probability for beta
+    //Create new objects
+    double oldlikebit=0, newlikebit=0, likebit, priorbit=0;
+    double acceptance;
+    NumericVector lp_current(nsites), lp_proposal(nsites), p_current(nsites), p_proposal(nsites), mala_temp1(nsites);
+    List out(2);
+    
+    // Create a beta new vector
+        NumericVector beta_new(p);
+        for(int g = 0; g < p; g++)
+        {
+        beta_new[g] = beta[g];
+        }
+    
+    // Update the parameters in one go as p is less than 3
+    // Propose a value
+        for(int g = 0; g < p; g++)
+        {
+        beta_new[g] = rnorm(1, beta[g], beta_tune)[0];
+        }
+    
+    // Compute the acceptance ratio - full conditionals   
+    lp_current = linpredcompute(X, nsites, p, beta, offset);
+    lp_proposal = linpredcompute(X, nsites, p, beta_new, offset);     
+        for(int j = 0; j < nsites; j++)     
+        {
+        p_current[j] = exp(lp_current[j]) / (1 + exp(lp_current[j]));
+        p_proposal[j] = exp(lp_proposal[j]) / (1 + exp(lp_proposal[j]));
+        oldlikebit = oldlikebit + missind[j] * (y[j] * log(p_current[j]) + failures[j] * log((1-p_current[j])));
+        newlikebit = newlikebit + missind[j] * (y[j] * log(p_proposal[j]) + failures[j] * log((1-p_proposal[j])));
+        }
+     likebit = newlikebit - oldlikebit;
+    
+        for(int g = 0; g < p; g++)     
+        {
+        priorbit = priorbit + 0.5 * pow((beta[g]-prior_meanbeta[g]),2) / prior_varbeta[g] - 0.5 * pow((beta_new[g]-prior_meanbeta[g]),2) / prior_varbeta[g];
+        }
+    
+        
+    // Accept or reject the proposal      
+    acceptance = exp(likebit + priorbit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            out[0] = beta_new;
+            out[1] = 1;
+        }
+        else
+        { 
+            out[0] = beta;
+            out[1] = 0; 
+        }
+        
+        
+        // Compute the acceptance probability and return the value
+        return out;    
+}
+
+
 
 
 
 // [[Rcpp::export]]
 List binomialindepupdate(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
-               const NumericVector failures, const double theta_tune,  NumericVector offset, NumericVector missind)
+               const NumericVector failures, const NumericVector trials, const double theta_tune,  NumericVector offset, NumericVector missind)
 {
 // Update the independent random effects 
 //Create new objects
 int accept=0;
-double acceptance;
+double acceptance, acceptance1, acceptance2, mala_old, mala_new;
 double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
 double proptheta, pold, pnew;
 NumericVector thetanew(nsites);
@@ -197,29 +347,45 @@ NumericVector thetanew(nsites);
    
 //  Update each random effect in turn
 thetanew = theta;
-     for(int j = 0; j < nsites; j++)
-     {
-      // propose a value  
-      proptheta = rnorm(1, thetanew[j], theta_tune)[0];
-      
-      // Accept or reject it
-      newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
-      oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
-      pold = exp(offset[j] + thetanew[j]) / (1 + exp(offset[j] + thetanew[j]));
-      pnew = exp(offset[j] + proptheta) / (1 + exp(offset[j] + proptheta));
-      oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
-      newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
-      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
-          if(runif(1)[0] <= acceptance) 
-          {
-          thetanew[j] = proptheta;
-          accept = accept + 1;
-          }
-          else
-          { 
-          }
-    }
+    for(int j = 0; j < nsites; j++)
+    {
+    // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+        // propose a value
+        mala_old = thetanew[j] + 0.5 * pow(theta_tune, 2) * (y[j] - (trials[j] * exp(thetanew[j] + offset[j])) / (1 + exp(thetanew[j] + offset[j])) - thetanew[j] / sigma2);
+        proptheta = rnorm(1, mala_old, theta_tune)[0];
+        
+        // Accept or reject it
+        // Full conditional ratio
+        newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
+        oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
+        
+        pold = exp(offset[j] + thetanew[j]) / (1 + exp(offset[j] + thetanew[j]));
+        pnew = exp(offset[j] + proptheta) / (1 + exp(offset[j] + proptheta));
+        oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
+        newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
+        acceptance1 = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
 
+        // Proposal distribution ratio
+        mala_new = proptheta + 0.5 * pow(theta_tune, 2) * (y[j] - (trials[j] * exp(proptheta + offset[j])) / (1 + exp(proptheta + offset[j])) - proptheta / sigma2);
+        acceptance2 = exp(-(0.5 / pow(theta_tune, 2)) * (pow((thetanew[j] - mala_new),2) - pow((proptheta-mala_old),2)));
+        acceptance = acceptance1 * acceptance2;
+        
+        // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+            thetanew[j] = proptheta;
+            accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+        thetanew[j] = rnorm(1, 0, theta_tune)[0];    
+        }
+    }
 
 List out(2);
 out[0] = thetanew;
@@ -236,9 +402,9 @@ List poissonindepupdate(const int nsites, NumericVector theta, double sigma2, co
 // Update the spatially correlated random effects 
 //Create new objects
 int accept=0;
-double acceptance;
+double acceptance, acceptance1, acceptance2, mala_old, mala_new;
 double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
-double proptheta, fittedold, fittednew;
+double proptheta, lpold, lpnew;
 NumericVector thetanew(nsites);
  
    
@@ -246,25 +412,41 @@ NumericVector thetanew(nsites);
 thetanew = theta;
      for(int j = 0; j < nsites; j++)
      {
-      // propose a value  
-      proptheta = rnorm(1, thetanew[j], theta_tune)[0];
-      
-      // Accept or reject it
-      newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
-      oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
-      fittedold = exp(offset[j] + thetanew[j]);
-      fittednew = exp(offset[j] + proptheta);
-      oldlikebit = missind[j] * (y[j] * log(fittedold) - fittedold);
-      newlikebit = missind[j] * (y[j] * log(fittednew) - fittednew);
-      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
-          if(runif(1)[0] <= acceptance) 
-          {
-          thetanew[j] = proptheta;
-          accept = accept + 1;
-          }
-          else
-          { 
-          }
+         // Different updates depending on whether the y[j] is missing or not.
+         if(missind[j]==1)
+         {
+             // propose a value
+             mala_old = thetanew[j] + 0.5 * pow(theta_tune, 2) * (y[j] - exp(thetanew[j] + offset[j]) - thetanew[j] / sigma2);
+             proptheta = rnorm(1, mala_old, theta_tune)[0];
+             
+             // Accept or reject it
+             // Full conditional ratio
+             newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
+             oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
+             lpold = offset[j] + thetanew[j];
+             lpnew = offset[j] + proptheta;
+             oldlikebit = missind[j] * (y[j] * lpold - exp(lpold));
+             newlikebit = missind[j] * (y[j] * lpnew - exp(lpnew));
+             acceptance1 = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+             
+             // Proposal distribution ratio
+             mala_new = proptheta + 0.5 * pow(theta_tune, 2) * (y[j] - exp(proptheta + offset[j]) - proptheta / sigma2);
+             acceptance2 = exp(-(0.5 / pow(theta_tune, 2)) * (pow((thetanew[j] - mala_new),2) - pow((proptheta-mala_old),2)));
+             acceptance = acceptance1 * acceptance2;
+             
+             // Acceptace or reject the proposal
+             if(runif(1)[0] <= acceptance) 
+             {
+                 thetanew[j] = proptheta;
+                 accept = accept + 1;
+             }
+             else
+             { 
+             }    
+         }else
+         {
+             thetanew[j] = rnorm(1, 0, theta_tune)[0];    
+         }
     }
 
 
@@ -275,108 +457,244 @@ return out;
 }
 
 
+// [[Rcpp::export]]
+List poissonbetaupdateMALA(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
+                       NumericVector offset, NumericVector y, NumericVector prior_meanbeta, 
+                       NumericVector prior_varbeta, NumericVector missind, const int nblock,
+                       double beta_tune, List block_list)
+{
+    // Compute the acceptance probability for beta
+    //Create new objects
+    int accept=0;
+    double oldlikebit=0, newlikebit=0, likebit, priorbit=0;
+    double acceptance;
+    NumericVector lp_current(nsites), lp_proposal(nsites), mala_temp1(nsites);
+    
+    // Create two beta vectors
+    NumericVector beta_old(p);
+    NumericVector beta_new(p);
+    for(int g=0; g<p; g++)
+    {
+        beta_old[g] = beta[g];
+        beta_new[g] = beta[g];
+    }
+    
+    // Update each block in turn
+    for(int r=0; r<nblock; r++)
+    {
+        // Determine the block to update
+        IntegerVector idx = block_list[r];
+        int len = block_list[(nblock+r)];
+        
+        // Propose a value
+        lp_current = linpredcompute(X, nsites, p, beta_old, offset);
+        mala_temp1 = missind * (y - exp(lp_current));
+        NumericVector mala_temp2(len), mala_old(len);
+        for(int g=0; g<len; g++)
+        {
+            mala_temp2[g] = sum(X(_,idx[g]) * mala_temp1);
+            mala_old[g] = beta_old[idx[g]] + 0.5 * pow(beta_tune,2) * (-(beta_old[idx[g]] - prior_meanbeta[idx[g]]) / prior_varbeta[idx[g]] + mala_temp2[g]); 
+            beta_new[idx[g]] = rnorm(1, mala_old[g], beta_tune)[0];
+        }
+        
+        // Compute the acceptance ratio - full conditionals 
+        oldlikebit = 0;
+        newlikebit=0;
+        lp_proposal = linpredcompute(X, nsites, p, beta_new, offset);     
+        for(int j = 0; j < nsites; j++)     
+        {
+            oldlikebit = oldlikebit + missind[j] * (y[j] * lp_current[j] - exp(lp_current[j]));
+            newlikebit = newlikebit + missind[j] * (y[j] * lp_proposal[j] - exp(lp_proposal[j]));
+        }
+        likebit = newlikebit - oldlikebit;
+        
+        for(int g = 0; g < len; g++)     
+        {
+            priorbit = priorbit + 0.5 * pow((beta_old[idx[g]]-prior_meanbeta[idx[g]]),2) / prior_varbeta[idx[g]] - 0.5 * pow((beta_new[idx[g]]-prior_meanbeta[idx[g]]),2) / prior_varbeta[idx[g]];
+        }
+        
+        // Compute the acceptance ratio - proposal distributions
+        mala_temp1 = missind * (y - exp(lp_proposal));
+        NumericVector mala_new(len);
+        double prop_accept=0;
+        for(int g=0; g<len; g++)
+        {
+            mala_temp2[g] = sum(X(_,idx[g]) * mala_temp1);
+            mala_new[g] = beta_new[idx[g]] + 0.5 * pow(beta_tune,2) * (-(beta_new[idx[g]] - prior_meanbeta[idx[g]]) / prior_varbeta[idx[g]] + mala_temp2[g]); 
+            prop_accept = prop_accept +   pow((beta_new[idx[g]] - mala_old[g]), 2) -  pow((beta_old[idx[g]] - mala_new[g]), 2); 
+        }
+        
+        // Accept or reject hte proposal      
+        acceptance = exp(0.5 * prop_accept / pow(beta_tune,2) + likebit + priorbit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            for(int g=0; g<len; g++)
+            {
+                beta_old[idx[g]] = beta_new[idx[g]];  
+            }
+            accept = accept + 1;
+        }
+        else
+        { 
+            for(int g=0; g<len; g++)
+            {
+                beta_new[idx[g]] = beta_old[idx[g]];  
+            }   
+        }
+    }
+    
+    
+    
+    // Compute the acceptance probability and return the value
+    //acceptance = exp(likebit + priorbit);
+    List out(2);
+    out[0] = beta_new;
+    out[1] = accept;
+    return out;    
+}
 
 
 
 // [[Rcpp::export]]
-double poissonbetaupdate(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
-               NumericVector proposal, NumericVector offset, NumericVector y, 
-               NumericVector prior_meanbeta, NumericVector prior_varbeta, NumericVector missind)
+List poissonbetaupdateRW(NumericMatrix X, const int nsites, const int p, NumericVector beta, 
+                           NumericVector offset, NumericVector y, NumericVector prior_meanbeta, 
+                           NumericVector prior_varbeta, NumericVector missind, double beta_tune)
 {
-// Compute the acceptance probability for beta
-//Create new objects
-double acceptance, oldlikebit=0, newlikebit=0, likebit, priorbit=0;
-NumericVector lp_current(nsites), lp_proposal(nsites), fitted_current(nsites), fitted_proposal(nsites);
+    // Compute the acceptance probability for beta
+    //Create new objects
+    double oldlikebit=0, newlikebit=0, likebit, priorbit=0;
+    double acceptance;
+    NumericVector lp_current(nsites), lp_proposal(nsites);
+    List out(2);
+    
+    // Create a beta new vector
+    NumericVector beta_new(p);
+        for(int g = 0; g < p; g++)
+        {
+        beta_new[g] = beta[g];
+        }
+    
+    
+    // Update the parameters in one go as p is less than 3
+    // Propose a value
+        for(int g = 0; g < p; g++)
+        {
+        beta_new[g] = rnorm(1, beta[g], beta_tune)[0];
+        }
+        
+    // Compute the acceptance ratio - full conditionals   
+    lp_current = linpredcompute(X, nsites, p, beta, offset);
+    lp_proposal = linpredcompute(X, nsites, p, beta_new, offset);     
+        for(int j = 0; j < nsites; j++)     
+        {
+        oldlikebit = oldlikebit + missind[j] * (y[j] * lp_current[j] - exp(lp_current[j]));
+        newlikebit = newlikebit + missind[j] * (y[j] * lp_proposal[j] - exp(lp_proposal[j]));
+        }
+    likebit = newlikebit - oldlikebit;
+        
+        for(int g = 0; g < p; g++)     
+        {
+        priorbit = priorbit + 0.5 * pow((beta[g]-prior_meanbeta[g]),2) / prior_varbeta[g] - 0.5 * pow((beta_new[g]-prior_meanbeta[g]),2) / prior_varbeta[g];
+        }
+        
 
+    // Accept or reject the proposal      
+    acceptance = exp(likebit + priorbit);
+        if(runif(1)[0] <= acceptance) 
+        {
+        out[0] = beta_new;
+        out[1] = 1;
+        }
+        else
+        { 
+        out[0] = beta;
+        out[1] = 0; 
+        }
 
-// Create the log likelihood acceptance probability component
-lp_current = linpredcompute(X, nsites, p, beta, offset);
-lp_proposal = linpredcompute(X, nsites, p, proposal, offset);     
-     for(int j = 0; j < nsites; j++)     
-     {
-     fitted_current[j] = exp(lp_current[j]);
-     fitted_proposal[j] = exp(lp_proposal[j]);
-     oldlikebit = oldlikebit + missind[j] * (y[j] * log(fitted_current[j]) - fitted_current[j]);
-     newlikebit = newlikebit + missind[j] * (y[j] * log(fitted_proposal[j]) - fitted_proposal[j]);
-     }
-likebit = newlikebit - oldlikebit;
-
-
-// Create the prior acceptance component
-     for(int j = 0; j < p; j++)     
-     {
-     priorbit = priorbit + 0.5 * pow((beta[j]-prior_meanbeta[j]),2) / prior_varbeta[j] - 0.5 * pow((proposal[j]-prior_meanbeta[j]),2) / prior_varbeta[j];
-     }
-
-
-// Compute the acceptance probability and return the value
-acceptance = exp(likebit + priorbit);
-return acceptance;
+    
+    // Compute the acceptance probability and return the value
+    return out;    
 }
+
 
 
 
 // [[Rcpp::export]]
 List poissoncarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
-     NumericVector Wtripletsum, const int nsites, NumericVector phi, 
-     double tau2, const NumericVector y, const double phi_tune, 
-     double rho, NumericVector offset, NumericVector missind)
+                      NumericVector Wtripletsum, const int nsites, NumericVector phi, 
+                      double tau2, const NumericVector y, const double phi_tune, 
+                      double rho, NumericVector offset, NumericVector missind)
 {
-// Update the spatially correlated random effects 
-//Create new objects
-int accept=0,rowstart=0, rowend=0;
-double acceptance, sumphi;
-double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
-double priorvardenom, priormean, priorvar;
-double propphi, lpold, lpnew;
-NumericVector phinew(nsites);
-   
-   
-//  Update each random effect in turn
-phinew = phi;
-
-     for(int j = 0; j < nsites; j++)
-     {
-     // Calculate prior variance
-     priorvardenom = rho * Wtripletsum[j] + 1 - rho;
-     priorvar = tau2 / priorvardenom;
-     
-     // Calculate the prior mean
-     rowstart = Wbegfin(j,0) - 1;
-     rowend = Wbegfin(j,1);
-     sumphi = 0;
-          for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
-     priormean = rho * sumphi / priorvardenom; 
-     
-      // propose a value  
-      propphi = rnorm(1, phinew[j], sqrt(priorvar*phi_tune))[0];
-      
-      // Accept or reject it
-      newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
-      oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
-      lpold = offset[j] + phinew[j];
-      lpnew = offset[j] + propphi;
-      oldlikebit = missind[j] * (y[j] * lpold - exp(lpold));
-      newlikebit = missind[j] * (y[j] * lpnew - exp(lpnew));
-      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
-          if(runif(1)[0] <= acceptance) 
-          {
-          phinew[j] = propphi;
-          accept = accept + 1;
-          }
-          else
-          { 
-          }
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0,rowstart=0, rowend=0;
+    double acceptance, acceptance1, acceptance2, sumphi, proposal_var, mala_old, mala_new;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double priorvardenom, priormean, priorvar;
+    double propphi, lpold, lpnew;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom; 
+        
+        // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+            // propose a value
+            proposal_var = priorvar * phi_tune;
+            mala_old = phinew[j] + 0.5 * proposal_var * (y[j] - exp(phinew[j] + offset[j]) - (phinew[j] - priormean) /priorvar);
+            propphi = rnorm(1, mala_old, sqrt(proposal_var))[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+            oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+            lpold = offset[j] + phinew[j];
+            lpnew = offset[j] + propphi;
+            oldlikebit = missind[j] * (y[j] * lpold - exp(lpold));
+            newlikebit = missind[j] * (y[j] * lpnew - exp(lpnew));
+            acceptance1 = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+            
+            // Proposal distribution ratio
+            mala_new = propphi + 0.5 * proposal_var * (y[j] - exp(propphi + offset[j]) - (propphi - priormean) /priorvar);
+            acceptance2 = exp(-(0.5 / proposal_var) * (pow((phinew[j] - mala_new),2) - pow((propphi-mala_old),2)));
+            acceptance = acceptance1 * acceptance2;
+            
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                phinew[j] = propphi;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+        phinew[j] = rnorm(1, priormean, sqrt(priorvar))[0];    
+        }
     }
-
-
-List out(2);
-out[0] = phinew;
-out[1] = accept;
-return out;
+    
+    
+    List out(2);
+    out[0] = phinew;
+    out[1] = accept;
+    return out;
 }
-
-
 
 
 
@@ -426,65 +744,84 @@ return phinew;
 
 // [[Rcpp::export]]
 List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
-                        NumericVector Wtripletsum,const int nsites,  const int nvar, NumericMatrix phi, 
-                        NumericMatrix Y, NumericMatrix failures, NumericMatrix phioffset, 
-                        NumericVector denoffset, NumericMatrix Sigma, NumericMatrix Sigmainv, double rho, 
-                        NumericMatrix cholsigma, NumericMatrix rand, NumericMatrix missind)
+                        const int nsites,  const int nvar, NumericMatrix phi, 
+                        NumericMatrix Y, NumericMatrix failures, NumericMatrix trials,
+                        NumericMatrix phioffset, NumericVector denoffset,  
+                        NumericMatrix Sigmainv, double rho, double phi_tune,
+                        NumericMatrix missind)
 {
     // Update the spatially correlated random effects 
     //Create new objects
     NumericMatrix fcprec(nvar, nvar);
     int rowstart=0, rowend=0, accept=0;
-    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar), mala1(nvar), mala2(nvar);
     NumericVector diffcurrent(nvar), diffprop(nvar);        
     NumericVector quadcurrent(nvar), quadprop(nvar);  
     NumericVector pold(nvar), pnew(nvar);
-    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance, hastings;
     
     //  Update each random effect in turn
     for(int j = 0; j < nsites; j++)
     {      
-    // Calculate the prior precision and propose a new value
-            for(int r=0; r<nvar; r++)
-            {
+    // Calculate the prior precision and mean
+        for(int r=0; r<nvar; r++)
+        {
             fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
-            propphi[r] = phi(j,r) + sum(cholsigma(r,_) * rand(j,_));
-            }
-            
-      // Calculate the prior mean
-      rowstart = Wbegfin(j,0) - 1;
-      rowend = Wbegfin(j,1);
-      sumphi = rep(0,nvar);
-      for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
-      fcmean = rho * sumphi / denoffset[j]; 
-      
-      // Prior ratio
-      diffcurrent = phi(j,_) - fcmean;
-      diffprop = propphi - fcmean;
-            for(int r=0; r<nvar; r++)
-            {
-            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
-            quadprop[r] = sum(diffprop * fcprec(_,r));  
-            }
-      oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
-      newpriorbit = 0.5 * sum(quadprop * diffprop);      
-      
-      // Likelihood ratio
-      pold = exp(phioffset(j,_) + phi(j,_)) / (1 + exp(phioffset(j,_) + phi(j,_)));
-      pnew = exp(phioffset(j,_) + propphi) / (1 + exp(phioffset(j,_) + propphi));
-      oldlikebit = sum(missind(j,_) * (Y(j,_) * log(pold) + failures(j,_) * log(1 - pold)));
-      newlikebit = sum(missind(j,_) * (Y(j,_) * log(pnew) + failures(j,_) * log(1 - pnew)));
+        }
+        
+    rowstart = Wbegfin(j,0) - 1;
+    rowend = Wbegfin(j,1);
+    sumphi = rep(0,nvar);
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
+    fcmean = rho * sumphi / denoffset[j]; 
+        
+        
+    // Generate the proposal distribution mean and propose a value
+        for(int r=0; r<nvar; r++)
+        {
+        mala1[r] =  phi(j,r) + 0.5 * pow(phi_tune, 2) * (missind(j,r) * (Y(j,r) - (trials(j,r) * exp(phi(j,r) + phioffset(j,r))) / (1 + exp(phi(j,r) + phioffset(j,r)))) -sum(fcprec(r,_) * (phi(j,_) - fcmean)));
+        propphi[r] = rnorm(1, mala1[r], phi_tune)[0];
+        //propphi[r] = rnorm(1, phi(j,r), phi_tune)[0];
+        }
 
-      // Accept or reject the value
-      acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
-            if(runif(1)[0] <= acceptance) 
-            {
-             phi(j,_) = propphi;
-             accept = accept + 1;
-            }
-            else
-            { 
-            }
+     // Generate the mala mean in reverse
+        for(int r=0; r<nvar; r++)
+        {
+        mala2[r] =  propphi[r] + 0.5 * pow(phi_tune, 2) * (missind(j,r) * (Y(j,r) - (trials(j,r) * exp(propphi[r] + phioffset(j,r))) / (1 + exp(propphi[r] + phioffset(j,r)))) -sum(fcprec(r,_) * (propphi - fcmean)));
+        }  
+            
+    // Compute the prior ratio
+    diffcurrent = phi(j,_) - fcmean;
+    diffprop = propphi - fcmean;
+        for(int r=0; r<nvar; r++)
+        {
+        quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+        quadprop[r] = sum(diffprop * fcprec(_,r));  
+        }
+    oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
+    newpriorbit = 0.5 * sum(quadprop * diffprop);      
+              
+    // Likelihood ratio
+    pold = exp(phioffset(j,_) + phi(j,_)) / (1 + exp(phioffset(j,_) + phi(j,_)));
+    pnew = exp(phioffset(j,_) + propphi) / (1 + exp(phioffset(j,_) + propphi));
+    oldlikebit = sum(missind(j,_) * (Y(j,_) * log(pold) + failures(j,_) * log(1 - pold)));
+    newlikebit = sum(missind(j,_) * (Y(j,_) * log(pnew) + failures(j,_) * log(1 - pnew)));
+
+    // Hastings ratio   
+    hastings = - (sum(pow(phi(j,_) - mala2,2)) - sum(pow(propphi - mala1,2))) / (2*pow(phi_tune,2));
+     
+     
+    // Accept or reject the value
+    acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit + hastings);
+    //acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+    if(runif(1)[0] <= acceptance) 
+        {
+        phi(j,_) = propphi;
+        accept = accept + 1;
+        }
+        else
+        { 
+        }
     }     
             
             
@@ -497,74 +834,84 @@ List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
 
 
 
-
-
-
 // [[Rcpp::export]]
 List poissonmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
-                        NumericVector Wtripletsum,const int nsites,  const int nvar, NumericMatrix phi, 
-                        NumericMatrix Y, NumericMatrix phioffset, 
-                        NumericVector denoffset, NumericMatrix Sigma, NumericMatrix Sigmainv, double rho, 
-                        NumericMatrix cholsigma, NumericMatrix rand, NumericMatrix missind)
+                       const int nsites,  const int nvar, NumericMatrix phi, 
+                       NumericMatrix Y, NumericMatrix phioffset, 
+                       NumericVector denoffset, NumericMatrix Sigmainv, double rho, 
+                       double phi_tune, NumericMatrix missind)
 {
     // Update the spatially correlated random effects 
     //Create new objects
     NumericMatrix fcprec(nvar, nvar);
     int rowstart=0, rowend=0, accept=0;
-    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar), mala1(nvar), mala2(nvar);
     NumericVector diffcurrent(nvar), diffprop(nvar);        
     NumericVector quadcurrent(nvar), quadprop(nvar);  
     NumericVector lpold(nvar), lpnew(nvar);
-    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance, hastings;
     
     //  Update each random effect in turn
     for(int j = 0; j < nsites; j++)
-    {      
-        // Calculate the prior precision and propose a new value
+    {     
+    // Calculate the prior precision and mean
         for(int r=0; r<nvar; r++)
         {
             fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
-            propphi[r] = phi(j,r) + sum(cholsigma(r,_) * rand(j,_));
         }
         
-        // Calculate the prior mean
         rowstart = Wbegfin(j,0) - 1;
         rowend = Wbegfin(j,1);
         sumphi = rep(0,nvar);
         for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
         fcmean = rho * sumphi / denoffset[j]; 
         
-        // Prior ratio
-        diffcurrent = phi(j,_) - fcmean;
-        diffprop = propphi - fcmean;
+    // Generate the proposal distribution mean and propose a value
         for(int r=0; r<nvar; r++)
         {
-            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
-            quadprop[r] = sum(diffprop * fcprec(_,r));  
+        mala1[r] =  phi(j,r) + 0.5 * pow(phi_tune, 2) * (missind(j,r) * (Y(j,r) - exp(phi(j,r) + phioffset(j,r))) -sum(fcprec(r,_) * (phi(j,_) - fcmean)));
+        propphi[r] = rnorm(1, mala1[r], phi_tune)[0];
+        }
+        
+    // Generate the mala mean in reverse
+        for(int r=0; r<nvar; r++)
+        {
+        mala2[r] =  propphi[r] + 0.5 * pow(phi_tune, 2) * (missind(j,r) * (Y(j,r) - exp(propphi[r] + phioffset(j,r))) - sum(fcprec(r,_) * (propphi - fcmean)));
+        }       
+        
+         
+    // Compute the prior ratio
+    diffcurrent = phi(j,_) - fcmean;
+    diffprop = propphi - fcmean;
+        for(int r=0; r<nvar; r++)
+        {
+        quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+        quadprop[r] = sum(diffprop * fcprec(_,r));  
         }
         oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
         newpriorbit = 0.5 * sum(quadprop * diffprop);      
         
-        // Likelihood ratio
-        lpold = phioffset(j,_) + phi(j,_);
-        lpnew = phioffset(j,_) + propphi;
-        oldlikebit = sum(missind(j,_) * (Y(j,_) * lpold - exp(lpold)));
-        newlikebit = sum(missind(j,_) * (Y(j,_) * lpnew - exp(lpnew)));
+    // Likelihood ratio
+    lpold = phioffset(j,_) + phi(j,_);
+    lpnew = phioffset(j,_) + propphi;
+    oldlikebit = sum(missind(j,_) * (Y(j,_) * lpold - exp(lpold)));
+    newlikebit = sum(missind(j,_) * (Y(j,_) * lpnew - exp(lpnew)));
+    
+    // Hastings ratio   
+    hastings = - (sum(pow(phi(j,_) - mala2,2)) - sum(pow(propphi - mala1,2))) / (2*pow(phi_tune,2));
 
-        // Accept or reject the value
-        acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+    // Accept or reject the value
+    acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit + hastings);
         if(runif(1)[0] <= acceptance) 
         {
-            phi(j,_) = propphi;
-            accept = accept + 1;
+        phi(j,_) = propphi;
+        accept = accept + 1;
         }
         else
         { 
         }
     }     
-    
-    
-    // Return the results
+
     List out(2);
     out[0] = phi;
     out[1] = accept;
