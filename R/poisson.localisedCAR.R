@@ -1,4 +1,4 @@
-poisson.localisedCAR <- function(formula, data=NULL, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
+poisson.localisedCAR <- function(formula, data=NULL, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -8,7 +8,7 @@ a <- common.verbose(verbose)
     
     
 #### Frame object
-frame.results <- common.frame.localised(formula, data, "poisson")
+frame.results <- common.frame.localised(formula, data, "poisson", trials=NA)
 K <- frame.results$n
 p <- frame.results$p
 X <- frame.results$X
@@ -24,7 +24,12 @@ which.miss <- as.numeric(!is.na(Y))
 regression.vec <- frame.results$regression.vec
 beta <- frame.results$beta
 
-     
+
+#### Check on MALA argument
+    if(length(MALA)!=1) stop("MALA is not length 1.", call.=FALSE)
+    if(!is.logical(MALA)) stop("MALA is not logical.", call.=FALSE)  
+
+
 #### Format and check the number of clusters G     
     if(length(G)!=1) stop("G is the wrong length.", call.=FALSE)    
     if(!is.numeric(G)) stop("G is not numeric.", call.=FALSE)    
@@ -43,13 +48,13 @@ beta <- frame.results$beta
     if(!is.null(X))
     {
         if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-        if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    prior.beta.check(prior.mean.beta, prior.var.beta, p)
+        if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
+        common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
     }else
     {}
 
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
-prior.var.check(prior.tau2)
+common.prior.var.check(prior.tau2)
 
     if(is.null(prior.delta)) prior.delta <- 10
     if(length(prior.delta)!=1) stop("the prior value for delta is the wrong length.", call.=FALSE)    
@@ -123,8 +128,6 @@ samples.fitted <- array(NA, c(n.keep, K))
     {
     samples.beta <- array(NA, c(n.keep, p))
     accept.all <- rep(0,8)
-    proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-    chol.proposal.corr.beta <- chol(proposal.corr.beta) 
     proposal.sd.beta <- 0.01
     }else
     {
@@ -197,7 +200,13 @@ W.begfin <- W.quants$W.begfin
      ## Sample from phi
      ##################
      phi.offset <- regression.vec + offset  + lambda[Z]
-     temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
+        if(MALA)
+        {
+        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
+        }else
+        {
+        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
+        }
      phi <- temp1[[1]]
           for(i in 1:G)
           {
@@ -412,6 +421,12 @@ CPO <- rep(NA, K)
 LMPL <- sum(log(CPO))  
   
 
+#### Compute the % deviance explained
+fit.null <- glm(Y~1, offset=offset, family="poisson")$fitted.values
+deviance.null <- -2 * sum(dpois(x=Y[which(!is.na(Y))], lambda=fit.null, log=TRUE), na.rm=TRUE)
+percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
     if(!is.null(X))
     {    
@@ -464,8 +479,8 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, 
 
 ## Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects  model - Localised CAR model\n")
 if(is.null(X)) samples.beta.orig = NA
 

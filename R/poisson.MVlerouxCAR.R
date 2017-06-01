@@ -1,4 +1,4 @@
-poisson.MVlerouxCAR <- function(formula, data=NULL,  W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+poisson.MVlerouxCAR <- function(formula, data=NULL,  W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, fix.rho=FALSE, rho=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -23,6 +23,11 @@ which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
 
     
+#### Check on MALA argument
+if(length(MALA)!=1) stop("MALA is not length 1.", call.=FALSE)
+if(!is.logical(MALA)) stop("MALA is not logical.", call.=FALSE)  
+
+
 #### W matrix
     if(!is.matrix(W)) stop("W is not a matrix.", call.=FALSE)
 K <- nrow(W)
@@ -41,11 +46,11 @@ J <- N.all / K
 
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
     if(is.null(prior.Sigma.df)) prior.Sigma.df <- J+1
     if(is.null(prior.Sigma.scale)) prior.Sigma.scale <- diag(rep(1,J))
-prior.beta.check(prior.mean.beta, prior.var.beta, p)
-prior.varmat.check(prior.Sigma.scale, J)  
+common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
+common.prior.varmat.check(prior.Sigma.scale, J)  
 
 
 #### Compute the blocking structure for beta     
@@ -106,8 +111,6 @@ accept <- accept.all
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
 proposal.sd.rho <- 0.02
-proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-chol.proposal.corr.beta <- chol(proposal.corr.beta) 
 Sigma.post.df <- prior.Sigma.df + K  
     
     
@@ -199,7 +202,13 @@ which.miss.mat <- matrix(which.miss, nrow=K, ncol=J, byrow=TRUE)
     ##################
     den.offset <- rho * W.triplet.sum + 1 - rho
     phi.offset <- regression.mat + offset.mat
-    temp1 <- poissonmcarupdate(W.triplet, W.begfin, K, J, phi.mat, Y.mat.miss,  phi.offset, den.offset, Sigma.inv, rho, proposal.sd.phi, which.miss.mat)      
+        if(MALA)
+        {
+        temp1 <- poissonmcarupdateMALA(W.triplet, W.begfin, K, J, phi.mat, Y.mat.miss,  phi.offset, den.offset, Sigma.inv, rho, proposal.sd.phi, which.miss.mat)      
+        }else
+        {
+        temp1 <- poissonmcarupdateRW(W.triplet, W.begfin, K, J, phi.mat, Y.mat.miss,  phi.offset, den.offset, Sigma.inv, rho, proposal.sd.phi, which.miss.mat)      
+        }
         if(rho<1)
         {
         phi.mat <- temp1[[1]] - mean(temp1[[1]])
@@ -369,6 +378,12 @@ CPO <- rep(NA, N.all)
 LMPL <- sum(log(CPO), na.rm=TRUE)  
     
     
+#### Compute the % deviance explained
+fit.null <- glm(Y~1, offset=offset, family="poisson")$fitted.values
+deviance.null <- -2 * sum(dpois(x=Y[which(!is.na(Y))], lambda=fit.null, log=TRUE), na.rm=TRUE)
+percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
@@ -418,8 +433,8 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, 
     
 #### Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Leroux MCAR\n")
     if(fix.rho) samples.rho=NA
     if(n.miss==0) samples.Y = NA

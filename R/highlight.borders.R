@@ -41,6 +41,8 @@ polygons <- spdata@polygons
 
 #### Create a spatial points object
 boundary.all <- boundary.all[-1, ]
-boundary.final <- SpatialPoints(boundary.all)
+boundary.all2 <- boundary.all[!duplicated(boundary.all), ]
+rownames(boundary.all2) <- 1:nrow(boundary.all2)
+boundary.final <- SpatialPoints(boundary.all2)
 return(boundary.final) 
 }

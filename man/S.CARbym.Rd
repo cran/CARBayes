@@ -24,7 +24,7 @@ are created for the missing values for predictive purposes. These are saved in t
 \usage{
 S.CARbym(formula, family, data=NULL, trials=NULL, W, burnin, n.sample, 
 thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,  prior.tau2=NULL, 
-prior.sigma2=NULL, verbose=TRUE)
+prior.sigma2=NULL, MALA=TRUE, verbose=TRUE)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -47,10 +47,10 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
    \item{W}{
-A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
-a binary specification is used, where the jkth element equals one if areas (j, k) 
-are spatially close (e.g. share a common border) and is zero otherwise. The matrix 
-can be non-binary, but each row must contain at least one non-zero entry.
+A non-negative K by K neighbourhood matrix (where K is the number of spatial units). 
+Typically a binary specification is used, where the jkth element equals one if 
+areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
+The matrix can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
 The number of MCMC samples to discard as the burn-in period.
@@ -68,7 +68,7 @@ assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors 
-are assumed). Defaults to a vector with values 1000.
+are assumed). Defaults to a vector with values 100000.
 }  
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -77,6 +77,10 @@ prior for tau2. Defaults to c(1, 0.01).
   \item{prior.sigma2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale)
 prior for sigma2. Defaults to c(1, 0.01).  
+}
+    \item{MALA}{
+Logical, should the function use MALA (TRUE, default) or simple random walk (FALSE) 
+updates for the random effects. Not applicable if family=`gaussian'.
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -95,8 +99,8 @@ Logical, should the function update the user on its progress.
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
-loglikelihood.}
+(WAIC) and its corresponding estimated number of effective parameters (p.w), the
+loglikelihood, and the percentage deviance explained.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}

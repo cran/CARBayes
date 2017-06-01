@@ -1,4 +1,4 @@
-binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+binomial.lerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, fix.rho=FALSE, rho=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -21,6 +21,11 @@ Y <- frame.results$Y
 Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
+
+
+#### Check on MALA argument
+if(length(MALA)!=1) stop("MALA is not length 1.", call.=FALSE)
+if(!is.logical(MALA)) stop("MALA is not logical.", call.=FALSE)  
 
 
 #### Check and format the trials argument
@@ -46,10 +51,10 @@ failures.miss[which.miss==0] <- median(failures, na.rm=TRUE)
 
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
-prior.beta.check(prior.mean.beta, prior.var.beta, p)
-prior.var.check(prior.tau2)
+common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
+common.prior.var.check(prior.tau2)
 
 
 ## Compute the blocking structure for beta     
@@ -110,8 +115,6 @@ accept <- accept.all
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
 proposal.sd.rho <- 0.02
-proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-chol.proposal.corr.beta <- chol(proposal.corr.beta) 
 tau2.posterior.shape <- prior.tau2[1] + 0.5 * K
     
    
@@ -189,7 +192,13 @@ if(rho==1) tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)
     ## Sample from phi
     ####################
     beta.offset <- X.standardised %*% beta + offset
-    temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, trials=trials, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        if(MALA)
+        {
+        temp1 <- binomialcarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, trials=trials, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        }else
+        {
+        temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        }
     phi <- temp1[[1]]
         if(rho<1)
         {
@@ -360,6 +369,12 @@ CPO <- rep(NA, K)
 LMPL <- sum(log(CPO), na.rm=TRUE)     
     
     
+#### Compute the % deviance explained
+fit.null <- glm(cbind(Y, failures)~1, offset=offset, family="binomial")$fitted.values
+deviance.null <- -2 * sum(dbinom(x=Y[which(!is.na(Y))], size=trials[which(!is.na(Y))], prob=fit.null, log=TRUE), na.rm=TRUE)
+percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
     
@@ -400,8 +415,8 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, 
     
 #### Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Leroux CAR\n")
     if(fix.rho) samples.rho=NA
     if(n.miss==0) samples.Y = NA

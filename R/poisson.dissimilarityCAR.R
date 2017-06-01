@@ -1,4 +1,4 @@
-poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, verbose=TRUE)
+poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -21,6 +21,11 @@ Y <- frame.results$Y
 Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
+
+
+#### Check on MALA argument
+if(length(MALA)!=1) stop("MALA is not length 1.", call.=FALSE)
+if(!is.logical(MALA)) stop("MALA is not logical.", call.=FALSE)  
 
 
 #### Dissimilarity metric matrix
@@ -53,10 +58,10 @@ q <- length(Z)
 
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
-prior.beta.check(prior.mean.beta, prior.var.beta, p)
-prior.var.check(prior.tau2)
+common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
+common.prior.var.check(prior.tau2)
 
 
 ## Compute the blocking structure for beta     
@@ -115,8 +120,6 @@ accept.all <- accept
 proposal.sd.alpha <- 0.02 * alpha.max
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
-proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-chol.proposal.corr.beta <- chol(proposal.corr.beta) 
 tau2.posterior.shape <- prior.tau2[1] + 0.5 * K
 
 
@@ -206,8 +209,14 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     ####################
     ## Sample from phi
     ####################
-    beta.offset <- as.numeric(X.standardised %*% beta) + offset        
-    temp1 <- poissoncarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+    beta.offset <- as.numeric(X.standardised %*% beta) + offset     
+        if(MALA)
+        {
+        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        }else
+        {
+        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        }
     phi <- temp1[[1]]
     phi <- phi - mean(phi)
     accept[3] <- accept[3] + temp1[[2]]
@@ -377,7 +386,13 @@ CPO <- rep(NA, K)
      }
 LMPL <- sum(log(CPO), na.rm=TRUE)  
 
-     
+
+#### Compute the % deviance explained
+fit.null <- glm(Y~1, offset=offset, family="poisson")$fitted.values
+deviance.null <- -2 * sum(dpois(x=Y[which(!is.na(Y))], lambda=fit.null, log=TRUE), na.rm=TRUE)
+percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
@@ -474,8 +489,8 @@ W.posterior <- array(NA, c(K,K))
 
 #### Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
     if(W.binary)
     {
     model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Binary dissimilarity CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     

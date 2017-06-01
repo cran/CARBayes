@@ -21,7 +21,7 @@ are created for the missing values for predictive purposes. These are saved in t
 \usage{
 S.CARdissimilarity(formula, family, data=NULL,  trials=NULL, W, 
 Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, 
-prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, verbose=TRUE)
+prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, MALA=TRUE, verbose=TRUE)
 }
 
 
@@ -45,10 +45,10 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
   \item{W}{
-A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
-a binary specification is used, where the jkth element equals one if areas (j, k) 
-are spatially close (e.g. share a common border) and is zero otherwise. For this 
-model only the matrix must be binary.
+A non-negative K by K neighbourhood matrix (where K is the number of spatial units). 
+Typically a binary specification is used, where the jkth element equals one if 
+areas (j, k) are spatially close (e.g. share a common border) and is zero otherwise. 
+For this model only the matrix must be binary.
 }
   \item{Z}{
 A list, where each element is a K by K matrix of non-negative dissimilarity metrics.
@@ -73,7 +73,7 @@ assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors 
-are assumed). Defaults to a vector with values 1000.
+are assumed). Defaults to a vector with values 100000.
 }  
   \item{prior.nu2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -82,6 +82,10 @@ prior for nu2. Defaults to c(1, 0.01) and only used if family=`Gaussian'.
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
 prior for tau2. Defaults to c(1, 0.01).  
+}
+    \item{MALA}{
+        Logical, should the function use MALA (TRUE, default) or simple random walk (FALSE) 
+        updates for the random effects. Not applicable if family=`gaussian'.   
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -101,8 +105,8 @@ Logical, should the function update the user on its progress.
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
-loglikelihood.}
+(WAIC) and its corresponding estimated number of effective parameters (p.w), the
+loglikelihood, and the percentage deviance explained.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A list containing two matrices: W.posterior contains 
 posterior medians for each element w_kj of the K by K neighbourhood matrix W; 

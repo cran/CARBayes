@@ -28,7 +28,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[5],"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
 
             if(length(x$localised.structure[[2]])>1)
             {
@@ -59,7 +59,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[5],"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
         cat("\nNumber of clusters with the number of data points in each one\n")
         print(table(paste("group", x$localised.structure, sep="")))
         
@@ -82,7 +82,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", x$modelfit[5],"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
      }
         
 return(invisible(x))        

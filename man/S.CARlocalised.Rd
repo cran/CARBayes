@@ -24,7 +24,7 @@ not allowed in this model.
 S.CARlocalised(formula, family, data=NULL, G, trials=NULL, W,
 burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
 prior.mean.alpha=NULL, prior.var.alpha=NULL, prior.tau2=NULL,prior.delta=NULL, 
-verbose=TRUE)
+MALA=TRUE, verbose=TRUE)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -51,10 +51,10 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
    \item{W}{
-A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
-a binary specification is used, where the jkth element equals one if areas (j, k) 
-are spatially close (e.g. share a common border) and is zero otherwise. The matrix 
-can be non-binary, but each row must contain at least one non-zero entry.
+A non-negative K by K neighbourhood matrix (where K is the number of spatial units). 
+Typically a binary specification is used, where the jkth element equals one if areas 
+(j, k) are spatially close (e.g. share a common border) and is zero otherwise. The 
+matrix can be non-binary, but each row must contain at least one non-zero entry.
 }
   \item{burnin}{
 The number of MCMC samples to discard as the burn-in period.
@@ -80,7 +80,7 @@ multiplying the covariate with within area variation in its values. Defaults to 
 }
   \item{prior.var.alpha}{
 The prior variance for the regression parameter alpha (Gaussian priors are assumed) 
-multiplying the covariate with within area variation in its values. Defaults to 1000.
+multiplying the covariate with within area variation in its values. Defaults to 100000.
 }  
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -88,6 +88,10 @@ prior for tau2. Defaults to c(1, 0.01).
 }
      \item{prior.delta}{
 The prior maximum for the cluster smoothing parameter delta. Defaults to 10.  
+}
+    \item{MALA}{
+        Logical, should the function use MALA (TRUE, default) or simple random walk (FALSE) 
+        updates for the random effects. Not applicable if family=`gaussian'.   
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -106,8 +110,8 @@ Logical, should the function update the user on its progress.
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
-loglikelihood.}
+(WAIC) and its corresponding estimated number of effective parameters (p.w), the
+loglikelihood, and the percentage deviance explained.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{A vector giving the posterior median of which cluster 
 (group) each area is in.}
@@ -118,7 +122,7 @@ loglikelihood.}
 
 \references{
 Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
-misalignment in long-term air pollution and health studies, Environmetrics, , 26, 
+misalignment in long-term air pollution and health studies, Environmetrics, 26, 
 477-487.
 }
 

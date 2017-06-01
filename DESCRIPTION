@@ -1,11 +1,11 @@
 Package: CARBayes
 Type: Package
 Title: Spatial Generalised Linear Mixed Models for Areal Unit Data
-Version: 4.7
-Date: 2017-02-01
+Version: 5.0
+Date: 2017-06-01
 Author: Duncan Lee
 Maintainer: Duncan Lee <Duncan.Lee@glasgow.ac.uk>
-Description: Implements a class of univariate and multivariate spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation. The response variable can be binomial, Gaussian or Poisson. Spatial autocorrelation is modelled by  a set of random effects, which are assigned a conditional autoregressive (CAR) prior distribution. A number of different CAR priors are available for the random effects, including a multivariate CAR (MCAR) model for multivariate spatial data. Full details are given in the vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development was supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1.
+Description: Implements a class of univariate and multivariate spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation. The response variable can be binomial, Gaussian or Poisson, and spatial autocorrelation is modelled by  a set of random effects that are assigned a conditional autoregressive (CAR) prior distribution. A number of different models are available for univariate spatial data, including models with no random effects as well as random effects modelled by different types of CAR prior. Additionally,  a multivariate CAR (MCAR) model for multivariate spatial data is available, as is a two-level hierarchical model for individuals within areas. Full details are given in the vignette accompanying this package. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development has / is supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1, ESRC grant ES/K006460/1, and Innovate UK / Natural Environment Research Council (NERC) grant NE/N007352/1. 
 License: GPL (>= 2)
 Depends: MASS, R (>= 3.0.0), Rcpp (>= 0.11.5)
 Imports: CARBayesdata, coda, matrixcalc, MCMCpack, sp, spam, spdep,
@@ -18,6 +18,6 @@ ByteCompile: yes
 URL: http://github.com/duncanplee/CARBayes
 BugReports: http://github.com/duncanplee/CARBayes/issues
 NeedsCompilation: yes
-Packaged: 2017-01-31 11:43:40 UTC; duncanlee
+Packaged: 2017-06-01 07:06:52 UTC; duncanlee
 Repository: CRAN
-Date/Publication: 2017-02-01 16:12:02
+Date/Publication: 2017-06-01 10:58:32 UTC

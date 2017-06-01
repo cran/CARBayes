@@ -9,15 +9,29 @@ using namespace Rcpp;
 // quadform - computing quadratic forms phi %*% Q %*% theta.
 // binomialbetaupdateMALA - update regression parameters in the binomial model using MALA
 // binomialbetaupdateRW - update regression parameters in the binomial model using RW
-// binomialcarupdate - update random effects in the binomial model
-// binomialindepupdate - update the independent effects in the binomial model
+// binomialcarupdateMALA - update random effects in the binomial model using MALA
+// binomialcarupdateRW - update random effects in the binomial model using RW
+// binomialindepupdateMALA - update the independent effects in the binomial model using MALA
+// binomialindepupdateRW - update the independent effects in the binomial model using RW
 // poissonbetaupdateMALA - update regression parameters in the poisson model using MALA
 // poissonbetaupdateRW - update regression parameters in the poisson model using RW
-// poissoncarupdate - update random effects in the poisson model
-// poissonindepupdate - update the independent effects in the poisson model
+// poissoncarupdateMALA - update random effects in the poisson model using MALA
+// poissoncarupdateRW - update random effects in the poisson model using RW
+// poissonindepupdateMALA - update the independent effects in the poisson model using MALA
+// poissonindepupdateRW - update the independent effects in the poisson model using RW
 // gaussiancarupdate - update random effects in the Gaussian model
-// binomialmcarupdate - update random effects in the binomial MCAR model
-// poissonmcarupdate - update random effects in the poisson MCAR model
+// binomialmcarupdateMALA - update random effects in the binomial MCAR model using MALA
+// binomialmcarupdateRW - update random effects in the binomial MCAR model using RW
+// poissonmcarupdateMALA - update random effects in the poisson MCAR model using MALA
+// poissonmcarupdateRW - update random effects in the poisson MCAR model using RW
+
+// poissoncarmultilevelupdate - Poisson spatial random effects updates
+// binomialcarmultilevelupdate - binomial spatial random effects updates
+// gaussiancarmultilevelupdate - gaussian spatial random effects updates
+// gaussiancarmultilevelupdateindiv - Gaussian indep random effect updates
+// poissoncarmultilevelupdateindiv - Poisson indep random effect updates
+// binomialcarmultilevelupdateindiv - binomial indep random effect updates
+
 
 // [[Rcpp::export]]
 NumericVector linpredcompute(NumericMatrix X, const int nsites, const int p, 
@@ -85,7 +99,7 @@ return tau2_posteriorscale;
 
 
 // [[Rcpp::export]]
-List binomialcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+List binomialcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
                        NumericVector Wtripletsum,const int nsites, NumericVector phi, double tau2, 
                        const NumericVector y, const NumericVector failures, NumericVector trials, const double phi_tune, 
                        double rho, NumericVector offset, NumericVector missind)
@@ -159,6 +173,81 @@ List out(2);
 out[0] = phinew;
 out[1] = accept;
 return out;
+}
+
+
+
+
+// [[Rcpp::export]]
+List binomialcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                       NumericVector Wtripletsum,const int nsites, NumericVector phi, double tau2, 
+                       const NumericVector y, const NumericVector failures, const double phi_tune, 
+                       double rho, NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0, rowstart=0, rowend=0;
+    double acceptance, sumphi;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double priorvardenom, priormean, priorvar;
+    double propphi, pold, pnew, proposal_var;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom;  
+        
+        // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+            // propose a value
+            proposal_var = priorvar * phi_tune;
+            propphi = rnorm(1, phinew[j], sqrt(proposal_var))[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+            oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+            pold = exp(offset[j] + phinew[j]) / (1 + exp(offset[j] + phinew[j]));
+            pnew = exp(offset[j] + propphi) / (1 + exp(offset[j] + propphi));
+            oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
+            newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
+            acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+            
+
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                phinew[j] = propphi;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+            phinew[j] = rnorm(1, priormean, sqrt(priorvar))[0];    
+        }
+    }
+    
+    // Return the results
+    List out(2);
+    out[0] = phinew;
+    out[1] = accept;
+    return out;
 }
 
 
@@ -333,7 +422,7 @@ List binomialbetaupdateRW(NumericMatrix X, const int nsites, const int p, Numeri
 
 
 // [[Rcpp::export]]
-List binomialindepupdate(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
+List binomialindepupdateMALA(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
                const NumericVector failures, const NumericVector trials, const double theta_tune,  NumericVector offset, NumericVector missind)
 {
 // Update the independent random effects 
@@ -394,9 +483,66 @@ return out;
 }
 
 
+// [[Rcpp::export]]
+List binomialindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
+                         const NumericVector failures, const double theta_tune,  NumericVector offset, NumericVector missind)
+{
+    // Update the independent random effects 
+    //Create new objects
+    int accept=0;
+    double acceptance;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double proptheta, pold, pnew;
+    NumericVector thetanew(nsites);
+    
+    
+    //  Update each random effect in turn
+    thetanew = theta;
+    for(int j = 0; j < nsites; j++)
+    {
+        // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+            // propose a value
+            proptheta = rnorm(1, thetanew[j], theta_tune)[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
+            oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
+            
+            pold = exp(offset[j] + thetanew[j]) / (1 + exp(offset[j] + thetanew[j]));
+            pnew = exp(offset[j] + proptheta) / (1 + exp(offset[j] + proptheta));
+            oldlikebit = missind[j] * (y[j] * log(pold) + failures[j] * log((1-pold)));
+            newlikebit = missind[j] * (y[j] * log(pnew) + failures[j] * log((1-pnew)));
+            acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+            
+
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                thetanew[j] = proptheta;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+            thetanew[j] = rnorm(1, 0, theta_tune)[0];    
+        }
+    }
+    
+    List out(2);
+    out[0] = thetanew;
+    out[1] = accept;
+    return out;
+}
+
+
 
 // [[Rcpp::export]]
-List poissonindepupdate(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
+List poissonindepupdateMALA(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
                const double theta_tune,  NumericVector offset, NumericVector missind)
 {
 // Update the spatially correlated random effects 
@@ -455,6 +601,65 @@ out[0] = thetanew;
 out[1] = accept;
 return out;
 }
+
+
+
+
+// [[Rcpp::export]]
+List poissonindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, 
+                            const double theta_tune,  NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0;
+    double acceptance;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double proptheta, lpold, lpnew;
+    NumericVector thetanew(nsites);
+    
+    
+    //  Update each random effect in turn
+    thetanew = theta;
+    for(int j = 0; j < nsites; j++)
+    {
+        // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+            // propose a value
+            proptheta = rnorm(1, thetanew[j], theta_tune)[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/sigma2) * pow(proptheta, 2); 
+            oldpriorbit = (0.5/sigma2) * pow(thetanew[j], 2);
+            lpold = offset[j] + thetanew[j];
+            lpnew = offset[j] + proptheta;
+            oldlikebit = missind[j] * (y[j] * lpold - exp(lpold));
+            newlikebit = missind[j] * (y[j] * lpnew - exp(lpnew));
+            acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                thetanew[j] = proptheta;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+            thetanew[j] = rnorm(1, 0, theta_tune)[0];    
+        }
+    }
+    
+    
+    List out(2);
+    out[0] = thetanew;
+    out[1] = accept;
+    return out;
+}
+
 
 
 // [[Rcpp::export]]
@@ -620,7 +825,7 @@ List poissonbetaupdateRW(NumericMatrix X, const int nsites, const int p, Numeric
 
 
 // [[Rcpp::export]]
-List poissoncarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+List poissoncarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
                       NumericVector Wtripletsum, const int nsites, NumericVector phi, 
                       double tau2, const NumericVector y, const double phi_tune, 
                       double rho, NumericVector offset, NumericVector missind)
@@ -699,6 +904,79 @@ List poissoncarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
 
 
 
+// [[Rcpp::export]]
+List poissoncarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                          NumericVector Wtripletsum, const int nsites, NumericVector phi, 
+                          double tau2, const NumericVector y, const double phi_tune, 
+                          double rho, NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0,rowstart=0, rowend=0;
+    double acceptance, sumphi, proposal_var;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit;
+    double priorvardenom, priormean, priorvar;
+    double propphi, lpold, lpnew;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom; 
+        
+        // Different updates depending on whether the y[j] is missing or not.
+        if(missind[j]==1)
+        {
+            // propose a value
+            proposal_var = priorvar * phi_tune;
+            propphi = rnorm(1, phinew[j], sqrt(proposal_var))[0];
+            
+            // Accept or reject it
+            // Full conditional ratio
+            newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+            oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+            lpold = offset[j] + phinew[j];
+            lpnew = offset[j] + propphi;
+            oldlikebit = missind[j] * (y[j] * lpold - exp(lpold));
+            newlikebit = missind[j] * (y[j] * lpnew - exp(lpnew));
+            acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+            
+            // Acceptace or reject the proposal
+            if(runif(1)[0] <= acceptance) 
+            {
+                phinew[j] = propphi;
+                accept = accept + 1;
+            }
+            else
+            { 
+            }    
+        }else
+        {
+            phinew[j] = rnorm(1, priormean, sqrt(priorvar))[0];    
+        }
+    }
+    
+    
+    List out(2);
+    out[0] = phinew;
+    out[1] = accept;
+    return out;
+}
+
+
+
 
 // [[Rcpp::export]]
 NumericVector gaussiancarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
@@ -743,7 +1021,7 @@ return phinew;
 
 
 // [[Rcpp::export]]
-List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+List binomialmcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
                         const int nsites,  const int nvar, NumericMatrix phi, 
                         NumericMatrix Y, NumericMatrix failures, NumericMatrix trials,
                         NumericMatrix phioffset, NumericVector denoffset,  
@@ -781,7 +1059,6 @@ List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
         {
         mala1[r] =  phi(j,r) + 0.5 * pow(phi_tune, 2) * (missind(j,r) * (Y(j,r) - (trials(j,r) * exp(phi(j,r) + phioffset(j,r))) / (1 + exp(phi(j,r) + phioffset(j,r)))) -sum(fcprec(r,_) * (phi(j,_) - fcmean)));
         propphi[r] = rnorm(1, mala1[r], phi_tune)[0];
-        //propphi[r] = rnorm(1, phi(j,r), phi_tune)[0];
         }
 
      // Generate the mala mean in reverse
@@ -813,7 +1090,6 @@ List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
      
     // Accept or reject the value
     acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit + hastings);
-    //acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
     if(runif(1)[0] <= acceptance) 
         {
         phi(j,_) = propphi;
@@ -834,8 +1110,90 @@ List binomialmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
 
 
 
+
+
 // [[Rcpp::export]]
-List poissonmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+List binomialmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                        const int nsites,  const int nvar, NumericMatrix phi, 
+                        NumericMatrix Y, NumericMatrix failures,
+                        NumericMatrix phioffset, NumericVector denoffset,  
+                        NumericMatrix Sigmainv, double rho, double phi_tune,
+                        NumericMatrix missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    NumericMatrix fcprec(nvar, nvar);
+    int rowstart=0, rowend=0, accept=0;
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector diffcurrent(nvar), diffprop(nvar);        
+    NumericVector quadcurrent(nvar), quadprop(nvar);  
+    NumericVector pold(nvar), pnew(nvar);
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    
+    //  Update each random effect in turn
+    for(int j = 0; j < nsites; j++)
+    {      
+        // Calculate the prior precision and mean
+        for(int r=0; r<nvar; r++)
+        {
+            fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
+        }
+        
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = rep(0,nvar);
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
+        fcmean = rho * sumphi / denoffset[j]; 
+        
+        
+        // Generate the proposal distribution mean and propose a value
+        for(int r=0; r<nvar; r++)
+        {
+            propphi[r] = rnorm(1, phi(j,r), phi_tune)[0];
+        }
+        
+
+        // Compute the prior ratio
+        diffcurrent = phi(j,_) - fcmean;
+        diffprop = propphi - fcmean;
+        for(int r=0; r<nvar; r++)
+        {
+            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+            quadprop[r] = sum(diffprop * fcprec(_,r));  
+        }
+        oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
+        newpriorbit = 0.5 * sum(quadprop * diffprop);      
+        
+        // Likelihood ratio
+        pold = exp(phioffset(j,_) + phi(j,_)) / (1 + exp(phioffset(j,_) + phi(j,_)));
+        pnew = exp(phioffset(j,_) + propphi) / (1 + exp(phioffset(j,_) + propphi));
+        oldlikebit = sum(missind(j,_) * (Y(j,_) * log(pold) + failures(j,_) * log(1 - pold)));
+        newlikebit = sum(missind(j,_) * (Y(j,_) * log(pnew) + failures(j,_) * log(1 - pnew)));
+        
+
+        // Accept or reject the value
+        acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            phi(j,_) = propphi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }     
+    
+    
+    // Return the results
+    List out(2);
+    out[0] = phi;
+    out[1] = accept;
+    return out;
+}
+
+
+// [[Rcpp::export]]
+List poissonmcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
                        const int nsites,  const int nvar, NumericMatrix phi, 
                        NumericMatrix Y, NumericMatrix phioffset, 
                        NumericVector denoffset, NumericMatrix Sigmainv, double rho, 
@@ -917,3 +1275,444 @@ List poissonmcarupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
     out[1] = accept;
     return out;
 }
+
+
+
+
+// [[Rcpp::export]]
+List poissonmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                           const int nsites,  const int nvar, NumericMatrix phi, 
+                           NumericMatrix Y, NumericMatrix phioffset, 
+                           NumericVector denoffset, NumericMatrix Sigmainv, double rho, 
+                           double phi_tune, NumericMatrix missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    NumericMatrix fcprec(nvar, nvar);
+    int rowstart=0, rowend=0, accept=0;
+    NumericVector sumphi(nvar), fcmean(nvar), propphi(nvar);
+    NumericVector diffcurrent(nvar), diffprop(nvar);        
+    NumericVector quadcurrent(nvar), quadprop(nvar);  
+    NumericVector lpold(nvar), lpnew(nvar);
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, acceptance;
+    
+    //  Update each random effect in turn
+    for(int j = 0; j < nsites; j++)
+    {     
+        // Calculate the prior precision and mean
+        for(int r=0; r<nvar; r++)
+        {
+            fcprec(_,r) = denoffset[j] * Sigmainv(_,r);  
+        }
+        
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = rep(0,nvar);
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phi((Wtriplet(l,1) - 1),_);
+        fcmean = rho * sumphi / denoffset[j]; 
+        
+        // Generate the proposal distribution mean and propose a value
+        for(int r=0; r<nvar; r++)
+        {
+            propphi[r] = rnorm(1, phi(j,r), phi_tune)[0];
+        }
+        
+        
+        // Compute the prior ratio
+        diffcurrent = phi(j,_) - fcmean;
+        diffprop = propphi - fcmean;
+        for(int r=0; r<nvar; r++)
+        {
+            quadcurrent[r] = sum(diffcurrent * fcprec(_,r));  
+            quadprop[r] = sum(diffprop * fcprec(_,r));  
+        }
+        oldpriorbit = 0.5 * sum(quadcurrent * diffcurrent);
+        newpriorbit = 0.5 * sum(quadprop * diffprop);      
+        
+        // Likelihood ratio
+        lpold = phioffset(j,_) + phi(j,_);
+        lpnew = phioffset(j,_) + propphi;
+        oldlikebit = sum(missind(j,_) * (Y(j,_) * lpold - exp(lpold)));
+        newlikebit = sum(missind(j,_) * (Y(j,_) * lpnew - exp(lpnew)));
+        
+
+        // Accept or reject the value
+        acceptance = exp(oldpriorbit - newpriorbit - oldlikebit + newlikebit);
+        if(runif(1)[0] <= acceptance) 
+        {
+            phi(j,_) = propphi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }     
+    
+    List out(2);
+    out[0] = phi;
+    out[1] = accept;
+    return out;
+}
+
+
+
+// [[Rcpp::export]]
+NumericVector gaussiancarmultilevelupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                                          NumericVector Wtripletsum, NumericVector n_individual,
+                                          const int nsites, NumericVector phi, double tau2, 
+                                          double rho, double nu2, NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int rowstart=0, rowend=0;
+    double sumphi;
+    double fcprecision, fcsd, fcmean;
+    double priorvardenom, priormean, priorvar;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom; 
+        
+        // propose a value  
+        fcprecision = (n_individual[j]/nu2) + (1/priorvar);
+        fcsd = pow((1/fcprecision),0.5);
+        fcmean = (priormean / priorvar + offset[j]) / fcprecision;
+        phinew[j] = rnorm(1, fcmean, fcsd)[0];      
+    }
+    
+    
+    return phinew;
+}
+
+
+
+
+// [[Rcpp::export]]
+List binomialcarmultilevelupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                                 NumericVector Wtripletsum, List ind_area_list, NumericVector n_individual,
+                                 const int nsites, NumericVector phi, double tau2, 
+                                 const NumericVector y, const NumericVector failures, const double phi_tune, 
+                                 double rho, NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0, rowstart=0, rowend=0, n_current=0, datapoint=0;
+    double acceptance, sumphi;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, likebittotal;
+    double priorvardenom, priormean, priorvar;
+    double propphi, pold, pnew;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom; 
+        
+        // propose a value  
+        propphi = rnorm(1, phinew[j], sqrt(priorvar*phi_tune))[0];
+        
+        
+        // Accept or reject it
+        // Prior part
+        newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+        oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+        
+        // Likelihood part
+        // Determine the set of data points relating to area j
+        n_current = n_individual[j];
+        NumericVector individuals(n_current);
+        individuals = ind_area_list[j];
+        
+        // Compute the data likelihood
+        likebittotal = 0;
+        for(int r = 0; r < n_current; r++)
+        {
+            datapoint = individuals[r] - 1;
+            pold = exp(offset[datapoint] + phinew[j]) / (1 + exp(offset[datapoint] + phinew[j]));
+            pnew = exp(offset[datapoint] + propphi) / (1 + exp(offset[datapoint] + propphi)); 
+            oldlikebit = missind[datapoint] * (y[datapoint] * log(pold) + failures[datapoint] * log((1-pold)));
+            newlikebit = missind[datapoint] * (y[datapoint] * log(pnew) + failures[datapoint] * log((1-pnew)));
+            likebittotal = likebittotal + newlikebit - oldlikebit;   
+        }
+        
+        // Compute the acceptance probability and accept or reject the proposal    
+        acceptance = exp(oldpriorbit - newpriorbit + likebittotal);
+        if(runif(1)[0] <= acceptance) 
+        {
+            phinew[j] = propphi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }
+    
+    
+    // Return the results
+    List out(2);
+    out[0] = phinew;
+    out[1] = accept;
+    return out;
+}
+
+
+
+
+
+// [[Rcpp::export]]
+List poissoncarmultilevelupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin, 
+                                NumericVector Wtripletsum, List ind_area_list, NumericVector n_individual,
+                                const int nsites, NumericVector phi, 
+                                double tau2, const NumericVector y, const double phi_tune, 
+                                double rho, NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    int accept=0,rowstart=0, rowend=0, n_current=0, datapoint=0;
+    double acceptance, sumphi;
+    double oldpriorbit, newpriorbit, oldlikebit, newlikebit, likebittotal;
+    double priorvardenom, priormean, priorvar;
+    double propphi, lpold, lpnew;
+    NumericVector phinew(nsites);
+    
+    
+    //  Update each random effect in turn
+    phinew = phi;
+    
+    for(int j = 0; j < nsites; j++)
+    {
+        // Calculate prior variance
+        priorvardenom = rho * Wtripletsum[j] + 1 - rho;
+        priorvar = tau2 / priorvardenom;
+        
+        // Calculate the prior mean
+        rowstart = Wbegfin(j,0) - 1;
+        rowend = Wbegfin(j,1);
+        sumphi = 0;
+        for(int l = rowstart; l < rowend; l++) sumphi += Wtriplet(l, 2) * phinew[(Wtriplet(l,1) - 1)];
+        priormean = rho * sumphi / priorvardenom; 
+        
+        // propose a value  
+        propphi = rnorm(1, phinew[j], sqrt(priorvar*phi_tune))[0];
+        
+        // Accept or reject it
+        // Prior part
+        newpriorbit = (0.5/priorvar) * pow((propphi - priormean), 2); 
+        oldpriorbit = (0.5/priorvar) * pow((phinew[j] - priormean), 2);
+        
+        // Likelihood part
+        // Determine the set of data points relating to area j
+        n_current = n_individual[j];
+        NumericVector individuals(n_current);
+        individuals = ind_area_list[j];
+        
+        // Compute the data likelihood
+        likebittotal = 0;
+        for(int r = 0; r < n_current; r++)
+        {
+            datapoint = individuals[r] - 1;
+            lpold = offset[datapoint] + phinew[j];
+            lpnew = offset[datapoint] + propphi; 
+            oldlikebit = missind[datapoint] * (y[datapoint] * lpold - exp(lpold));
+            newlikebit = missind[datapoint] * (y[datapoint] * lpnew - exp(lpnew));
+            likebittotal = likebittotal + newlikebit - oldlikebit;   
+        }
+        
+        // Compute the acceptance probability and accept or reject the proposal    
+        acceptance = exp(oldpriorbit - newpriorbit + likebittotal);
+        if(runif(1)[0] <= acceptance) 
+        {
+            phinew[j] = propphi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }
+    
+    
+    List out(2);
+    out[0] = phinew;
+    out[1] = accept;
+    return out;
+}
+
+
+
+
+// [[Rcpp::export]]
+List poissoncarmultilevelupdateindiv(List ind_re_list, NumericVector n_re,
+                                     const int q, NumericVector psi, 
+                                     double sigma2, const NumericVector y, const double psi_tune, 
+                                     NumericVector offset, NumericVector missind)
+{
+    // Update the independent individual (or near individual) random effects 
+    //Create new objects
+    NumericVector psinew(q);
+    double proppsi, lpold, lpnew, acceptance, priorbit, likebittotal, oldlikebit, newlikebit;
+    int n_current, datapoint, accept=0;    
+    
+    
+    //  Update each random effect in turn
+    psinew = psi;
+    
+    for(int j = 0; j < q; j++)
+    {
+        // propose a value  
+        proppsi = rnorm(1, psinew[j], sqrt(psi_tune))[0];
+        
+        // Prior part
+        priorbit = (0.5 / sigma2) * (pow(psinew[j], 2) - pow(proppsi, 2)); 
+        
+        // Likelihood part
+        // Determine the set of data points relating to area j
+        n_current = n_re[j];
+        NumericVector individuals(n_current);
+        individuals = ind_re_list[j];
+        
+        // Compute the data likelihood
+        likebittotal = 0;
+        for(int r = 0; r < n_current; r++)
+        {
+            datapoint = individuals[r] - 1;
+            lpold = offset[datapoint] + psinew[j];
+            lpnew = offset[datapoint] + proppsi; 
+            oldlikebit = missind[datapoint] * (y[datapoint] * lpold - exp(lpold));
+            newlikebit = missind[datapoint] * (y[datapoint] * lpnew - exp(lpnew));
+            likebittotal = likebittotal + newlikebit - oldlikebit;   
+        }
+        
+        // Compute the acceptance probability and accept or reject the proposal    
+        acceptance = exp(priorbit + likebittotal);
+        if(runif(1)[0] <= acceptance) 
+        {
+            psinew[j] = proppsi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }
+    
+    
+    List out(2);
+    out[0] = psinew;
+    out[1] = accept;
+    return out;
+}
+
+
+// [[Rcpp::export]]
+List binomialcarmultilevelupdateindiv(List ind_re_list, NumericVector n_re,
+                                      const int q, NumericVector psi, 
+                                      double sigma2, const NumericVector y, const NumericVector failures,
+                                      const double psi_tune, NumericVector offset, NumericVector missind)
+{
+    // Update the independent individual (or near individual) random effects 
+    //Create new objects
+    NumericVector psinew(q);
+    double proppsi, pold, pnew, acceptance, priorbit, likebittotal, oldlikebit, newlikebit;
+    int n_current, datapoint, accept=0;    
+    
+    
+    //  Update each random effect in turn
+    psinew = psi;
+    
+    for(int j = 0; j < q; j++)
+    {
+        // propose a value  
+        proppsi = rnorm(1, psinew[j], sqrt(psi_tune))[0];
+        
+        // Prior part
+        priorbit = (0.5 / sigma2) * (pow(psinew[j], 2) - pow(proppsi, 2)); 
+        
+        // Likelihood part
+        // Determine the set of data points relating to area j
+        n_current = n_re[j];
+        NumericVector individuals(n_current);
+        individuals = ind_re_list[j];
+        
+        // Compute the data likelihood
+        likebittotal = 0;
+        for(int r = 0; r < n_current; r++)
+        {
+            datapoint = individuals[r] - 1;
+            pold = exp(offset[datapoint] + psinew[j]) / (1 + exp(offset[datapoint] + psinew[j]));
+            pnew = exp(offset[datapoint] + proppsi) / (1 + exp(offset[datapoint] + proppsi)); 
+            oldlikebit = missind[datapoint] * (y[datapoint] * log(pold) + failures[datapoint] * log((1-pold)));
+            newlikebit = missind[datapoint] * (y[datapoint] * log(pnew) + failures[datapoint] * log((1-pnew)));
+            likebittotal = likebittotal + newlikebit - oldlikebit;   
+        }
+        
+        // Compute the acceptance probability and accept or reject the proposal    
+        acceptance = exp(priorbit + likebittotal);
+        if(runif(1)[0] <= acceptance) 
+        {
+            psinew[j] = proppsi;
+            accept = accept + 1;
+        }
+        else
+        { 
+        }
+    }
+    
+    
+    List out(2);
+    out[0] = psinew;
+    out[1] = accept;
+    return out;
+}
+
+
+
+// [[Rcpp::export]]
+NumericVector gaussiancarmultilevelupdateindiv(List ind_re_list, NumericVector n_re,
+                                               const int q, NumericVector psi, double sigma2, double nu2, 
+                                               NumericVector offset, NumericVector missind)
+{
+    // Update the spatially correlated random effects 
+    //Create new objects
+    NumericVector psinew(q);
+    double fcprecision, fcsd, fcmean;
+    
+    //  Update each random effect in turn
+    psinew = psi;
+    for(int j = 0; j < q; j++)
+    {
+        // Calculate the precision, sd and mean
+        fcprecision = (n_re[j] / nu2) + (1 / sigma2);
+        fcsd = pow(( 1 / fcprecision), 0.5);    
+        fcmean = offset[j] / fcprecision;
+        
+        // propose a value
+        psinew[j] = rnorm(1, fcmean, fcsd)[0]; 
+    }
+    
+    return psinew;
+}
+
+

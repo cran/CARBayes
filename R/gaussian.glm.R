@@ -1,4 +1,4 @@
-gaussian.lerouxCAR <- function(formula, data=NULL, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+gaussian.glm <- function(formula, data=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -9,7 +9,7 @@ a <- common.verbose(verbose)
     
 #### Frame object
 frame.results <- common.frame(formula, data, "gaussian")
-K <- frame.results$n
+n <- frame.results$n
 p <- frame.results$p
 X <- frame.results$X
 X.standardised <- frame.results$X.standardised
@@ -25,102 +25,49 @@ Y.short <- Y[which.miss==1]
 X.short <- X.standardised[which.miss==1, ]
 offset.short <- offset[which.miss==1]
     
-#### rho and fix.rho
-    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
-    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
-    if(fix.rho & !is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
-    if(!fix.rho) rho <- runif(1)
-    if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
-    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)      
-
-
+    
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
-    if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
     if(is.null(prior.nu2)) prior.nu2 <- c(1, 0.01)
 common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
-common.prior.var.check(prior.tau2)    
 common.prior.var.check(prior.nu2)  
 
-
+    
 #### MCMC quantities - burnin, n.sample, thin
-common.burnin.nsample.thin.check(burnin, n.sample, thin)  
-
-
-
+common.burnin.nsample.thin.check(burnin, n.sample, thin)      
+    
+    
+    
 #############################
 #### Initial parameter values
 #############################
+#### Initial parameter values
 mod.glm <- lm(Y~X.standardised-1, offset=offset)
 beta.mean <- mod.glm$coefficients
 beta.sd <- sqrt(diag(summary(mod.glm)$cov.unscaled)) * summary(mod.glm)$sigma
 beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
-    
 res.temp <- Y - X.standardised %*% beta.mean - offset
-res.sd <- sd(res.temp, na.rm=TRUE)/5
-phi <- rnorm(n=K, mean=rep(0,K), sd=res.sd)
-tau2 <- var(phi) / 10
-nu2 <- tau2
- 
-   
- 
+nu2 <- var(as.numeric(res.temp), na.rm=TRUE)
+
+    
+    
 ###############################    
 #### Set up the MCMC quantities    
 ###############################
 #### Matrices to store samples
 n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
-samples.phi <- array(NA, c(n.keep, K))
 samples.nu2 <- array(NA, c(n.keep, 1))
-samples.tau2 <- array(NA, c(n.keep, 1))
-    if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
 samples.deviance <- array(NA, c(n.keep, 1))
-samples.like <- array(NA, c(n.keep, K))
-samples.fitted <- array(NA, c(n.keep, K))
+samples.like <- array(NA, c(n.keep, n))
+samples.fitted <- array(NA, c(n.keep, n))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
     
-
+    
 #### Metropolis quantities
-accept <- rep(0,2)
-accept.all <- accept
-proposal.sd.rho <- 0.02
-tau2.posterior.shape <- prior.tau2[1] + 0.5*K
-nu2.posterior.shape <- prior.nu2[1] + 0.5*(K-n.miss)
-    
-    
-##################################
-#### Set up the spatial quantities
-##################################
-#### CAR quantities
-W.quants <- common.Wcheckformat.leroux(W, K, fix.rho, rho)
-W <- W.quants$W
-W.triplet <- W.quants$W.triplet
-n.triplet <- W.quants$n.triplet
-W.triplet.sum <- W.quants$W.triplet.sum
-n.neighbours <- W.quants$n.neighbours 
-W.begfin <- W.quants$W.begfin
-    
-    
-#### Create the determinant     
-    if(!fix.rho)
-    {
-    Wstar <- diag(apply(W,1,sum)) - W
-    Wstar.eigen <- eigen(Wstar)
-    Wstar.val <- Wstar.eigen$values
-    det.Q <- 0.5 * sum(log((rho * Wstar.val + (1-rho))))    
-    }else
-    {}   
-    
-    
-#### Check for islands
-W.list<- mat2listw(W)
-W.nb <- W.list$neighbours
-W.islands <- n.comp.nb(W.nb)
-islands <- W.islands$comp.id
-n.islands <- max(W.islands$nc)
-if(rho==1) tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)   
-    
+nu2.posterior.shape <- prior.nu2[1] + 0.5*(n-n.miss)
+
     
 #### Beta update quantities
 data.precision.beta <- t(X.short) %*% X.short
@@ -133,7 +80,7 @@ data.precision.beta <- t(X.short) %*% X.short
     }
     
     
-
+    
 ###########################
 #### Run the Bayesian model
 ###########################
@@ -149,7 +96,7 @@ data.precision.beta <- t(X.short) %*% X.short
     }
     
     
-#### Create the MCMC samples
+#### Create the MCMC samples    
     for(j in 1:n.sample)
     {
     ####################
@@ -157,80 +104,27 @@ data.precision.beta <- t(X.short) %*% X.short
     ####################
     fc.precision <- prior.precision.beta + data.precision.beta / nu2
     fc.var <- solve(fc.precision)
-    beta.offset <- as.numeric(Y.short - offset.short - phi[which.miss==1])
+    beta.offset <- as.numeric(Y.short - offset.short)
     beta.offset2 <- t(X.short) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
     fc.mean <- fc.var %*% beta.offset2
     chol.var <- t(chol(fc.var))
     beta <- fc.mean + chol.var %*% rnorm(p)        
         
-    
+        
         
     ##################
     ## Sample from nu2
     ##################
-    fitted.current <-  as.numeric(X.short %*% beta) + phi[which.miss==1] + offset.short
+    fitted.current <-  as.numeric(X.short %*% beta) + offset.short
     nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.short - fitted.current)^2)
     nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
-        
-    
-        
-    ####################
-    ## Sample from phi
-    ####################
-    offset.phi <- (Y.miss - as.numeric(X.standardised %*% beta) - offset) / nu2    
-    phi <- gaussiancarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi, which.miss)
-        if(rho<1)
-        {
-        phi <- phi - mean(phi)
-        }
-        else
-        {
-        phi[which(islands==1)] <- phi[which(islands==1)] - mean(phi[which(islands==1)])   
-        }
-        
-        
-        
-    ##################
-    ## Sample from tau2
-    ##################
-    temp2 <- quadform(W.triplet, W.triplet.sum, n.triplet, K, phi, phi, rho)
-    tau2.posterior.scale <- temp2 + prior.tau2[2] 
-    tau2 <- 1 / rgamma(1, tau2.posterior.shape, scale=(1/tau2.posterior.scale))
-        
-        
-        
-    ##################
-    ## Sample from rho
-    ##################
-        if(!fix.rho)
-        {
-        proposal.rho <- rtruncnorm(n=1, a=0, b=1, mean=rho, sd=proposal.sd.rho)  
-        temp3 <- quadform(W.triplet, W.triplet.sum, n.triplet, K, phi, phi, proposal.rho)
-        det.Q.proposal <- 0.5 * sum(log((proposal.rho * Wstar.val + (1-proposal.rho))))              
-        logprob.current <- det.Q - temp2 / tau2
-        logprob.proposal <- det.Q.proposal - temp3 / tau2
-        prob <- exp(logprob.proposal - logprob.current)
-        
-        #### Accept or reject the proposal
-            if(prob > runif(1))
-            {
-            rho <- proposal.rho
-            det.Q <- det.Q.proposal
-            accept[1] <- accept[1] + 1           
-            }else
-            {
-            }              
-            accept[2] <- accept[2] + 1           
-        }else
-        {}
-        
-        
+
         
     #########################
     ## Calculate the deviance
     #########################
-    fitted <- as.numeric(X.standardised %*% beta) + phi + offset
-    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),K), log=TRUE)
+    fitted <- as.numeric(X.standardised %*% beta) + offset
+    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
     like <- exp(deviance.all)
     deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
         
@@ -243,37 +137,14 @@ data.precision.beta <- t(X.short) %*% X.short
         {
         ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
-        samples.phi[ele, ] <- phi
         samples.nu2[ele, ] <- nu2
-        samples.tau2[ele, ] <- tau2
-            if(!fix.rho) samples.rho[ele, ] <- rho
         samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
             if(n.miss>0) samples.Y[ele, ] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))
         }else
-        {
-        }
-        
-        
-           
-    ########################################
-    ## Self tune the acceptance probabilties
-    ########################################
-    k <- j/100
-        if(ceiling(k)==floor(k))
-        {
-        #### Update the proposal sds
-            if(!fix.rho)
-            {
-            proposal.sd.rho <- common.accceptrates2(accept[1:2], proposal.sd.rho, 40, 50, 0.5)
-            }
-        accept.all <- accept.all + accept
-        accept <- c(0,0)
-        }else
-        {   
-        }
-        
+        {}
+
         
         
     ################################       
@@ -285,7 +156,7 @@ data.precision.beta <- t(X.short) %*% X.short
         }
     }
     
-
+    
 ##### end timer
     if(verbose)
     {
@@ -294,29 +165,21 @@ data.precision.beta <- t(X.short) %*% X.short
     }else
     {}
     
-    
 
+    
 ###################################
 #### Summarise and save the results 
 ###################################
 #### Compute the acceptance rates
-    if(!fix.rho)
-    {
-    accept.rho <- 100 * accept.all[1] / accept.all[2]
-    }else
-    {
-    accept.rho <- NA    
-    }
-accept.final <- c(rep(100, 4), accept.rho)
-names(accept.final) <- c("beta", "phi", "nu2", "tau2", "rho")
+accept.final <- rep(100, 2)
+names(accept.final) <- c("beta", "nu2")
     
     
 #### Deviance information criterion (DIC)
 median.beta <- apply(samples.beta, 2, median)
-median.phi <- apply(samples.phi, 2, median)
-fitted.median <- X.standardised %*% median.beta + median.phi + offset
+fitted.median <- X.standardised %*% median.beta + offset
 nu2.median <- median(samples.nu2)
-deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),K), log = TRUE), na.rm=TRUE)
+deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE), na.rm=TRUE)
 p.d <- median(samples.deviance) - deviance.fitted
 DIC <- 2 * median(samples.deviance) - deviance.fitted    
     
@@ -328,8 +191,8 @@ WAIC <- -2 * (LPPD - p.w)
     
     
 #### Compute the Conditional Predictive Ordinate  
-CPO <- rep(NA, K)
-    for(j in 1:K)
+CPO <- rep(NA, n)
+    for(j in 1:n)
     {
     CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=sqrt(samples.nu2))))    
     }
@@ -353,26 +216,14 @@ summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(100,p), effectiveSize(sa
 rownames(summary.beta) <- colnames(X)
 colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
     
-summary.hyper <- array(NA, c(3 ,7))
+summary.hyper <- array(NA, c(1 ,7))
 summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
 summary.hyper[1, 4:7] <- c(n.keep, 100, effectiveSize(samples.nu2), geweke.diag(samples.nu2)$z)
-summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
-summary.hyper[2, 4:7] <- c(n.keep, 100, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
-    if(!fix.rho)
-    {
-    summary.hyper[3, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-    summary.hyper[3, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
-    }else
-    {
-    summary.hyper[3, 1:3] <- c(rho, rho, rho)
-    summary.hyper[3, 4:7] <- rep(NA, 4)
-    }
-    
 summary.results <- rbind(summary.beta, summary.hyper)
-rownames(summary.results)[(nrow(summary.results)-2):nrow(summary.results)] <- c("nu2", "tau2", "rho")
+rownames(summary.results)[nrow(summary.results)] <- c("nu2")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
-    
+
     
 #### Create the Fitted values and residuals
 fitted.values <- apply(samples.fitted, 2, median)
@@ -386,22 +237,20 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, 
 loglike <- (-0.5 * deviance.fitted)
 modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
 names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
-model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Leroux CAR\n")
-    if(fix.rho) samples.rho=NA
+model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - None\n")
     if(n.miss==0) samples.Y = NA
+ 
+samples <- list(beta=samples.beta.orig, nu2=mcmc(samples.nu2), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+    results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
+    class(results) <- "CARBayes"
     
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), nu2=mcmc(samples.nu2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
-class(results) <- "CARBayes"
-  
-  
-#### Finish by stating the time taken    
+    #### Finish by stating the time taken    
     if(verbose)
     {
-    b<-proc.time()
-    cat(" finished in ", round(b[3]-a[3], 1), "seconds")
+        b<-proc.time()
+        cat(" finished in ", round(b[3]-a[3], 1), "seconds")
     }else
     {}
-return(results)
+    return(results)
 }
 

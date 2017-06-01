@@ -32,7 +32,8 @@
 \usage{
 MVS.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin, 
 n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.Sigma.df=NULL, prior.Sigma.scale=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+prior.Sigma.df=NULL, prior.Sigma.scale=NULL, fix.rho=FALSE, rho=NULL, MALA=TRUE, 
+verbose=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -58,10 +59,11 @@ A vector the same length as the response containing the total number of trials
 for each area. Only used if family=`binomial'. 
 }
 \item{W}{
-    A K by K neighbourhood matrix (where K is the number of spatial units). Typically 
-    a binary specification is used, where the jkth element equals one if areas (j, k) 
-    are spatially close (e.g. share a common border) and is zero otherwise. The matrix 
-    can be non-binary, but each row must contain at least one non-zero entry.
+    A non-negative K by K neighbourhood matrix (where K is the number of spatial 
+    units). Typically a binary specification is used, where the jkth element 
+    equals one if areas (j, k) are spatially close (e.g. share a common border) 
+    and is zero otherwise. The matrix can be non-binary, but each row must contain 
+    at least one non-zero entry.
 }
 \item{burnin}{
     The number of MCMC samples to discard as the burn-in period.
@@ -79,7 +81,7 @@ for each area. Only used if family=`binomial'.
 }
 \item{prior.var.beta}{
     A vector of prior variances for the regression parameters beta (Gaussian priors 
-     are assumed). Defaults to a vector with values 1000.
+     are assumed). Defaults to a vector with values 100000.
 }  
 \item{prior.Sigma.df}{
     The prior degrees of freedom for the Inverse-Wishart prior for Sigma. 
@@ -98,6 +100,10 @@ The value that the spatial dependence parameter is set to if fix.rho=TRUE. Must 
 interval [0, 1], where 0 corresponds to independence while 1 corresponds to fitting the
 intrinsic CAR prior. Note, if rho=0 then the W matrix is not included in the model
 so enter a K by K matrix of zeros instead.
+}
+\item{MALA}{
+        Logical, should the function use MALA (TRUE, default) or simple random walk (FALSE) 
+        updates for the random effects. Not applicable if family=`gaussian'.   
 }
 \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -118,8 +124,8 @@ in the same order as the data vectors.}
 \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w), and the
-loglikelihood.}
+(WAIC) and its corresponding estimated number of effective parameters (p.w), the
+loglikelihood, and the percentage deviance explained.}
 \item{accept }{The acceptance probabilities for the parameters.}
 \item{localised.structure }{NULL, for compatability with the other models.}
 \item{formula }{The formula for the covariate and offset part of the model.}
@@ -135,7 +141,7 @@ Kavanagh, L., D. Lee, and G. Pryce (2016). Is Poverty Decentralising? Quantifyin
 Uncertainty in the Decentralisation of Urban Poverty, Annals of the American 
 Association of Geographers, 106, 1286-1298.
 
-Leroux, B., X. Lei, and N. Breslow (1999). Estimation of disease rates in small 
+Leroux, B., X. Lei, and N. Breslow (2000). Estimation of disease rates in small 
 areas: A new mixed model for spatial dependence, Chapter Statistical Models in 
 Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds),
 pp. 135-178. Springer-Verlag, New York.

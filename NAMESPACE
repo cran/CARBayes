@@ -1,12 +1,14 @@
 useDynLib(CARBayes)
 export(
      combine.data.shapefile,
-	highlight.borders,
+	 highlight.borders,
 	 MVS.CARleroux,
      S.CARbym, 
      S.CARdissimilarity,
      S.CARleroux,
      S.CARlocalised,
+	 S.CARmultilevel,
+	 S.glm,
      summarise.lincomb,
      summarise.samples
      )

@@ -1,3 +1,22 @@
+#### This file has a list of common functions in alphabetical order. These functions include:
+
+# common.acceptrates1 - update proposal variance for a MH step based on having no max limit on the proposal var.
+# common.acceptrates2 - update proposal variance for a MH step based on having  a max limit on the proposal var.
+# common.betablock - Create the blocking structure for beta.
+# common.betatransform - back transform the regression parameters to the original scale.
+# common.burnin.nsample.thin.check - check the burnin, n.sample, thin arugments.
+# common.frame - check the frame argument.
+# common.frame.localised - check the frame argument for the localised model.
+# common.prior.beta.check - Check the prior entered for beta.
+# common.prior.var.check - check the prior entered for variance parameters.
+# common.prior.varmat.check - check the prior entered for variance matrix parameters.
+# common.verbose - check the verbose argument.
+# common.Wcheckformat.leroux - check the W matrix for the leroux model.
+# common.Wcheckformat - check the W matrix.
+# common.Wcheckformat.disimilarity - check the W matrix for the dissimilarity model.
+
+
+
 #### Acceptance rates - no maximum limit on the proposal sd
 common.accceptrates1 <- function(accept, sd, min, max)
 {
@@ -20,7 +39,7 @@ common.accceptrates1 <- function(accept, sd, min, max)
 
 
 #### Acceptance rates - maximum limit on the proposal sd
-common.accceptrates2 <- function(accept, sd, min, max, sd.max)
+ common.accceptrates2 <- function(accept, sd, min, max, sd.max)
 {
     #### Update the proposal standard deviations
     rate <- 100 * accept[1] / accept[2]
@@ -28,7 +47,7 @@ common.accceptrates2 <- function(accept, sd, min, max, sd.max)
     if(rate > max)
     {
         sd <- sd + 0.1 * sd
-        sd <- min(sd + 0.1 * sd, sd.max)
+        sd[which(sd>sd.max)] <- sd.max
     }else if(rate < min)              
     {
         sd <- sd - 0.1 * sd
@@ -155,65 +174,6 @@ common.burnin.nsample.thin.check <- function(burnin, n.sample, thin)
 }
 
 
-
-#### Check beta prior arguments
-prior.beta.check <- function(prior.mean.beta, prior.var.beta, p)
-{
-    ## Checks    
-    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
-    
-    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
-    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
-}
-
-
-
-#### Check variance prior arguments
-prior.var.check <- function(prior.var)
-{
-    ## Checks   
-    if(length(prior.var)!=2) stop("the prior value for tau2 is the wrong length.", call.=FALSE)    
-    if(!is.numeric(prior.var)) stop("the prior value for tau2 is not numeric.", call.=FALSE)    
-    if(sum(is.na(prior.var))!=0) stop("the prior value for tau2 has missing values.", call.=FALSE) 
-}
-
-
-
-#### Check variance matrix prior arguments
-prior.varmat.check <- function(prior.varmat, J)
-{
-    if(nrow(prior.varmat)!=J) stop("prior.Sigma.scale is the wrong dimension.", call.=FALSE)    
-    if(ncol(prior.varmat)!=J) stop("prior.Sigma.scale is the wrong dimension.", call.=FALSE)    
-    if(!is.numeric(prior.varmat)) stop("prior.Sigma.scale has non-numeric values.", call.=FALSE)    
-    if(sum(is.na(prior.varmat))!=0) stop("prior.Sigma.scale has missing values.", call.=FALSE)    
-    if(!is.positive.definite(prior.varmat)) stop("prior.Sigma.scale is not a positive definite matrix.", call.=FALSE)
-    if(!is.symmetric.matrix(prior.varmat)) stop("prior.Sigma.scale is not symmetric.", call.=FALSE)
-}
-
-
-
-#### Check the verbose option
-common.verbose <- function(verbose)
-{
-    if(is.null(verbose)) verbose=TRUE     
-    if(!is.logical(verbose)) stop("the verbose option is not logical.", call.=FALSE)
-    
-    if(verbose)
-    {
-        cat("Setting up the model\n")
-        a<-proc.time()
-    }else{
-        a <- 1    
-    }
-    return(a)
-}
-
-
-
 #### Read in and format the frame argument
 common.frame <- function(formula, data, family)
 {
@@ -286,17 +246,18 @@ common.frame <- function(formula, data, family)
     {
         if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
         int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
-        if(int.check > 0) stop("the respons variable has non-integer values.", call.=FALSE)
+        if(int.check > 0) stop("the response variable has non-integer values.", call.=FALSE)
         if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
     }else if(family=="gaussian")
     {
-        if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)    }else
-        {
+        if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)    
+    }else
+    {
             if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
             int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
             if(int.check > 0) stop("the response variable has non-integer values.", call.=FALSE)
             if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
-        }
+    }
     
     
     #### Return the values needed
@@ -308,7 +269,7 @@ common.frame <- function(formula, data, family)
 
 
 #### Read in and format the frame argument from the localised model
-common.frame.localised <- function(formula, data, family)
+common.frame.localised <- function(formula, data, family, trials)
 {
     #### Overall formula object
     frame <- try(suppressWarnings(model.frame(formula, data=data, na.action=na.pass)), silent=TRUE)
@@ -362,6 +323,7 @@ common.frame.localised <- function(formula, data, family)
         X.indicator <- NULL
         regression.vec <- rep(0, n)
         p <- 0
+        beta <- NA
     }else
     {
         ## Check for linearly related columns
@@ -397,11 +359,22 @@ common.frame.localised <- function(formula, data, family)
         }
         
         ## Compute a starting value for beta
-        mod.glm <- glm(Y~X.standardised-1, offset=offset, family="quasipoisson")
-        beta.mean <- mod.glm$coefficients
-        beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
-        beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
-        regression.vec <- X.standardised %*% beta
+            if(family=="binomial")
+            {
+            failures <- trials - Y
+            mod.glm <- glm(cbind(Y, failures)~X.standardised, offset=offset, family="quasibinomial")
+            beta.mean <- mod.glm$coefficients[-1]
+            beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))[-1]
+            beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
+            regression.vec <- X.standardised %*% beta    
+            }else
+            {
+            mod.glm <- glm(Y~X.standardised, offset=offset, family="quasipoisson")
+            beta.mean <- mod.glm$coefficients[-1]
+            beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))[-1]
+            beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
+            regression.vec <- X.standardised %*% beta    
+            }
     }
     
     
@@ -410,6 +383,65 @@ common.frame.localised <- function(formula, data, family)
                     offset=offset, Y=Y, regression.vec=regression.vec, beta=beta)
     return(results)
 }
+
+
+
+#### Check beta prior arguments
+common.prior.beta.check <- function(prior.mean.beta, prior.var.beta, p)
+{
+    ## Checks    
+    if(length(prior.mean.beta)!=p) stop("the vector of prior means for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.mean.beta)) stop("the vector of prior means for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.mean.beta))!=0) stop("the vector of prior means for beta has missing values.", call.=FALSE)    
+    
+    if(length(prior.var.beta)!=p) stop("the vector of prior variances for beta is the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.var.beta)) stop("the vector of prior variances for beta is not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.var.beta))!=0) stop("the vector of prior variances for beta has missing values.", call.=FALSE)    
+    if(min(prior.var.beta) <=0) stop("the vector of prior variances has elements less than zero", call.=FALSE)
+}
+
+
+
+#### Check variance prior arguments
+common.prior.var.check <- function(prior.var)
+{
+    ## Checks   
+    if(length(prior.var)!=2) stop("the prior values for a variance parameter are the wrong length.", call.=FALSE)    
+    if(!is.numeric(prior.var)) stop("the prior values for a variance parameter are not numeric.", call.=FALSE)    
+    if(sum(is.na(prior.var))!=0) stop("the prior values for a variance parameter have missing values.", call.=FALSE) 
+}
+
+
+
+#### Check variance matrix prior arguments
+common.prior.varmat.check <- function(prior.varmat, J)
+{
+    if(nrow(prior.varmat)!=J) stop("prior.Sigma.scale is the wrong dimension.", call.=FALSE)    
+    if(ncol(prior.varmat)!=J) stop("prior.Sigma.scale is the wrong dimension.", call.=FALSE)    
+    if(!is.numeric(prior.varmat)) stop("prior.Sigma.scale has non-numeric values.", call.=FALSE)    
+    if(sum(is.na(prior.varmat))!=0) stop("prior.Sigma.scale has missing values.", call.=FALSE)    
+    if(!is.positive.definite(prior.varmat)) stop("prior.Sigma.scale is not a positive definite matrix.", call.=FALSE)
+    if(!is.symmetric.matrix(prior.varmat)) stop("prior.Sigma.scale is not symmetric.", call.=FALSE)
+}
+
+
+
+#### Check the verbose option
+common.verbose <- function(verbose)
+{
+    if(is.null(verbose)) verbose=TRUE     
+    if(!is.logical(verbose)) stop("the verbose option is not logical.", call.=FALSE)
+    
+    if(verbose)
+    {
+        cat("Setting up the model\n")
+        a<-proc.time()
+    }else{
+        a <- 1    
+    }
+    return(a)
+}
+
 
 
 

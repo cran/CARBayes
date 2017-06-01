@@ -56,12 +56,12 @@ if(length(W.binary)!=1) stop("W.binary has the wrong length.", call.=FALSE)
 
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-    if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
+    if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
     if(is.null(prior.nu2)) prior.nu2 <- c(1, 0.01)
-prior.beta.check(prior.mean.beta, prior.var.beta, p)
-prior.var.check(prior.tau2)
-prior.var.check(prior.nu2)
+common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
+common.prior.var.check(prior.tau2)
+common.prior.var.check(prior.nu2)
 
 
 #### MCMC quantities - burnin, n.sample, thin
@@ -370,6 +370,12 @@ CPO <- rep(NA, K)
 LMPL <- sum(log(CPO), na.rm=TRUE)   
      
 
+#### Compute the % deviance explained
+deviance.null <- sum((Y - mean(Y, na.rm=T))^2, na.rm=T)
+deviance.fit <- sum((Y - fitted.median)^2, na.rm=T)
+percent_dev_explained <- 100 * (deviance.null - deviance.fit) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
@@ -467,8 +473,8 @@ W.posterior <- array(NA, c(K,K))
 
 ## Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
     if(W.binary)
     {
     model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Binary dissimilarity CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     

@@ -1,4 +1,4 @@
-binomial.localisedCAR <- function(formula, data=NULL, trials, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, verbose=TRUE)
+binomial.localisedCAR <- function(formula, data=NULL, trials, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -8,7 +8,7 @@ a <- common.verbose(verbose)
     
     
 #### Frame object
-frame.results <- common.frame.localised(formula, data, "binomial")
+frame.results <- common.frame.localised(formula, data, "binomial", trials)
 K <- frame.results$n
 p <- frame.results$p
 X <- frame.results$X
@@ -21,6 +21,11 @@ Y <- frame.results$Y
 which.miss <- as.numeric(!is.na(Y))
 regression.vec <- frame.results$regression.vec
 beta <- frame.results$beta
+
+
+#### Check on MALA argument
+if(length(MALA)!=1) stop("MALA is not length 1.", call.=FALSE)
+if(!is.logical(MALA)) stop("MALA is not logical.", call.=FALSE)  
 
 
 #### Check and format the trials argument
@@ -51,13 +56,13 @@ failures <- trials - Y
     if(!is.null(X))
     {
         if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
-        if(is.null(prior.var.beta)) prior.var.beta <- rep(1000, p)
-    prior.beta.check(prior.mean.beta, prior.var.beta, p)
+        if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
+        common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
     }else
     {}
 
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
-prior.var.check(prior.tau2)
+common.prior.var.check(prior.tau2)
 
   if(is.null(prior.delta)) prior.delta <- 10
   if(length(prior.delta)!=1) stop("the prior value for delta is the wrong length.", call.=FALSE)    
@@ -132,8 +137,6 @@ samples.fitted <- array(NA, c(n.keep, K))
     {
     samples.beta <- array(NA, c(n.keep, p))
     accept.all <- rep(0,8)
-    proposal.corr.beta <- solve(t(X.standardised) %*% X.standardised)
-    chol.proposal.corr.beta <- chol(proposal.corr.beta) 
     proposal.sd.beta <- 0.01
     }else
     {
@@ -206,7 +209,13 @@ W.begfin <- W.quants$W.begfin
      ## Sample from phi
      ##################
      beta.offset <- regression.vec + offset  + lambda[Z]
-     temp1 <- binomialcarupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, trials=trials, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset, which.miss)
+        if(MALA)
+        {
+        temp1 <- binomialcarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, trials=trials, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset, which.miss)
+        }else
+        {
+        temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset, which.miss)
+        }
      phi <- temp1[[1]]
           for(i in 1:G)
           {
@@ -426,6 +435,12 @@ CPO <- rep(NA, K)
 LMPL <- sum(log(CPO))  
 
      
+#### Compute the % deviance explained
+fit.null <- glm(cbind(Y, failures)~1, offset=offset, family="binomial")$fitted.values
+deviance.null <- -2 * sum(dbinom(x=Y[which(!is.na(Y))], size=trials[which(!is.na(Y))], prob=fit.null, log=TRUE), na.rm=TRUE)
+percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+
+
 #### transform the parameters back to the origianl covariate scale.
     if(!is.null(X))
     {    
@@ -480,8 +495,8 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, 
 
 #### Compile and return the results
 loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
+names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects  model - Localised CAR model\n")
 if(is.null(X)) samples.beta.orig = NA
 
