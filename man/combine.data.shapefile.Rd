@@ -37,7 +37,7 @@ should inlcude the K row names of the data frame.
 
 
 \value{
-\item{ }{A SpatialPolygonsDataFrame object from the `sp' 
+\item{ }{A SpatialPolygonsDataFrame object from the sp 
 package containing the conbined data and shapefile object.
 }
 }

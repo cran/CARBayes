@@ -28,7 +28,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", round(x$modelfit[5],2),"\n")
 
             if(length(x$localised.structure[[2]])>1)
             {
@@ -59,7 +59,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", round(x$modelfit[5],2),"\n")
         cat("\nNumber of clusters with the number of data points in each one\n")
         print(table(paste("group", x$localised.structure, sep="")))
         
@@ -70,8 +70,18 @@ print.CARBayes <- function(x,...)
         cat("#### Model fitted\n")
         cat("#################\n")
         cat(x$model)
-        cat("Regression equation - ")
-        print(x$formula)
+            if(length(x$formula)==1)
+            {
+            cat("Regression equation - ")
+            print(x$formula)    
+            }else
+            {
+            cat("Regression equation - ")
+            print(x$formula[[1]])    
+            cat("Zero probability equation - ")
+            print(x$formula[[2]])   
+            }
+        
         cat("Number of missing observations - ")
         cat(n.miss)
         cat("\n")
@@ -82,7 +92,7 @@ print.CARBayes <- function(x,...)
         cat("############\n")
         cat("Posterior quantities and DIC\n\n")
         print(x$summary.results)
-        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "Percent deviance explained = ", round(x$modelfit[7],2),"\n")
+        cat("\nDIC = ", x$modelfit[1], "     ", "p.d = ", x$modelfit[2], "     ", "LMPL = ", round(x$modelfit[5],2),"\n")
      }
         
 return(invisible(x))        

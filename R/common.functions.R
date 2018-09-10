@@ -7,6 +7,7 @@
 # common.burnin.nsample.thin.check - check the burnin, n.sample, thin arugments.
 # common.frame - check the frame argument.
 # common.frame.localised - check the frame argument for the localised model.
+# common.modelfit - compute the model fit criteria.s
 # common.prior.beta.check - Check the prior entered for beta.
 # common.prior.var.check - check the prior entered for variance parameters.
 # common.prior.varmat.check - check the prior entered for variance matrix parameters.
@@ -61,10 +62,11 @@ common.accceptrates1 <- function(accept, sd, min, max)
 
 
 #### Beta blocking
-common.betablock <- function(p)
+common.betablock <- function(p, blocksize.beta=NULL)
 {
     ## Compute the blocking structure for beta     
-    blocksize.beta <- 10 
+    if(is.null(blocksize.beta)) blocksize.beta <- 10 
+       
     if(blocksize.beta >= p)
     {
         n.beta.block <- 1
@@ -225,44 +227,60 @@ common.frame <- function(formula, data, family)
     }
     
     
-    #### Offset variable
-    offset <- try(model.offset(frame), silent=TRUE)
-    if(class(offset)=="try-error")   stop("the offset is not numeric.", call.=FALSE)
-    if(is.null(offset))  offset <- rep(0,n)
-    if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
-    if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
-    
-    
+
     #### Response variable
     ## Create the response
     Y <- model.response(frame)
-    which.miss <- as.numeric(!is.na(Y))
-    n.miss <- n - sum(which.miss)
-    Y.miss <- Y
-    Y.miss[which.miss==0] <- median(Y, na.rm=TRUE)
+    J <- length(Y) / n
+    which.miss <- matrix(as.numeric(!is.na(Y)), nrow=n, ncol=J)
+        if(J==1) which.miss <- as.numeric(which.miss)
+    n.miss <- n*J - sum(which.miss)
+
     
     ## Check for errors
     if(family=="binomial")
     {
         if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
-        int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
+        int.check <- n*J - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
         if(int.check > 0) stop("the response variable has non-integer values.", call.=FALSE)
         if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
     }else if(family=="gaussian")
     {
         if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)    
-    }else
+    }else if(family=="poisson")
     {
             if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
-            int.check <- n - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
+            int.check <- n*J - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
             if(int.check > 0) stop("the response variable has non-integer values.", call.=FALSE)
             if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
+    }else if(family=="multinomial")
+    {
+        if(!is.numeric(Y)) stop("the response variable has non-numeric values.", call.=FALSE)
+        int.check <- n*J - n.miss - sum(ceiling(Y)==floor(Y), na.rm=TRUE)
+        if(int.check > 0) stop("the response variable has non-integer values.", call.=FALSE)
+        if(min(Y, na.rm=TRUE)<0) stop("the response variable has negative values.", call.=FALSE)
     }
+    else
+    {}
+    
+
+    #### Offset variable
+    offset <- try(model.offset(frame), silent=TRUE)
+    if(class(offset)=="try-error")   stop("the offset is not numeric.", call.=FALSE)
+        if(family=="multinomial")
+        {
+            if(is.null(offset))  offset <- array(0,c(n, (J-1)))
+        }else
+        {
+            if(is.null(offset))  offset <- array(0,c(n, J))
+        }
+    if(sum(is.na(offset))>0) stop("the offset has missing 'NA' values.", call.=FALSE)
+    if(!is.numeric(offset)) stop("the offset variable has non-numeric values.", call.=FALSE)
     
     
     #### Return the values needed
     results <- list(n=n, p=p, X=X, X.standardised=X.standardised, X.sd=X.sd, X.mean=X.mean, X.indicator=X.indicator, 
-                    offset=offset, Y=Y, Y.miss=Y.miss, which.miss=which.miss, n.miss=n.miss)
+                    offset=offset, Y=Y,  which.miss=which.miss, n.miss=n.miss)
     return(results)
 }
 
@@ -385,6 +403,36 @@ common.frame.localised <- function(formula, data, family, trials)
 }
 
 
+# Compute the DIC. WAIC,LMPL and loglikelihood
+common.modelfit <- function(samples.like, deviance.fitted)
+{
+    #### WAIC
+    LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
+    p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
+    WAIC <- -2 * (LPPD - p.w)
+    
+    
+    #### Compute the Conditional Predictive Ordinate
+    CPO <- 1/apply(1/samples.like, 2, mean)
+    LMPL <- sum(log(CPO), na.rm=TRUE)    
+    
+    
+    #### DIC
+    mean.deviance <- mean(-2 * apply(log(samples.like), 1, sum, na.rm=T))   
+    p.d <- mean.deviance - deviance.fitted
+    DIC <- 2 * mean.deviance - deviance.fitted
+    
+    
+    #### loglikelihood
+    loglike <- -0.5 * deviance.fitted
+    
+    
+    #### Model fit criteria
+    modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike)
+    names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood")
+    return(modelfit)  
+}
+
 
 #### Check beta prior arguments
 common.prior.beta.check <- function(prior.mean.beta, prior.var.beta, p)
@@ -441,7 +489,6 @@ common.verbose <- function(verbose)
     }
     return(a)
 }
-
 
 
 

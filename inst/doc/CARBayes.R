@@ -1,13 +1,13 @@
 ### R code from vignette source 'CARBayes.Rnw'
 
 ###################################################
-### code chunk number 1: CARBayes.Rnw:62-63
+### code chunk number 1: CARBayes.Rnw:71-72
 ###################################################
 options(prompt = "R> ")
 
 
 ###################################################
-### code chunk number 2: CARBayes.Rnw:380-386
+### code chunk number 2: CARBayes.Rnw:407-413
 ###################################################
 library(CARBayesdata)
 library(shapefiles)
@@ -18,7 +18,7 @@ data(lipshp)
 
 
 ###################################################
-### code chunk number 3: CARBayes.Rnw:391-394
+### code chunk number 3: CARBayes.Rnw:418-421
 ###################################################
 library(CARBayes)
 lipdbf$dbf <- lipdbf$dbf[ ,c(2,1)]
@@ -26,15 +26,7 @@ data.combined <- combine.data.shapefile(data=lipdata, shp=lipshp, dbf=lipdbf)
 
 
 ###################################################
-### code chunk number 4: CARBayes.Rnw:400-403
-###################################################
-library(spdep)
-W.nb <- poly2nb(data.combined, row.names = rownames(lipdata))
-W.mat <- nb2mat(W.nb, style="B")
-
-
-###################################################
-### code chunk number 5: CARBayes.Rnw:420-424
+### code chunk number 4: CARBayes.Rnw:435-439
 ###################################################
 library(CARBayesdata)
 library(sp)
@@ -43,38 +35,43 @@ data(pricedata)
 
 
 ###################################################
-### code chunk number 6: CARBayes.Rnw:429-433
+### code chunk number 5: CARBayes.Rnw:444-445
 ###################################################
-missing.IG <- setdiff(rownames(GGHB.IG@data), pricedata$IG)
-missing.IG.row <- which(missing.IG==rownames(GGHB.IG@data))
-propertydata.spatial <- GGHB.IG[-missing.IG.row, ]
-propertydata.spatial@data <- data.frame(propertydata.spatial@data, pricedata)
+propertydata.spatial <- merge(x=GGHB.IG, y=pricedata, by="IG", all.x=FALSE)
 
 
 ###################################################
-### code chunk number 7: CARBayes.Rnw:461-471
+### code chunk number 6: CARBayes.Rnw:469-472
 ###################################################
-northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), 
-    offset = c(220000,647000), scale = 4000)
-scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), 
-    offset = c(225000,647000), scale = 10000, fill=c("transparent","black"))
-text1 <- list("sp.text", c(225000,649000), "0")
-text2 <- list("sp.text", c(230000,649000), "5000 m")
-breakpoints <- seq(min(pricedata$price)-1, max(pricedata$price)+1, length.out=8)
-spplot(propertydata.spatial, c("price"), sp.layout=list(northarrow, scalebar, 
-    text1, text2), scales=list(draw = TRUE), at=breakpoints,
-    col.regions=terrain.colors(n=length(breakpoints)-1), col="transparent")
+library(rgdal)
+propertydata.spatial <- spTransform(propertydata.spatial, 
+                                    CRS("+proj=longlat +datum=WGS84 +no_defs"))
 
 
 ###################################################
-### code chunk number 8: CARBayes.Rnw:488-490
+### code chunk number 7: CARBayes.Rnw:477-487
+###################################################
+library(leaflet)
+colours <- colorNumeric(palette = "BuPu", domain = propertydata.spatial@data$price)
+map1 <- leaflet(data=propertydata.spatial) %>% 
+    addTiles() %>% 
+    addPolygons(fillColor = ~colours(price), color="red", weight=1, 
+                fillOpacity = 0.7) %>%
+    addLegend(pal = colours, values = propertydata.spatial@data$price, opacity = 1, 
+                title="Price") %>%
+    addScaleBar(position="bottomleft")
+map1
+
+
+###################################################
+### code chunk number 8: CARBayes.Rnw:503-505
 ###################################################
 propertydata.spatial@data$logprice <- log(propertydata.spatial@data$price)
 propertydata.spatial@data$logdriveshop <- log(propertydata.spatial@data$driveshop)
 
 
 ###################################################
-### code chunk number 9: CARBayes.Rnw:495-498
+### code chunk number 9: CARBayes.Rnw:510-513
 ###################################################
 library(splines)
 form <- logprice~ns(crime,3)+rooms+sales+factor(type) + logdriveshop
@@ -82,7 +79,7 @@ model <- lm(formula=form, data=propertydata.spatial@data)
 
 
 ###################################################
-### code chunk number 10: CARBayes.Rnw:505-510
+### code chunk number 10: CARBayes.Rnw:520-525
 ###################################################
 library(spdep)
 W.nb <- poly2nb(propertydata.spatial, row.names = rownames(propertydata.spatial@data))
@@ -92,7 +89,7 @@ moran.mc(x=resid.model, listw=W.list, nsim=1000)
 
 
 ###################################################
-### code chunk number 11: CARBayes.Rnw:654-658
+### code chunk number 11: CARBayes.Rnw:664-668
 ###################################################
 library(CARBayesdata)
 library(sp)
@@ -101,51 +98,44 @@ data(respiratorydata)
 
 
 ###################################################
-### code chunk number 12: CARBayes.Rnw:663-672
+### code chunk number 12: CARBayes.Rnw:673-674
 ###################################################
-missing.IG <- setdiff(rownames(GGHB.IG@data), respiratorydata$IG)
-missing.IG.row <- rep(NA, length(missing.IG))
-    for(i in 1:length(missing.IG))
-    {
-    missing.IG.row[i] <- which(missing.IG[i] == rownames(GGHB.IG@data))     
-    }
-respiratorydata.spatial <- GGHB.IG[-missing.IG.row, ]
-respiratorydata.spatial@data <- data.frame(respiratorydata.spatial@data, 
-    respiratorydata)
+respiratorydata.spatial <- merge(x=GGHB.IG, y=respiratorydata, by="IG", all.x=FALSE)
 
 
 ###################################################
-### code chunk number 13: CARBayes.Rnw:677-678
+### code chunk number 13: CARBayes.Rnw:680-681
 ###################################################
 head(respiratorydata.spatial@data)
 
 
 ###################################################
-### code chunk number 14: CARBayes.Rnw:685-696
+### code chunk number 14: CARBayes.Rnw:688-700
 ###################################################
-northarrow <- list("SpatialPolygonsRescale", layout.north.arrow(), offset = 
-    c(220000,647000), scale = 4000)
-scalebar <- list("SpatialPolygonsRescale", layout.scale.bar(), offset = 
-    c(225000,647000), scale = 10000, fill=c("transparent","black"))
-text1 <- list("sp.text", c(225000,649000), "0")
-text2 <- list("sp.text", c(230000,649000), "5000 m")
-breakpoints <- seq(min(respiratorydata.spatial@data$SMR)-0.05, 
-    max(respiratorydata.spatial@data$SMR)+0.05, length.out=8)
-spplot(respiratorydata.spatial, c("SMR"), sp.layout=list(northarrow, scalebar, 
-    text1, text2), scales=list(draw = TRUE), at=breakpoints, 
-    col.regions=terrain.colors(n=length(breakpoints)-1), col="transparent")
+respiratorydata.spatial <- spTransform(respiratorydata.spatial, 
+                                    CRS("+proj=longlat +datum=WGS84 +no_defs"))
+library(leaflet)
+colours <- colorNumeric(palette = "BuPu", domain = respiratorydata.spatial@data$SMR)
+map2 <- leaflet(data=respiratorydata.spatial) %>% 
+    addTiles() %>% 
+    addPolygons(fillColor = ~colours(SMR), color="red", weight=1, 
+                fillOpacity = 0.7) %>%
+    addLegend(pal = colours, values = respiratorydata.spatial@data$SMR, opacity = 1, 
+                title="SMR") %>%
+    addScaleBar(position="bottomleft")
+map2
 
 
 ###################################################
-### code chunk number 15: CARBayes.Rnw:711-714
+### code chunk number 15: CARBayes.Rnw:715-718
 ###################################################
 W.nb <- poly2nb(respiratorydata.spatial, row.names = 
-    rownames(respiratorydata.spatial@data))
+                rownames(respiratorydata.spatial@data))
 W <- nb2mat(W.nb, style="B")
 
 
 ###################################################
-### code chunk number 16: CARBayes.Rnw:722-724
+### code chunk number 16: CARBayes.Rnw:726-728
 ###################################################
 income <- respiratorydata.spatial@data$incomedep
 Z.incomedep <- as.matrix(dist(income, diag=TRUE, upper=TRUE)) 

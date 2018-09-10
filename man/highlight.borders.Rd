@@ -25,7 +25,7 @@ highlighted on a map; and 1 for borders between neighbouring areas not to be
 highlighted on a map.
 }
   \item{spdata}{
-The 'SpatialPolygonsDataFrame' object used for plotting the data and creating the 
+The SpatialPolygonsDataFrame object used for plotting the data and creating the 
 original neighbourhood matrix W.
 }
 }
@@ -33,9 +33,9 @@ original neighbourhood matrix W.
 
 
 \value{
-\item{ }{A `SpatialPoints' object from the `sp' package, which contains
+\item{ }{A SpatialPoints object from the sp package, which contains
 the vertices of all the borders to be highlighted on the map.  The mapping can 
-be done using the `spplot()' function, see the vignette accompanying this package
+be done using the leaflet package, see the vignette accompanying this package
 for an example.
 }
 }

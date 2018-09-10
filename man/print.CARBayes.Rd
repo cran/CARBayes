@@ -20,10 +20,10 @@ and the Geweke convergence diagnostic in the form of a Z-score.
 
 \arguments{
   \item{x}{
-A `CARBayes' fitted model object
+A CARBayes fitted model object.
 }
   \item{\dots}{
-Ignored
+Ignored.s
 }
 }
 \author{

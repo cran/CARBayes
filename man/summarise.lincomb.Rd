@@ -8,7 +8,7 @@ from the linear predictor.
 }
 
 \description{
-This function takes in a `carbayes' model object and computes the posterior 
+This function takes in a CARBayes model object and computes the posterior 
 distribution and posterior quantiles of a linear combination of the covariates
 from the linear predictor. For example, if a quadratic effect of a covariate on 
 the response was specified, then this function allows you to compute the posterior
@@ -21,7 +21,7 @@ summarise.lincomb(model, columns=NULL, quantiles=0.5, distribution=FALSE)
 
 \arguments{
   \item{model}{
-A `carbayes' model object from fitting one of the models in this package.
+A CARBayes model object from fitting one of the models in this package.
 }
   \item{columns}{
 A vector of column numbers stating which columns in the design matrix of covariates

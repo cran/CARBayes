@@ -16,23 +16,23 @@
     are allowed within each areal unit. The linear predictor is modelled by
     known covariates (either individual or areal level) and two vectors of random effects. 
     The latter include areal level effects modelled by the conditional autoregressive 
-    prior proposed by Leroux et al. (1999). Independent random effects can be obtained 
-    by setting (fix.rho=TRUE, rho=0). Similarly, the intrinsic CAR model can be 
-    obtained by setting (fix.rho=TRUE, rho=1). The second set of random effects are 
-    determined by a single effect for each level of a categorical covariate. These
-    random effects are independent with a common variance sigma2. Inference is 
-    conducted in a Bayesian setting using Markov chain Monte Carlo (McMC)  
-    simulation. Missing (NA) values are allowed in the response, and 
-    posterior predictive  distributions are created for the missing values for 
-    predictive purposes. These are  saved in the`samples' argument in the output 
-    of the function and are denoted by `Y'. 
+    prior proposed by Leroux et al. (2000). Independent random effects can be obtained 
+    by setting rho=0, while the intrinsic CAR model can be obtained by setting 
+    rho=1. The second set of random effects are determined by a single effect for 
+    each level of a categorical covariate. These random effects are independent 
+    with a common variance sigma2. Inference is conducted in a Bayesian setting 
+    using Markov chain Monte Carlo (MCMC) simulation. Missing (NA) values are 
+    allowed in the response, and posterior predictive  distributions are created 
+    for the missing values using data augmentation. These are  saved in the 
+    "samples" argument in the output of the function and are denoted by "Y". For a 
+    full model specification see the vignette accompanying this package. 
 }
 
 
 \usage{
     S.CARmultilevel(formula, family, data=NULL,  trials=NULL, W, ind.area, 
     ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
-    prior.nu2=NULL, prior.tau2=NULL, prior.sigma2=NULL, fix.rho=FALSE, rho=NULL, 
+    prior.nu2=NULL, prior.tau2=NULL, prior.sigma2=NULL, rho=NULL, 
     verbose=TRUE)
 }
 
@@ -40,34 +40,33 @@
 \arguments{
     \item{formula}{
         A formula for the covariate part of the model using the syntax of the
-        lm() function. Offsets can be included here using the offset() function. The 
-        response can contain missing (NA) values.
+        lm() function. Offsets can be included here using the offset() function.
+        The response, offset and each covariate are vectors with length equal to
+        the number of individuals. The response can contain missing (NA) values.
     }
     \item{family}{
-        One of either `binomial', `gaussian' or `poisson', which respectively specify a 
-        binomial likelihood model with a logistic link function, a Gaussian likelihood 
-        model with an identity link function, or a Poisson likelihood model with a 
-        log link function. 
+        One of either "binomial", "gaussian", or "poisson", which respectively 
+        specify a binomial likelihood model with a logistic link function, a 
+        Gaussian likelihood model with an identity link function, or a Poisson 
+        likelihood model with a log link function. 
     }
     \item{data}{
         An optional data.frame containing the  variables in the formula.
     }
     \item{trials}{
         A vector the same length as the response containing the total number of trials 
-        for individual. Only used if family=`binomial'. 
+        for each individual. Only used if family="binomial". 
     }
     \item{W}{A non-negative K by K neighbourhood matrix (where K is the number of 
    spatial units). Typically a binary specification is used, where the jkth 
    element equals one if areas (j, k) are spatially close (e.g. share a common 
    border) and is zero otherwise. The matrix can be non-binary, but each row must 
-   contain at least one non-zero entry. Note, if fix.rho=TRUE and rho=0 then the W 
-   matrix is not actually used by the model so a K by K matrix of zeros could be 
-   entered instead if a real W matrix is cannot be obtained.
+   contain at least one non-zero entry.
 }
         \item{ind.area}{
         A vector of integers the same length as the number of data points (individuals) 
-        giving which spatial unit (nunmbered from 1 to K to align with the W matrix) each
-        individual belongs to.
+        giving which spatial unit (nunmbered from 1 to K to align with the rows of
+        the W matrix) each individual belongs to.
         }
         \item{ind.re}{
         A categorical variable where each level will be assigned a different independent
@@ -93,7 +92,7 @@
         }  
         \item{prior.nu2}{
         The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
-        prior for nu2. Defaults to c(1, 0.01) and only used if family=`Gaussian'.   
+        prior for nu2. Defaults to c(1, 0.01) and only used if family="Gaussian".   
         }
         \item{prior.tau2}{
         The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -103,14 +102,10 @@
         The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
         prior for sigma2. Defaults to c(1, 0.01).  
         }
-        \item{fix.rho}{
-        Logical, should the spatial dependence parameter rho be fixed rather than being estimated
-        in the model.
-        }
         \item{rho}{
-        The value that the spatial dependence parameter is set to if fix.rho=TRUE. Must be in the
-        interval [0, 1], where 0 corresponds to independence while 1 corresponds to fitting the
-        intrinsic CAR prior.
+        The value in the interval [0, 1] that the spatial dependence parameter rho is 
+        fixed at if it should not be estimated. If this arugment is NULL then rho is
+        estimated in the model.
         }
         \item{verbose}{
         Logical, should the function update the user on its progress.  
@@ -122,16 +117,19 @@
 
 \value{
     \item{summary.results }{A summary table of the parameters.}
-    \item{samples }{A list containing the McMC samples from the model.}
+    \item{samples }{A list containing the MCMC samples from the model.}
     \item{fitted.values }{A vector of fitted values for each area.}
-    \item{residuals }{A vector of residuals for each area.}
-    \item{modelfit }{Model fit criteria including the Deviance Information Criterion 
+    \item{residuals }{A matrix with 2 columns where each column is a type of 
+        residual and each row relates to an area. The types are "response" (raw), 
+        and "pearson".}
+\item{modelfit }{Model fit criteria including the Deviance Information Criterion 
 (DIC) and its corresponding estimated effective number of parameters (p.d), the Log 
 Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion 
-(WAIC) and its corresponding estimated number of effective parameters (p.w), the
-loglikelihood, and the percentage deviance explained.}
-    \item{localised.structure }{NULL, for compatability with the other models.}
-    \item{formula }{The formula for the covariate and offset part of the model.}
+(WAIC) and its corresponding estimated number of effective parameters (p.w), and
+the loglikelihood.}
+    \item{localised.structure }{NULL, for compatability with other models.}
+\item{formula }{The formula (as a text string) for the response, covariate and 
+offset parts of the model}
     \item{model }{A text string describing the model fit.}
     \item{X }{The design matrix of covariates.}
 }
@@ -146,9 +144,9 @@ loglikelihood, and the percentage deviance explained.}
 
 
 \examples{
-##################################################
+#################################################
 #### Run the model on simulated data on a lattice
-##################################################
+#################################################
     
 #### Set up a square lattice region
 x.easting <- 1:10
@@ -193,5 +191,9 @@ Y <- rbinom(n=n.total, size=trials, prob=prob)
 #### Run the model
 formula <- Y ~ x1 + x2
 \dontrun{model <- S.CARmultilevel(formula=formula, family="binomial", ind.area=ind.area,
-                ind.re=ind.re, trials=trials, W=W, burnin=20000, n.sample=100000)}
+                ind.re=as.factor(ind.re), trials=trials, W=W, burnin=20000, n.sample=100000)}
+                
+#### Toy example for checking
+model <- S.CARmultilevel(formula=formula, family="binomial", ind.area=ind.area,
+                ind.re=as.factor(ind.re), trials=trials, W=W, burnin=10, n.sample=50)
 }

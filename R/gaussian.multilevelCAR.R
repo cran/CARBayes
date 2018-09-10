@@ -1,4 +1,4 @@
-gaussian.multilevelCAR <- function(formula, data=NULL, W, ind.area, ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.sigma2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+gaussian.multilevelCAR <- function(formula, data=NULL, W, ind.area, ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, prior.tau2=NULL, prior.sigma2=NULL, rho=NULL, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -18,22 +18,23 @@ X.mean <- frame.results$X.mean
 X.indicator <- frame.results$X.indicator 
 offset <- frame.results$offset
 Y <- frame.results$Y
-Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
-Y.short <- Y[which.miss==1]
-X.short <- X.standardised[which.miss==1, ]
-offset.short <- offset[which.miss==1]
+Y.DA <- Y
 
     
-#### rho and fix.rho
-    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
-    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
-    if(fix.rho & !is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
-    if(!fix.rho) rho <- runif(1)
+#### rho
+    if(is.null(rho))
+    {
+    rho <- runif(1)
+    fix.rho <- FALSE   
+    }else
+    {
+    fix.rho <- TRUE    
+    }
+    if(!is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
     if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
-    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)   
-
+    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
 
 #### CAR quantities
 K <- length(unique(ind.area))
@@ -67,12 +68,10 @@ K <- ncol(W)
 
 ind.area.list <- as.list(rep(0,K))
 n.individual <- rep(0,K)
-n.individual.miss <- rep(0,K)
     for(r in 1:K)
     {
     ind.area.list[[r]] <- which(ind.area==r)
     n.individual[r] <- length(ind.area.list[[r]])
-    n.individual.miss[r] <- sum(which.miss[ind.area.list[[r]]])
     }
 
 
@@ -138,7 +137,8 @@ nu2 <- tau2
     {
     psi.extend <- rep(0, n)
     }
-    
+fitted <- as.numeric(X.standardised %*% beta) + phi.extend + offset + psi.extend
+
     
  
 ###############################    
@@ -153,7 +153,6 @@ samples.tau2 <- array(NA, c(n.keep, 1))
     if(!is.null(ind.re)) samples.psi <- array(NA, c(n.keep, q))
     if(!is.null(ind.re)) samples.sigma2 <- array(NA, c(n.keep, 1))
     if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
 samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
@@ -164,7 +163,7 @@ accept <- rep(0,2)
 accept.all <- accept
 proposal.sd.rho <- 0.02
 tau2.posterior.shape <- prior.tau2[1] + 0.5*K
-nu2.posterior.shape <- prior.nu2[1] + 0.5*(n-n.miss)
+nu2.posterior.shape <- prior.nu2[1] + 0.5*n
     if(!is.null(ind.re)) sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * q 
     
  
@@ -179,7 +178,7 @@ n.islands <- max(W.islands$nc)
     
     
 #### Beta update quantities
-data.precision.beta <- t(X.short) %*% X.short
+data.precision.beta <- t(X.standardised) %*% X.standardised
     if(length(prior.var.beta)==1)
     {
     prior.precision.beta <- 1 / prior.var.beta
@@ -208,13 +207,24 @@ data.precision.beta <- t(X.short) %*% X.short
 #### Create the MCMC samples    
     for(j in 1:n.sample)
     {
+    ####################################
+    ## Sample from Y - data augmentation
+    ####################################
+        if(n.miss>0)
+        {
+            Y.DA[which.miss==0] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))    
+        }else
+        {}
+        
+        
+        
     ####################
     ## Sample from beta
     ####################
     fc.precision <- prior.precision.beta + data.precision.beta / nu2
     fc.var <- solve(fc.precision)
-    beta.offset <- as.numeric(Y.short - offset.short - phi.extend[which.miss==1] - psi.extend[which.miss==1])
-    beta.offset2 <- t(X.short) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
+    beta.offset <- as.numeric(Y.DA - offset - phi.extend - psi.extend)
+    beta.offset2 <- t(X.standardised) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
     fc.mean <- fc.var %*% beta.offset2
     chol.var <- t(chol(fc.var))
     beta <- fc.mean + chol.var %*% rnorm(p)        
@@ -224,8 +234,8 @@ data.precision.beta <- t(X.short) %*% X.short
     ##################
     ## Sample from nu2
     ##################
-    fitted.current <-  as.numeric(X.short %*% beta) + phi.extend[which.miss==1] + offset.short + psi.extend[which.miss==1]
-    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.short - fitted.current)^2)
+    fitted.current <-  as.numeric(X.standardised %*% beta) + phi.extend + offset + psi.extend
+    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.DA - fitted.current)^2)
     nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
         
 
@@ -233,9 +243,9 @@ data.precision.beta <- t(X.short) %*% X.short
     ####################
     ## Sample from phi
     ####################
-    offset.phi <- (Y - as.numeric(X.standardised %*% beta) - offset - psi.extend) / nu2
+    offset.phi <- (Y.DA - as.numeric(X.standardised %*% beta) - offset - psi.extend) / nu2
     offset.phi2 <- tapply(offset.phi, ind.area, sum, na.rm=T)
-    phi <- gaussiancarmultilevelupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, n_individual=n.individual.miss, nsites=K, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi2, which.miss)
+    phi <- gaussiancarmultilevelupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, n_individual=n.individual, nsites=K, phi=phi, tau2=tau2, rho=rho, nu2=nu2, offset=offset.phi2)
         if(rho<1)
         {
         phi <- phi - mean(phi)
@@ -253,9 +263,9 @@ data.precision.beta <- t(X.short) %*% X.short
         if(!is.null(ind.re))
         {
         #### Update psi 
-        offset.psi <- (Y - as.numeric(X.standardised %*% beta) - offset - phi.extend) / nu2
+        offset.psi <- (Y.DA - as.numeric(X.standardised %*% beta) - offset - phi.extend) / nu2
         offset.psi2 <- tapply(offset.psi, ind.re, sum, na.rm=T)
-        temp1b <-  gaussiancarmultilevelupdateindiv(ind_re_list=ind.re.list, n_re=n.re, q=q, psi=psi, sigma2=sigma2, nu2=nu2, offset=offset.psi2, which.miss)
+        temp1b <-  gaussiancarmultilevelupdateindiv(ind_re_list=ind.re.list, n_re=n.re, q=q, psi=psi, sigma2=sigma2, nu2=nu2, offset=offset.psi2)
         psi <- temp1b - mean(temp1b)
         psi.extend <- psi[ind.re.num]   
         
@@ -326,10 +336,9 @@ data.precision.beta <- t(X.short) %*% X.short
             if(!is.null(ind.re))  samples.psi[ele, ] <- psi
             if(!is.null(ind.re)) samples.sigma2[ele, ] <- sigma2
             if(!fix.rho) samples.rho[ele, ] <- rho
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))
+            if(n.miss>0) samples.Y[ele, ] <- Y.DA[which.miss==0]
         }else
         {}
         
@@ -396,46 +405,27 @@ accept.final <- c(rep(100, 2), accept.psi, 100, 100, accept.rho, accept.sigma2)
 names(accept.final) <- c("beta", "phi", "psi", "nu2", "tau2", "rho", "sigma2")
   
     
-#### Deviance information criterion (DIC)
-median.beta <- apply(samples.beta, 2, median)
-median.phi <- apply(samples.phi, 2, median)
-median.phi.extend <-  median.phi[ind.area]
+#### Compute the fitted deviance
+mean.beta <- apply(samples.beta, 2, mean)
+mean.phi <- apply(samples.phi, 2, mean)
+mean.phi.extend <-  mean.phi[ind.area]
     if(!is.null(ind.re))
     {
-    median.psi <- apply(samples.psi, 2, median)
-    median.psi.extend <-  median.psi[ind.re.num]
+    mean.psi <- apply(samples.psi, 2, mean)
+    mean.psi.extend <-  mean.psi[ind.re.num]
     }else
     {
-    median.psi.extend <- rep(0,n)
+    mean.psi.extend <- rep(0,n)
     }
-fitted.median <- X.standardised %*% median.beta + median.phi.extend + median.psi.extend + offset
-nu2.median <- median(samples.nu2)
-deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE), na.rm=TRUE)
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted    
-    
-    
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-    
-    
-#### Compute the Conditional Predictive Ordinate  
-CPO <- rep(NA, n)
-    for(j in 1:n)
-    {
-    CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=sqrt(samples.nu2))))    
-    }
-LMPL <- sum(log(CPO), na.rm=TRUE)       
-    
-    
-#### Compute the % deviance explained
-deviance.null <- sum((Y - mean(Y, na.rm=T))^2, na.rm=T)
-deviance.fit <- sum((Y - fitted.median)^2, na.rm=T)
-percent_dev_explained <- 100 * (deviance.null - deviance.fit) / deviance.null
+fitted.mean <- X.standardised %*% mean.beta + mean.phi.extend + mean.psi.extend + offset
+nu2.mean <- mean(samples.nu2)
+deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.mean, sd = rep(sqrt(nu2.mean),n), log = TRUE), na.rm=TRUE)
 
+    
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)
 
+    
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
@@ -479,17 +469,13 @@ summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
     
 
 #### Create the Fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
-pearson.residuals <- response.residuals /sqrt(nu2.median)
-deviance.residuals <- sign(response.residuals) * sqrt((Y-fitted.values)^2/nu2.median)
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+pearson.residuals <- response.residuals /sqrt(nu2.mean)
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
 
     
 #### Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
     if(is.null(ind.re))
     {
     model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - Multilevel Leroux CAR\n")

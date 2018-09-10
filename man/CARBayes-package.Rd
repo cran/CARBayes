@@ -11,33 +11,37 @@ Spatial Generalised Linear Mixed Models for Areal Unit Data
 \description{
 Implements a class of univariate and multivariate spatial generalised linear mixed 
 models for areal unit data, with inference in a Bayesian setting using Markov chain 
-Monte Carlo (MCMC) simulation. The response variable can be binomial, Gaussian or 
-Poisson, and spatial autocorrelation is modelled by  a set of random effects that are 
-assigned a conditional autoregressive (CAR) prior distribution. A number of different 
-models are available for univariate spatial data, including models with no random 
-effects as well as random effects modelled by different types of CAR prior. Additionally,  
-a multivariate CAR (MCAR) model for multivariate spatial data is available, as is
-a two-level hierarchical model for individuals within areas. Full details are given in 
-the vignette accompanying this package. The initial creation of this package was 
-supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, 
-and on-going development has / is supported by the Engineering and Physical Science 
-Research Council (EPSRC) grant EP/J017442/1, ESRC grant ES/K006460/1, and 
-Innovate UK / Natural Environment Research Council (NERC) grant NE/N007352/1. 
-Version 5.0 has a  number of changes from version 4.7, including: (i) inclusion of a
-simple model with no random effects (S.CARglm()); (ii) inclusion of a two-level 
-hierarchical model for modelling individuals within areas (S.CARmultilevel()); 
-(iii) an argument in the model fitting functions to allow the random effects to be 
-updated using either random walk Metropolis steps or the  Metropolis adjusted Langevin 
-algorithm (MALA); and (iv) calculation of the percentage of the deviance explained 
-by the model.
+Monte Carlo (MCMC) simulation. The response variable can be binomial, Gaussian, 
+multinomial, Poisson or zero-inflated Poisson (ZIP), and spatial autocorrelation 
+is modelled by  a set of random effects that are assigned a conditional 
+autoregressive (CAR) prior distribution. A number of different models are 
+available for univariate spatial data, including models with no random effects as 
+well as random effects modelled by different types of CAR prior, including the 
+BYM model (Besag et al. (1991) <doi:10.1007/BF00116466>), the Leroux model 
+(Leroux et al. (2000) <doi:10.1007/978-1-4612-1284-3_4>) and the localised model 
+(Lee et al. (2015) <doi:10.1002/env.2348>). Additionally,  a multivariate CAR 
+(MCAR) model for multivariate spatial data is available, as is a two-level 
+hierarchical  model for modelling data relating to individuals within areas. Full 
+details are given in the vignette accompanying this package. The initial creation 
+of this package was supported by the Economic and Social Research Council (ESRC) 
+grant RES-000-22-4256, and on-going development has been supported by the 
+Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1, ESRC 
+grant ES/K006460/1, Innovate UK / Natural Environment Research Council (NERC) 
+grant NE/N007352/1 and the TB Alliance. Version 5.1 has a  number of changes to 
+version 5.0, including: (i) Multinomial and ZIP data models with either no random 
+effects or random effects modelled by the Leroux CAR prior. For the multinomial 
+model the latter is an MCAR model; (ii) a ZIP data model with the BYM CAR prior;
+(iii) An MCAR model for a Gaussian  data likelihood; (iv) The use of data 
+augmentation to account for missing values in the respone variable; and (v) 
+An updated vignette using the leaflet package for interactive mapping.
 }
 
 \details{
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 5.0\cr
-Date: \tab 2017-06-01\cr
+Version: \tab 5.1\cr
+Date: \tab 2018-09-10\cr
 License: \tab GPL (>= 2)\cr
 }
 }
@@ -69,10 +73,10 @@ Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial
 misalignment in long-term air pollution and health studies, Environmetrics, 26, 
 477-487.
 
-Leroux, B., Lei, X and Breslow, N (2000). Estimation of disease rates in small 
-areas: A new mixed model for spatial dependence, Chapter Statistical Models in 
-Epidemiology, the Environment and Clinical Trials, Halloran, M and Berry, D (eds), 
-pp. 135-178. Springer-Verlag, New York.
+Leroux B, Lei X, Breslow N (2000). "Estimation of Disease Rates in SmallAreas: A 
+New Mixed Model for Spatial Dependence." In M Halloran, D Berry (eds.), 
+\emph{Statistical Models in Epidemiology, the Environment and Clinical Trials},
+pp. 179-191. Springer-Verlag, New York.
 
 Roberts, G and Rosenthal, J (1998). Optimal scaling of discrete approximations to
 the Langevin diffusions, Journal of the Royal Statistical Society Series B 60, 

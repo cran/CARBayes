@@ -9,7 +9,7 @@ a <- common.verbose(verbose)
     
 #### Frame object
 frame.results <- common.frame(formula, data, "binomial")
-n <- frame.results$n
+K <- frame.results$n
 p <- frame.results$p
 X <- frame.results$X
 X.standardised <- frame.results$X.standardised
@@ -18,20 +18,19 @@ X.mean <- frame.results$X.mean
 X.indicator <- frame.results$X.indicator 
 offset <- frame.results$offset
 Y <- frame.results$Y
-Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
-    
+Y.DA <- Y
+
     
 #### Check and format the trials argument
     if(sum(is.na(trials))>0) stop("the numbers of trials has missing 'NA' values.", call.=FALSE)
     if(!is.numeric(trials)) stop("the numbers of trials has non-numeric values.", call.=FALSE)
-int.check <- n-sum(ceiling(trials)==floor(trials))
+int.check <- K-sum(ceiling(trials)==floor(trials))
     if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
     if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
 failures <- trials - Y
-failures.miss <- failures
-failures.miss[which.miss==0] <- median(failures, na.rm=TRUE)
+failures.DA <- trials - Y.DA
     if(sum(Y>trials, na.rm=TRUE)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
     
     
@@ -68,7 +67,8 @@ mod.glm <- glm(dat~X.standardised-1, offset=offset, family="quasibinomial")
 beta.mean <- mod.glm$coefficients
 beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
 beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
-
+lp <- as.numeric(X.standardised %*% beta) + offset
+prob <- exp(lp)  / (1 + exp(lp))
     
     
 ###############################    
@@ -77,9 +77,8 @@ beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
 #### Matrices to store samples   
 n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
-samples.deviance <- array(NA, c(n.keep, 1))
-samples.like <- array(NA, c(n.keep, n))
-samples.fitted <- array(NA, c(n.keep, n))
+samples.like <- array(NA, c(n.keep, K))
+samples.fitted <- array(NA, c(n.keep, K))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
     
     
@@ -108,16 +107,28 @@ proposal.sd.beta <- 0.01
 #### Create the MCMC samples      
     for(j in 1:n.sample)
     {
+    ####################################
+    ## Sample from Y - data augmentation
+    ####################################
+        if(n.miss>0)
+        {
+        Y.DA[which.miss==0] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
+        failures.DA <- trials - Y.DA
+        }else
+        {}
+        
+        
+        
     ####################
     ## Sample from beta
     ####################
     offset.temp <- offset
         if(p>2)
         {
-        temp <- binomialbetaupdateMALA(X.standardised, n, p, beta, offset.temp, Y.miss, failures.miss, trials, prior.mean.beta, prior.var.beta, which.miss, n.beta.block, proposal.sd.beta, list.block)
+        temp <- binomialbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.DA, failures.DA, trials, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }else
         {
-        temp <- binomialbetaupdateRW(X.standardised, n, p, beta, offset.temp, Y.miss, failures.miss, prior.mean.beta, prior.var.beta, which.miss, proposal.sd.beta)
+        temp <- binomialbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, failures.DA, prior.mean.beta, prior.var.beta, proposal.sd.beta)
         }
     beta <- temp[[1]]
     accept[1] <- accept[1] + temp[[2]]
@@ -144,10 +155,9 @@ proposal.sd.beta <- 0.01
         {
         ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
+            if(n.miss>0) samples.Y[ele, ] <- Y.DA[which.miss==0]
         }else
         {}
         
@@ -203,37 +213,18 @@ accept.final <- c(accept.beta)
 names(accept.final) <- c("beta")    
     
     
-#### Deviance information criterion (DIC)
-median.beta <- apply(samples.beta, 2, median)
-median.logit <- as.numeric(X.standardised %*% median.beta) + offset    
-median.prob <- exp(median.logit)  / (1 + exp(median.logit))
-fitted.median <- trials * median.prob
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted     
-    
-    
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-    
-    
-#### Compute the Conditional Predictive Ordinate
-CPO <- rep(NA, n)
-    for(j in 1:n)
-    {
-    CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
-    }
-LMPL <- sum(log(CPO), na.rm=TRUE)     
-    
-    
-#### Compute the % deviance explained
-fit.null <- glm(cbind(Y, failures)~1, offset=offset, family="binomial")$fitted.values
-deviance.null <- -2 * sum(dbinom(x=Y[which(!is.na(Y))], size=trials[which(!is.na(Y))], prob=fit.null, log=TRUE), na.rm=TRUE)
-percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+#### Compute the fitted deviance
+mean.beta <- apply(samples.beta, 2, mean)
+mean.logit <- as.numeric(X.standardised %*% mean.beta) + offset    
+mean.prob <- exp(mean.logit)  / (1 + exp(mean.logit))
+fitted.mean <- trials * mean.prob
+deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=mean.prob, log=TRUE), na.rm=TRUE)
 
-
+    
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)
+    
+    
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
     
@@ -250,17 +241,13 @@ summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
     
 #### Create the Fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
-pearson.residuals <- response.residuals /sqrt(fitted.values * (1 - median.prob))
-deviance.residuals <- sign(response.residuals) * sqrt(2 * (Y * log(Y/fitted.values) + (trials-Y) * log((trials-Y)/(trials - fitted.values))))
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+pearson.residuals <- response.residuals /sqrt(fitted.values * (1 - mean.prob))
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
     
     
 #### Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - None\n")
     if(n.miss==0) samples.Y = NA
 

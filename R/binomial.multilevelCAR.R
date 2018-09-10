@@ -1,4 +1,4 @@
-binomial.multilevelCAR <- function(formula, data=NULL, trials, W, ind.area, ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, fix.rho=FALSE, rho=NULL, verbose=TRUE)
+binomial.multilevelCAR <- function(formula, data=NULL, trials, W, ind.area, ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, rho=NULL, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -18,9 +18,9 @@ X.mean <- frame.results$X.mean
 X.indicator <- frame.results$X.indicator 
 offset <- frame.results$offset
 Y <- frame.results$Y
-Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
+Y.DA <- Y
 
     
 #### Check and format the trials argument
@@ -30,18 +30,23 @@ int.check <- n-sum(ceiling(trials)==floor(trials))
     if(int.check > 0) stop("the numbers of trials has non-integer values.", call.=FALSE)
     if(min(trials)<=0) stop("the numbers of trials has zero or negative values.", call.=FALSE)
 failures <- trials - Y
-failures.miss <- failures
-failures.miss[which.miss==0] <- median(failures, na.rm=TRUE)
+failures.DA <- trials - Y.DA
     if(sum(Y>trials, na.rm=TRUE)>0) stop("the response variable has larger values that the numbers of trials.", call.=FALSE)
 
 
-#### rho and fix.rho
-    if(!is.logical(fix.rho)) stop("fix.rho is not logical.", call.=FALSE)   
-    if(fix.rho & is.null(rho)) stop("rho is fixed but an initial value was not set.", call.=FALSE)   
-    if(fix.rho & !is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
-    if(!fix.rho) rho <- runif(1)
+#### rho
+    if(is.null(rho))
+    {
+    rho <- runif(1)
+    fix.rho <- FALSE   
+    }else
+    {
+    fix.rho <- TRUE    
+    }
+    if(!is.numeric(rho) ) stop("rho is fixed but is not numeric.", call.=FALSE)  
     if(rho<0 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
-    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)   
+    if(rho>1 ) stop("rho is outside the range [0, 1].", call.=FALSE)  
+
 
 
 #### CAR quantities
@@ -161,6 +166,8 @@ tau2 <- var(phi) / 10
     {
     psi.extend <- rep(0, n)
     }
+lp <- as.numeric(X.standardised %*% beta) + phi.extend +  psi.extend + offset
+prob <- exp(lp)  / (1 + exp(lp))
 
 
 
@@ -175,7 +182,6 @@ samples.tau2 <- array(NA, c(n.keep, 1))
     if(!is.null(ind.re)) samples.psi <- array(NA, c(n.keep, q))
     if(!is.null(ind.re)) samples.sigma2 <- array(NA, c(n.keep, 1))
     if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
 samples.like <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
@@ -220,16 +226,28 @@ n.islands <- max(W.islands$nc)
 #### Create the MCMC samples      
     for(j in 1:n.sample)
     {
+    ####################################
+    ## Sample from Y - data augmentation
+    ####################################
+        if(n.miss>0)
+        {
+        Y.DA[which.miss==0] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
+        failures.DA <- trials - Y.DA
+        }else
+        {}
+        
+        
+        
     ####################
     ## Sample from beta
     ####################
     offset.temp <- phi.extend + offset + psi.extend
         if(p>2)
         {
-        temp <- binomialbetaupdateMALA(X.standardised, n, p, beta, offset.temp, Y.miss, failures.miss, trials, prior.mean.beta, prior.var.beta, which.miss, n.beta.block, proposal.sd.beta, list.block)
+        temp <- binomialbetaupdateMALA(X.standardised, n, p, beta, offset.temp, Y.DA, failures.DA, trials, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }else
         {
-        temp <- binomialbetaupdateRW(X.standardised, n, p, beta, offset.temp, Y.miss, failures.miss, prior.mean.beta, prior.var.beta, which.miss, proposal.sd.beta)
+        temp <- binomialbetaupdateRW(X.standardised, n, p, beta, offset.temp, Y.DA, failures.DA, prior.mean.beta, prior.var.beta, proposal.sd.beta)
         }
     beta <- temp[[1]]
     accept[1] <- accept[1] + temp[[2]]
@@ -241,7 +259,7 @@ n.islands <- max(W.islands$nc)
     ## Sample from phi
     ####################
     beta.offset <- X.standardised %*% beta + offset + psi.extend
-    temp1 <- binomialcarmultilevelupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, ind_area_list=ind.area.list, n_individual=n.individual, nsites=K, phi=phi, tau2=tau2, y=Y.miss, failures=failures.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+    temp1 <- binomialcarmultilevelupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, ind_area_list=ind.area.list, n_individual=n.individual, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
     phi <- temp1[[1]]
         if(rho<1)
         {
@@ -263,7 +281,7 @@ n.islands <- max(W.islands$nc)
     {
     #### Update psi 
     beta.offset <- X.standardised %*% beta + offset + phi.extend
-    temp1b <-  binomialcarmultilevelupdateindiv(ind_re_list=ind.re.list, n_re=n.re, q=q, psi=psi, sigma2=sigma2, y=Y.miss, failures=failures.miss, psi_tune=proposal.sd.psi, offset=beta.offset, which.miss)
+    temp1b <-  binomialcarmultilevelupdateindiv(ind_re_list=ind.re.list, n_re=n.re, q=q, psi=psi, sigma2=sigma2, y=Y.DA, failures=failures.DA, psi_tune=proposal.sd.psi, offset=beta.offset)
     psi <- temp1b[[1]] - mean(temp1b[[1]])
     accept[7] <- accept[7] + temp1b[[2]]
     accept[8] <- accept[8] + q    
@@ -336,10 +354,9 @@ n.islands <- max(W.islands$nc)
             if(!is.null(ind.re)) samples.psi[ele, ] <- psi
             if(!is.null(ind.re)) samples.sigma2[ele, ] <- sigma2
             if(!fix.rho) samples.rho[ele, ] <- rho
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <- rbinom(n=n.miss, size=trials[which.miss==0], prob=prob[which.miss==0])
+            if(n.miss>0) samples.Y[ele, ] <- Y.DA[which.miss==0]
         }else
         {}
         
@@ -416,47 +433,28 @@ accept.final <- c(accept.beta, accept.phi, accept.psi, accept.rho, accept.tau2, 
 names(accept.final) <- c("beta", "phi","psi", "rho", "tau2", "sigma2")
 
 
-#### Deviance information criterion (DIC)
-median.beta <- apply(samples.beta, 2, median)
-median.phi <- apply(samples.phi, 2, median)
-median.phi.extend <-  median.phi[ind.area]
+#### Compute the fitted deviance
+mean.beta <- apply(samples.beta, 2, mean)
+mean.phi <- apply(samples.phi, 2, mean)
+mean.phi.extend <-  mean.phi[ind.area]
     if(!is.null(ind.re))
     {
-    median.psi <- apply(samples.psi, 2, median)
-    median.psi.extend <-  median.psi[ind.re.num]
+    mean.psi <- apply(samples.psi, 2, mean)
+    mean.psi.extend <-  mean.psi[ind.re.num]
     }else
     {
-    median.psi.extend <- rep(0,n)
+    mean.psi.extend <- rep(0,n)
     }
-median.logit <- as.numeric(X.standardised %*% median.beta) + median.phi.extend + median.psi.extend + offset    
-median.prob <- exp(median.logit)  / (1 + exp(median.logit))
-fitted.median <- trials * median.prob
-deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=median.prob, log=TRUE), na.rm=TRUE)
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted     
-    
-    
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-    
-    
-#### Compute the Conditional Predictive Ordinate
-CPO <- rep(NA, n)
-    for(j in 1:n)
-    {
-    CPO[j] <- 1/median((1 / dbinom(x=Y[j], size=trials[j], prob=(samples.fitted[ ,j] / trials[j]))))    
-    }
-LMPL <- sum(log(CPO), na.rm=TRUE)     
-    
-    
-#### Compute the % deviance explained
-fit.null <- glm(cbind(Y, failures)~1, offset=offset, family="binomial")$fitted.values
-deviance.null <- -2 * sum(dbinom(x=Y[which(!is.na(Y))], size=trials[which(!is.na(Y))], prob=fit.null, log=TRUE), na.rm=TRUE)
-percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
+mean.logit <- as.numeric(X.standardised %*% mean.beta) + mean.phi.extend + mean.psi.extend + offset    
+mean.prob <- exp(mean.logit)  / (1 + exp(mean.logit))
+fitted.mean <- trials * mean.prob
+deviance.fitted <- -2 * sum(dbinom(x=Y, size=trials, prob=mean.prob, log=TRUE), na.rm=TRUE)
 
+    
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)
 
+    
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
@@ -497,17 +495,13 @@ summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
 
 #### Create the Fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
-pearson.residuals <- response.residuals /sqrt(fitted.values * (1 - median.prob))
-deviance.residuals <- sign(response.residuals) * sqrt(2 * (Y * log(Y/fitted.values) + (trials-Y) * log((trials-Y)/(trials - fitted.values))))
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+pearson.residuals <- response.residuals /sqrt(fitted.values * (1 - mean.prob))
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
 
 
 #### Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
     if(is.null(ind.re))
     {
     model.string <- c("Likelihood model - Binomial (logit link function)", "\nRandom effects model - Multilevel Leroux CAR\n")

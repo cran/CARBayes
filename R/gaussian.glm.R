@@ -9,7 +9,7 @@ a <- common.verbose(verbose)
     
 #### Frame object
 frame.results <- common.frame(formula, data, "gaussian")
-n <- frame.results$n
+K <- frame.results$n
 p <- frame.results$p
 X <- frame.results$X
 X.standardised <- frame.results$X.standardised
@@ -18,13 +18,10 @@ X.mean <- frame.results$X.mean
 X.indicator <- frame.results$X.indicator 
 offset <- frame.results$offset
 Y <- frame.results$Y
-Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
-Y.short <- Y[which.miss==1]
-X.short <- X.standardised[which.miss==1, ]
-offset.short <- offset[which.miss==1]
-    
+Y.DA <- Y
+
     
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
@@ -49,6 +46,7 @@ beta.sd <- sqrt(diag(summary(mod.glm)$cov.unscaled)) * summary(mod.glm)$sigma
 beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
 res.temp <- Y - X.standardised %*% beta.mean - offset
 nu2 <- var(as.numeric(res.temp), na.rm=TRUE)
+fitted <- as.numeric(X.standardised %*% beta) + offset
 
     
     
@@ -59,18 +57,17 @@ nu2 <- var(as.numeric(res.temp), na.rm=TRUE)
 n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
 samples.nu2 <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
-samples.like <- array(NA, c(n.keep, n))
-samples.fitted <- array(NA, c(n.keep, n))
+samples.like <- array(NA, c(n.keep, K))
+samples.fitted <- array(NA, c(n.keep, K))
     if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
     
     
 #### Metropolis quantities
-nu2.posterior.shape <- prior.nu2[1] + 0.5*(n-n.miss)
+nu2.posterior.shape <- prior.nu2[1] + 0.5*K
 
     
 #### Beta update quantities
-data.precision.beta <- t(X.short) %*% X.short
+data.precision.beta <- t(X.standardised) %*% X.standardised
     if(length(prior.var.beta)==1)
     {
     prior.precision.beta <- 1 / prior.var.beta
@@ -99,13 +96,24 @@ data.precision.beta <- t(X.short) %*% X.short
 #### Create the MCMC samples    
     for(j in 1:n.sample)
     {
+    ####################################
+    ## Sample from Y - data augmentation
+    ####################################
+        if(n.miss>0)
+        {
+        Y.DA[which.miss==0] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))    
+        }else
+        {}
+        
+        
+        
     ####################
     ## Sample from beta
     ####################
     fc.precision <- prior.precision.beta + data.precision.beta / nu2
     fc.var <- solve(fc.precision)
-    beta.offset <- as.numeric(Y.short - offset.short)
-    beta.offset2 <- t(X.short) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
+    beta.offset <- as.numeric(Y.DA - offset)
+    beta.offset2 <- t(X.standardised) %*% beta.offset / nu2 + prior.precision.beta %*% prior.mean.beta
     fc.mean <- fc.var %*% beta.offset2
     chol.var <- t(chol(fc.var))
     beta <- fc.mean + chol.var %*% rnorm(p)        
@@ -115,8 +123,8 @@ data.precision.beta <- t(X.short) %*% X.short
     ##################
     ## Sample from nu2
     ##################
-    fitted.current <-  as.numeric(X.short %*% beta) + offset.short
-    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.short - fitted.current)^2)
+    fitted.current <-  as.numeric(X.standardised %*% beta) + offset
+    nu2.posterior.scale <- prior.nu2[2] + 0.5 * sum((Y.DA - fitted.current)^2)
     nu2 <- 1 / rgamma(1, nu2.posterior.shape, scale=(1/nu2.posterior.scale))    
 
         
@@ -124,7 +132,7 @@ data.precision.beta <- t(X.short) %*% X.short
     ## Calculate the deviance
     #########################
     fitted <- as.numeric(X.standardised %*% beta) + offset
-    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),n), log=TRUE)
+    deviance.all <- dnorm(Y, mean = fitted, sd = rep(sqrt(nu2),K), log=TRUE)
     like <- exp(deviance.all)
     deviance <- -2 * sum(deviance.all, na.rm=TRUE)  
         
@@ -138,10 +146,9 @@ data.precision.beta <- t(X.short) %*% X.short
         ele <- (j - burnin) / thin
         samples.beta[ele, ] <- beta
         samples.nu2[ele, ] <- nu2
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <- rnorm(n=n.miss, mean=fitted[which.miss==0], sd=sqrt(nu2))
+            if(n.miss>0) samples.Y[ele, ] <- Y.DA[which.miss==0]
         }else
         {}
 
@@ -175,35 +182,16 @@ accept.final <- rep(100, 2)
 names(accept.final) <- c("beta", "nu2")
     
     
-#### Deviance information criterion (DIC)
-median.beta <- apply(samples.beta, 2, median)
-fitted.median <- X.standardised %*% median.beta + offset
-nu2.median <- median(samples.nu2)
-deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.median, sd = rep(sqrt(nu2.median),n), log = TRUE), na.rm=TRUE)
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted    
-    
-    
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-    
-    
-#### Compute the Conditional Predictive Ordinate  
-CPO <- rep(NA, n)
-    for(j in 1:n)
-    {
-    CPO[j] <- 1/median((1 / dnorm(Y[j], mean=samples.fitted[ ,j], sd=sqrt(samples.nu2))))    
-    }
-LMPL <- sum(log(CPO), na.rm=TRUE)       
-    
-    
-#### Compute the % deviance explained
-deviance.null <- sum((Y - mean(Y, na.rm=T))^2, na.rm=T)
-deviance.fit <- sum((Y - fitted.median)^2, na.rm=T)
-percent_dev_explained <- 100 * (deviance.null - deviance.fit) / deviance.null
+#### Compute the fitted deviance
+mean.beta <- apply(samples.beta, 2, mean)
+fitted.mean <- X.standardised %*% mean.beta + offset
+nu2.mean <- mean(samples.nu2)
+deviance.fitted <- -2 * sum(dnorm(Y, mean = fitted.mean, sd = rep(sqrt(nu2.mean),K), log = TRUE), na.rm=TRUE)
 
+    
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)      
+    
 
 #### transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
@@ -226,17 +214,13 @@ summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
     
 #### Create the Fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
-pearson.residuals <- response.residuals /sqrt(nu2.median)
-deviance.residuals <- sign(response.residuals) * sqrt((Y-fitted.values)^2/nu2.median)
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+pearson.residuals <- response.residuals /sqrt(nu2.mean)
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
     
     
 #### Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Gaussian (identity link function)", "\nRandom effects model - None\n")
     if(n.miss==0) samples.Y = NA
  

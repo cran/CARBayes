@@ -18,9 +18,9 @@ X.mean <- frame.results$X.mean
 X.indicator <- frame.results$X.indicator 
 offset <- frame.results$offset
 Y <- frame.results$Y
-Y.miss <- frame.results$Y.miss
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
+Y.DA <- Y 
 
 
 #### Check on MALA argument
@@ -97,7 +97,7 @@ res.sd <- sd(res.temp, na.rm=TRUE)/5
 phi <- rnorm(n=K, mean=rep(0,K), sd=res.sd)
 tau2 <- var(phi) / 10
 alpha <- runif(n=q, min=rep(0,q), max=rep(alpha.max/(2+q)))  
-
+fitted <- exp(as.numeric(X.standardised %*% beta) + phi + offset)
 
 
 ###############################    
@@ -109,7 +109,6 @@ samples.beta <- array(NA, c(n.keep, p))
 samples.phi <- array(NA, c(n.keep, K))
 samples.tau2 <- array(NA, c(n.keep, 1))
 samples.alpha <- array(NA, c(n.keep, q))
-samples.deviance <- array(NA, c(n.keep, 1))
 samples.like <- array(NA, c(n.keep, K))
 samples.fitted <- array(NA, c(n.keep, K))
 if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
@@ -189,16 +188,27 @@ det.Q <- sum(log(diag(chol.spam(Q))))
 #### Create the MCMC samples 
     for(j in 1:n.sample)
     {
+    ####################################
+    ## Sample from Y - data augmentation
+    ####################################
+        if(n.miss>0)
+        {
+        Y.DA[which.miss==0] <- rpois(n=n.miss, lambda=fitted[which.miss==0])    
+        }else
+        {}
+        
+        
+        
     ####################
     ## Sample from beta
     ####################
     offset.temp <- phi + offset
         if(p>2)
         {
-        temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.miss, prior.mean.beta, prior.var.beta, which.miss, n.beta.block, proposal.sd.beta, list.block)
+        temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }else
         {
-        temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.miss, prior.mean.beta, prior.var.beta, which.miss, proposal.sd.beta)
+        temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, proposal.sd.beta)
         }
     beta <- temp[[1]]
     accept[1] <- accept[1] + temp[[2]]
@@ -212,15 +222,15 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     beta.offset <- as.numeric(X.standardised %*% beta) + offset     
         if(MALA)
         {
-        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
         }else
         {
-        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.miss, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset, which.miss)
+        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
         }
     phi <- temp1[[1]]
     phi <- phi - mean(phi)
     accept[3] <- accept[3] + temp1[[2]]
-    accept[4] <- accept[4] + K - n.miss                  
+    accept[4] <- accept[4] + K                  
                
 
     
@@ -299,10 +309,9 @@ det.Q <- sum(log(diag(chol.spam(Q))))
         samples.phi[ele, ] <- phi
         samples.tau2[ele, ] <- tau2
         samples.alpha[ele, ] <- alpha
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <- rpois(n=n.miss, lambda=fitted[which.miss==0])
+            if(n.miss>0) samples.Y[ele, ] <- Y.DA[which.miss==0]
         }else
         {}
 
@@ -363,37 +372,18 @@ accept.final <- c(accept.beta, accept.phi, accept.tau2, accept.alpha)
 names(accept.final) <- c("beta", "phi", "tau2", "alpha")          
 
      
-#### Deviance information criterion (DIC)
-median.beta <- apply(samples.beta, 2, median)
-median.phi <- apply(samples.phi, 2, median)
-fitted.median <- exp(X.standardised %*% median.beta + median.phi + offset)
-deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE), na.rm=TRUE)
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted     
+#### Compute the fitted deviance
+mean.beta <- apply(samples.beta, 2, mean)
+mean.phi <- apply(samples.phi, 2, mean)
+fitted.mean <- exp(X.standardised %*% mean.beta + mean.phi + offset)
+deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE), na.rm=TRUE)
 
 
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-
-     
-#### Compute the Conditional Predictive Ordinate
-CPO <- rep(NA, K)
-     for(j in 1:K)
-     {
-     CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
-     }
-LMPL <- sum(log(CPO), na.rm=TRUE)  
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)
 
 
-#### Compute the % deviance explained
-fit.null <- glm(Y~1, offset=offset, family="poisson")$fitted.values
-deviance.null <- -2 * sum(dpois(x=Y[which(!is.na(Y))], lambda=fit.null, log=TRUE), na.rm=TRUE)
-percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
-
-
-#### transform the parameters back to the origianl covariate scale.
+#### Transform the parameters back to the origianl covariate scale.
 samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
 
 
@@ -440,11 +430,10 @@ summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
 
      
 #### Create the fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
 pearson.residuals <- response.residuals /sqrt(fitted.values)
-deviance.residuals <- sign(response.residuals) * sqrt(2 * (Y * log(Y/fitted.values) + fitted.values - Y))
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
 
 
 #### Create the posterior medians for the neighbourhood matrix W
@@ -488,9 +477,6 @@ W.posterior <- array(NA, c(K,K))
 
 
 #### Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
     if(W.binary)
     {
     model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Binary dissimilarity CAR", "\nDissimilarity metrics - ", rownames(summary.alpha), "\n")     

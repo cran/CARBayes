@@ -20,7 +20,6 @@ offset <- frame.results$offset
 Y <- frame.results$Y
 log.Y <- log(Y)
 log.Y[Y==0] <- -0.1 
-which.miss <- as.numeric(!is.na(Y))
 regression.vec <- frame.results$regression.vec
 beta <- frame.results$beta
 
@@ -118,7 +117,6 @@ samples.tau2 <- array(NA, c(n.keep, 1))
 samples.Z <- array(NA, c(n.keep, K))
 samples.lambda <- array(NA, c(n.keep, G))
 samples.delta <- array(NA, c(n.keep, 1))
-samples.deviance <- array(NA, c(n.keep, 1))
 samples.like <- array(NA, c(n.keep, K))
 samples.fitted <- array(NA, c(n.keep, K))
 
@@ -182,10 +180,10 @@ W.begfin <- W.quants$W.begfin
         offset.temp <- phi + offset + lambda[Z]
             if(p>2)
             {
-            temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, which.miss, n.beta.block, proposal.sd.beta, list.block)
+            temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
             }else
             {
-            temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, which.miss, proposal.sd.beta)
+            temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, proposal.sd.beta)
             }
         beta <- temp[[1]]
         accept[7] <- accept[7] + temp[[2]]
@@ -202,10 +200,10 @@ W.begfin <- W.quants$W.begfin
      phi.offset <- regression.vec + offset  + lambda[Z]
         if(MALA)
         {
-        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
+        temp1 <- poissoncarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset)
         }else
         {
-        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset, which.miss)
+        temp1 <- poissoncarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset)
         }
      phi <- temp1[[1]]
           for(i in 1:G)
@@ -304,7 +302,6 @@ W.begfin <- W.quants$W.begfin
         samples.tau2[ele, ] <- tau2
         samples.Z[ele, ] <- Z
         samples.delta[ele, ] <- delta
-        samples.deviance[ele, ] <- deviance
         samples.like[ele, ] <- like
         samples.fitted[ele, ] <- fitted
             if(!is.null(X)) samples.beta[ele, ] <- beta    
@@ -388,45 +385,26 @@ accept.tau2 <- 100
     }
 
      
-#### Deviance information criterion (DIC)
-median.phi <- apply(samples.phi, 2, median)
-median.Z <- round(apply(samples.Z,2,median),0)
-median.lambda <- apply(samples.lambda,2,median)
+#### Compute the fitted deviance
+mean.phi <- apply(samples.phi, 2, mean)
+mean.Z <- round(apply(samples.Z,2,mean),0)
+mean.lambda <- apply(samples.lambda,2,mean)
     if(!is.null(X))
     {
-    median.beta <- apply(samples.beta,2,median)
-    regression.vec <- as.numeric(X.standardised %*% median.beta)   
+    mean.beta <- apply(samples.beta,2,mean)
+    regression.vec <- as.numeric(X.standardised %*% mean.beta)   
     }else
     {
     regression.vec <- rep(0,K)
     }
-fitted.median <- exp(regression.vec  + median.lambda[median.Z] + median.phi + offset)
-deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.median, log=TRUE))
-p.d <- median(samples.deviance) - deviance.fitted
-DIC <- 2 * median(samples.deviance) - deviance.fitted     
+fitted.mean <- exp(regression.vec  + mean.lambda[mean.Z] + mean.phi + offset)
+deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE))
+
      
+#### Model fit criteria
+modelfit <- common.modelfit(samples.like, deviance.fitted)
 
-#### Watanabe-Akaike Information Criterion (WAIC)
-LPPD <- sum(log(apply(samples.like,2,mean)), na.rm=TRUE)
-p.w <- sum(apply(log(samples.like),2,var), na.rm=TRUE)
-WAIC <- -2 * (LPPD - p.w)
-
-
-#### Compute the Conditional Predictive Ordinate
-CPO <- rep(NA, K)
-     for(j in 1:K)
-     {
-     CPO[j] <- 1/median((1 / dpois(x=Y[j], lambda=samples.fitted[ ,j])))    
-     }
-LMPL <- sum(log(CPO))  
   
-
-#### Compute the % deviance explained
-fit.null <- glm(Y~1, offset=offset, family="poisson")$fitted.values
-deviance.null <- -2 * sum(dpois(x=Y[which(!is.na(Y))], lambda=fit.null, log=TRUE), na.rm=TRUE)
-percent_dev_explained <- 100 * (deviance.null - deviance.fitted) / deviance.null
-
-
 #### transform the parameters back to the origianl covariate scale.
     if(!is.null(X))
     {    
@@ -470,22 +448,18 @@ summary.lambda <- summary.lambda[Z.used, ]
 
 
 #### Create the fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, median)
+fitted.values <- apply(samples.fitted, 2, mean)
 response.residuals <- as.numeric(Y) - fitted.values
 pearson.residuals <- response.residuals /sqrt(fitted.values)
-deviance.residuals <- sign(response.residuals) * sqrt(2 * (Y * log(Y/fitted.values) + fitted.values - Y))
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals, deviance=deviance.residuals)
+residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
 
 
 ## Compile and return the results
-loglike <- (-0.5 * deviance.fitted)
-modelfit <- c(DIC, p.d, WAIC, p.w, LMPL, loglike, percent_dev_explained)
-names(modelfit) <- c("DIC", "p.d", "WAIC", "p.w", "LMPL", "loglikelihood", "Percentage deviance explained")
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects  model - Localised CAR model\n")
 if(is.null(X)) samples.beta.orig = NA
 
 samples <- list(beta=mcmc(samples.beta.orig), phi=mcmc(samples.phi), lambda=mcmc(samples.lambda), Z=mcmc(samples.Z), tau2=mcmc(samples.tau2), delta=mcmc(samples.delta), fitted=mcmc(samples.fitted))          
-results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=median.Z,  formula=formula, model=model.string, X=X)
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=mean.Z,  formula=formula, model=model.string, X=X)
 class(results) <- "CARBayes"
 
 #### Finish by stating the time taken    
