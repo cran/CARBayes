@@ -222,7 +222,8 @@ data.precision.beta <- t(X.standardised) %*% X.standardised
         det.Q.proposal <- 0.5 * sum(log((proposal.rho * Wstar.val + (1-proposal.rho))))              
         logprob.current <- det.Q - temp2 / tau2
         logprob.proposal <- det.Q.proposal - temp3 / tau2
-        prob <- exp(logprob.proposal - logprob.current)
+        hastings <- log(dtruncnorm(x=rho, a=0, b=1, mean=proposal.rho, sd=proposal.sd.rho)) - log(dtruncnorm(x=proposal.rho, a=0, b=1, mean=rho, sd=proposal.sd.rho)) 
+        prob <- exp(logprob.proposal - logprob.current + hastings)
         
         #### Accept or reject the proposal
             if(prob > runif(1))

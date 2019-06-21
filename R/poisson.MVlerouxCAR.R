@@ -272,7 +272,8 @@ regression <- X.standardised %*% beta
         ## Compute the acceptance rate
         logprob.current <- 0.5 * J * det.Q - 0.5 * sum(diag(t(phi) %*% Q %*% phi %*% Sigma.inv))
         logprob.proposal <- 0.5 * J * det.Q.prop - 0.5 * sum(diag(t(phi) %*% Q.prop %*% phi %*% Sigma.inv))
-        prob <- exp(logprob.proposal - logprob.current)
+        hastings <- log(dtruncnorm(x=rho, a=0, b=1, mean=proposal.rho, sd=proposal.sd.rho)) - log(dtruncnorm(x=proposal.rho, a=0, b=1, mean=rho, sd=proposal.sd.rho)) 
+        prob <- exp(logprob.proposal - logprob.current + hastings)
             if(prob > runif(1))
             {
             rho <- proposal.rho

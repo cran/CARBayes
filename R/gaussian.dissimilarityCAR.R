@@ -263,8 +263,9 @@ data.precision.beta <- t(X.standardised) %*% X.standardised
     #### Calculate the acceptance probability
     logprob.current <- det.Q - temp2 / tau2
     logprob.proposal <- det.Qprop - temp3 / tau2
-    prob <- exp(logprob.proposal - logprob.current)
-    	     
+    hastings <- sum(log(dtruncnorm(x=alpha, a=rep(0,q), b=alpha.max, mean=proposal.alpha, sd=proposal.sd.alpha)) - log(dtruncnorm(x=proposal.alpha, a=rep(0,q), b=alpha.max, mean=alpha, sd=proposal.sd.alpha))) 
+    prob <- exp(logprob.proposal - logprob.current + hastings)
+
     #### Accept or reject the proposed value
         if(prob > runif(1))
     	{

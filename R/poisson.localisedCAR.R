@@ -227,12 +227,13 @@ W.begfin <- W.quants$W.begfin
     #####################
     ## Sample from lambda
     #####################
-    proposal <- c(-1000, lambda, 1000)
-          for(i in 1:G)
-          {
-           proposal[(i+1)] <- rtruncnorm(n=1, a=proposal[i], b=proposal[(i+2)], mean=proposal[(i+1)], sd=proposal.sd.lambda)    
-          }
-     proposal <- proposal[2:(G+1)]
+     proposal.extend <- c(-1000, lambda, 1000)
+     lambda.extend <- c(-1000, lambda, 1000)
+     for(i in 1:G)
+     {
+         proposal.extend[(i+1)] <- rtruncnorm(n=1, a=proposal.extend[i], b=proposal.extend[(i+2)], mean=lambda[i], sd=proposal.sd.lambda)    
+     }
+     proposal <- proposal.extend[2:(G+1)]
      lp.current <- lambda[Z] + phi + regression.vec + offset
      lp.proposal <- proposal[Z] + phi + regression.vec + offset
      prob1 <- sum((exp(lp.current) - exp(lp.proposal)))
@@ -268,7 +269,8 @@ W.begfin <- W.quants$W.begfin
     proposal.delta <-  rtruncnorm(n=1, a=1, b=prior.delta, mean=delta, sd=proposal.sd.delta)    
     prob1 <- sum((Z-Gstar)^2) * (delta - proposal.delta)        
     prob2 <- K * log(sum(exp(-delta *(1:G - Gstar)^2))) - K * log(sum(exp(-proposal.delta *(1:G - Gstar)^2)))
-    prob <- exp(prob1 + prob2)    
+    hastings <- log(dtruncnorm(x=delta, a=1, b=prior.delta, mean=proposal.delta, sd=proposal.sd.delta)) - log(dtruncnorm(x=proposal.delta, a=1, b=prior.delta, mean=delta, sd=proposal.sd.delta)) 
+    prob <- exp(prob1 + prob2 + hastings)    
           if(prob > runif(1))
           {
           delta <- proposal.delta

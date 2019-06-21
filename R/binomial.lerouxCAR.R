@@ -247,10 +247,12 @@ if(rho==1) tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)
         det.Q.proposal <- 0.5 * sum(log((proposal.rho * Wstar.val + (1-proposal.rho))))              
         logprob.current <- det.Q - temp2 / tau2
         logprob.proposal <- det.Q.proposal - temp3 / tau2
-        prob2 <- exp(logprob.proposal - logprob.current)
+        hastings <- log(dtruncnorm(x=rho, a=0, b=1, mean=proposal.rho, sd=proposal.sd.rho)) - log(dtruncnorm(x=proposal.rho, a=0, b=1, mean=rho, sd=proposal.sd.rho)) 
+        prob <- exp(logprob.proposal - logprob.current + hastings)
+        
         
         #### Accept or reject the proposal
-            if(prob2 > runif(1))
+            if(prob > runif(1))
             {
             rho <- proposal.rho
             det.Q <- det.Q.proposal
