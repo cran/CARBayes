@@ -404,7 +404,7 @@ if(is.null(colnames(Y)))
 {
     for(r in 1:J)
     {
-        col.name[((r-1)*p+1):(r*p)] <- paste("Category ", r+1,  " - ", colnames(X), sep="")   
+        col.name[((r-1)*p+1):(r*p)] <- paste("Variable ", r,  " - ", colnames(X), sep="")   
     }
 }else
 {

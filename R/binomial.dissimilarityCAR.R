@@ -43,7 +43,6 @@ failures.DA <- trials - Y.DA
     if(class(Z)!="list") stop("Z is not a list object.", call.=FALSE)
     if(sum(is.na(as.numeric(lapply(Z, sum, na.rm=FALSE))))>0) stop("Z contains missing 'NA' values.", call.=FALSE)
 q <- length(Z)
-	if(sum(as.character(lapply(Z,class))=="matrix")<q) stop("Z contains non-matrix values.", call.=FALSE)
 	if(sum(as.numeric(lapply(Z,nrow))==K) <q) stop("Z contains matrices of the wrong size.", call.=FALSE)
 	if(sum(as.numeric(lapply(Z,ncol))==K) <q) stop("Z contains matrices of the wrong size.", call.=FALSE)
 	if(min(as.numeric(lapply(Z,min)))<0) stop("Z contains negative values.", call.=FALSE)
