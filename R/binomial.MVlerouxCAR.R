@@ -1,4 +1,4 @@
-binomial.MVlerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=TRUE, verbose=TRUE)
+binomial.MVlerouxCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=FALSE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -232,12 +232,12 @@ trials.vec <- as.numeric(t(trials))
     offset.temp <- phi + offset
         for(r in 1:J)
         {
-            if(p>2)
+            if(MALA)
             {
             temp <- binomialbetaupdateMALA(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], failures.DA[ ,r], trials[ ,r], prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta[r], list.block)
             }else
             {
-            temp <- binomialbetaupdateRW(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], failures.DA[ ,r], prior.mean.beta, prior.var.beta, proposal.sd.beta[r])
+            temp <- binomialbetaupdateRW(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], failures.DA[ ,r], prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta[r], list.block)
             }
         beta[ ,r] <- temp[[1]]
         accept.beta[r] <- accept.beta[r] + temp[[2]]

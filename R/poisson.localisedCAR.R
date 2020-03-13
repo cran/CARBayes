@@ -1,4 +1,4 @@
-poisson.localisedCAR <- function(formula, data=NULL, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=TRUE, verbose=TRUE)
+poisson.localisedCAR <- function(formula, data=NULL, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=FALSE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -178,12 +178,12 @@ W.begfin <- W.quants$W.begfin
         if(!is.null(X))
         {
         offset.temp <- phi + offset + lambda[Z]
-            if(p>2)
+            if(MALA)
             {
             temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
             }else
             {
-            temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, proposal.sd.beta)
+            temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
             }
         beta <- temp[[1]]
         accept[7] <- accept[7] + temp[[2]]

@@ -1,4 +1,4 @@
-poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, MALA=TRUE, verbose=TRUE)
+poisson.dissimilarityCAR <- function(formula, data=NULL, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, MALA=FALSE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -202,12 +202,12 @@ det.Q <- sum(log(diag(chol.spam(Q))))
     ## Sample from beta
     ####################
     offset.temp <- phi + offset
-        if(p>2)
+        if(MALA)
         {
         temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }else
         {
-        temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, proposal.sd.beta)
+        temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }
     beta <- temp[[1]]
     accept[1] <- accept[1] + temp[[2]]

@@ -1,4 +1,4 @@
-poisson.MVlerouxCAR <- function(formula, data=NULL,  W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=TRUE, verbose=TRUE)
+poisson.MVlerouxCAR <- function(formula, data=NULL,  W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=FALSE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -212,12 +212,12 @@ Y.vec <- as.numeric(t(Y))
     offset.temp <- phi + offset
         for(r in 1:J)
         {
-            if(p>2)
+            if(MALA)
             {
             temp <- poissonbetaupdateMALA(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta[r], list.block)
             }else
             {
-            temp <- poissonbetaupdateRW(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], prior.mean.beta, prior.var.beta, proposal.sd.beta[r])
+            temp <- poissonbetaupdateRW(X.standardised, K, p, beta[ ,r], offset.temp[ ,r], Y.DA[ ,r], prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta[r], list.block)
             }
         beta[ ,r] <- temp[[1]]
         accept.beta[r] <- accept.beta[r] + temp[[2]]

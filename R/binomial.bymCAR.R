@@ -1,4 +1,4 @@
-binomial.bymCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, MALA=TRUE, verbose=TRUE)
+binomial.bymCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, MALA=FALSE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -171,12 +171,12 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)
     ## Sample from beta
     ####################
     offset.temp <- phi + offset + theta
-        if(p>2)
+        if(MALA)
         {
         temp <- binomialbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.DA, failures.DA, trials, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }else
         {
-        temp <- binomialbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, failures.DA, prior.mean.beta, prior.var.beta, proposal.sd.beta)
+        temp <- binomialbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, failures.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
         }
     beta <- temp[[1]]
     accept[1] <- accept[1] + temp[[2]]
