@@ -1,8 +1,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
-
-
 // This file contains the following functions:
 
 // linpredcompute - computing the linear predictor for covariates.
@@ -2328,5 +2326,10 @@ NumericVector gaussiancarmultilevelupdateindiv(List ind_re_list, NumericVector n
     
     return psinew;
 }
+
+
+
+
+
 
 
