@@ -1,4 +1,4 @@
-poisson.glm <- function(formula, data=NULL,  burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, MALA=FALSE, verbose=TRUE)
+poisson.glm <- function(formula, data=NULL,  burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -215,14 +215,13 @@ samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.s
     
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 summary.results <- summary.beta
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
-
     
 #### Create the Fitted values and residuals
 fitted.values <- apply(samples.fitted, 2, mean)

@@ -1,4 +1,4 @@
-zip.glm <- function(formula, formula.omega, data=NULL,  burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,  prior.mean.delta=NULL, prior.var.delta=NULL,  MALA=FALSE, verbose=TRUE)
+zip.glm <- function(formula, formula.omega, data=NULL,  burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,  prior.mean.delta=NULL, prior.var.delta=NULL,  MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -363,19 +363,19 @@ samples.delta.orig <- common.betatransform(samples.delta, V.indicator, V.mean, V
     
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 samples.delta.orig <- mcmc(samples.delta.orig)
-summary.delta <- t(apply(samples.delta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.delta <- t(rbind(apply(samples.delta.orig, 2, mean), apply(samples.delta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.delta <- cbind(summary.delta, rep(n.keep, q), rep(accept.delta,q), effectiveSize(samples.delta.orig), geweke.diag(samples.delta.orig)$z)
     for(i in 1:q)
     {
     rownames(summary.delta)[i] <- paste("omega - ", colnames(V)[i])    
     }
-colnames(summary.delta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.delta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 summary.results <- rbind(summary.beta, summary.delta)
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)

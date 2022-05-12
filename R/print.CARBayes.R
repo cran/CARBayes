@@ -9,7 +9,7 @@ print.CARBayes <- function(x,...)
     n.miss <- ncol(x$samples$Y)
     }
     
-    if(class(x$localised.structure)=="list")
+    if(is.list(x$localised.structure))
     {
         #### Print out the model fitted
         cat("\n#################\n")
@@ -40,7 +40,7 @@ print.CARBayes <- function(x,...)
             print(tab)
             }else
             {}
-    }else if(class(x$localised.structure)=="numeric")
+    }else if(is.numeric(x$localised.structure))
     {
         #### Print out the model fitted
         cat("\n#################\n")
@@ -70,7 +70,7 @@ print.CARBayes <- function(x,...)
         cat("#### Model fitted\n")
         cat("#################\n")
         cat(x$model)
-            if(class(x$formula)=="formula")
+            if(!is.list(x$formula))
             {
             cat("Regression equation - ")
             print(x$formula)    

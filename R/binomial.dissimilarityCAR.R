@@ -1,4 +1,4 @@
-binomial.dissimilarityCAR <- function(formula, data=NULL,  trials, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, MALA=FALSE, verbose=TRUE)
+binomial.dissimilarityCAR <- function(formula, data=NULL,  trials, W, Z, W.binary=TRUE, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -40,7 +40,7 @@ failures.DA <- trials - Y.DA
 
 
 #### Dissimilarity metric matrix
-    if(class(Z)!="list") stop("Z is not a list object.", call.=FALSE)
+    if(!is.list(Z)) stop("Z is not a list object.", call.=FALSE)
     if(sum(is.na(as.numeric(lapply(Z, sum, na.rm=FALSE))))>0) stop("Z contains missing 'NA' values.", call.=FALSE)
 q <- length(Z)
 	if(sum(as.numeric(lapply(Z,nrow))==K) <q) stop("Z contains matrices of the wrong size.", call.=FALSE)
@@ -234,13 +234,7 @@ det.Q <- sum(log(diag(chol.spam(Q))))
 	## Sample from phi
 	####################
     beta.offset <- X.standardised %*% beta + offset
-        if(MALA)
-        {
-        temp1 <- binomialcarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, trials=trials, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
-        }else
-        {
-        temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
-        }
+    temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
     phi <- temp1[[1]]
     phi <- phi - mean(phi)
     accept[3] <- accept[3] + temp1[[2]]
@@ -403,13 +397,13 @@ samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.s
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 samples.alpha <- mcmc(samples.alpha)
-summary.alpha <- t(apply(samples.alpha, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.alpha <- t(rbind(apply(samples.alpha, 2, mean), apply(samples.alpha, 2, quantile, c(0.025, 0.975)))) 
 summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q), effectiveSize(samples.alpha), geweke.diag(samples.alpha)$z)
 
 	if(!is.null(names(Z)))
@@ -426,7 +420,7 @@ summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q), effec
 	}
 
 summary.hyper <- array(NA, c(1 ,7))
-summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper[1, 1:3] <- c(mean(samples.tau2), quantile(samples.tau2, c(0.025, 0.975)))
 summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)

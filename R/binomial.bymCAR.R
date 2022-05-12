@@ -1,4 +1,4 @@
-binomial.bymCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, MALA=FALSE, verbose=TRUE)
+binomial.bymCAR <- function(formula, data=NULL, trials, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -187,13 +187,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)
     ## Sample from phi
     ####################
     beta.offset <- X.standardised %*% beta + theta + offset
-        if(MALA)
-        {
-        temp1 <- binomialcarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, trials=trials, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
-        }else
-        {
-        temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
-        }
+    temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y.DA, failures=failures.DA, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
     phi <- temp1[[1]]
     phi[which(islands==1)] <- phi[which(islands==1)] - mean(phi[which(islands==1)])
     accept[3] <- accept[3] + temp1[[2]]
@@ -205,13 +199,7 @@ tau2.posterior.shape <- prior.tau2[1] + 0.5 * (K-n.islands)
     ## Sample from theta
     ####################
     beta.offset <- as.numeric(X.standardised %*% beta) + phi + offset
-        if(MALA)
-        {
-        temp2 <- binomialindepupdateMALA(nsites=K, theta=theta, sigma2=sigma2, y=Y.DA, failures=failures.DA, trials=trials, theta_tune=proposal.sd.theta, offset=beta.offset) 
-        }else
-        {
-        temp2 <- binomialindepupdateRW(nsites=K, theta=theta, sigma2=sigma2, y=Y.DA, failures=failures.DA, theta_tune=proposal.sd.theta, offset=beta.offset) 
-        }
+    temp2 <- binomialindepupdateRW(nsites=K, theta=theta, sigma2=sigma2, y=Y.DA, failures=failures.DA, theta_tune=proposal.sd.theta, offset=beta.offset) 
     theta <- temp2[[1]]
     theta <- theta - mean(theta)    
     accept[5] <- accept[5] + temp2[[2]]
@@ -338,15 +326,15 @@ samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.s
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 summary.hyper <- array(NA, c(2,7))
-summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper[1, 1:3] <- c(mean(samples.tau2), quantile(samples.tau2, c(0.025, 0.975)))
 summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
-summary.hyper[2, 1:3] <- quantile(samples.sigma2, c(0.5, 0.025, 0.975))
+summary.hyper[2, 1:3] <- c(mean(samples.sigma2), quantile(samples.sigma2, c(0.025, 0.975)))
 summary.hyper[2, 4:7] <- c(n.keep, accept.sigma2, effectiveSize(samples.sigma2), geweke.diag(samples.sigma2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper)

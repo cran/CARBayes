@@ -2,19 +2,19 @@
 \alias{highlight.borders}
 
 \title{
-Creates a SpatialPoints object identifying a subset of borders between neighbouring
-areas.
+Creates a MULTIPOINT object (from the sf package) identifying a subset of borders 
+between neighbouring areas.
 }
 
 
 \description{
-Creates a SpatialPoints object identifying a subset of borders between neighbouring
-areas, which allows them to be overlayed on a map. An example is given in 
-the vignette accompanying this package.
+Creates a MULTIPOINT object (from the sf package) identifying a subset of borders 
+between neighbouring areas, which allows them to be overlayed on a map. 
+An example is given in the vignette accompanying this package.
 }
 
 \usage{
-highlight.borders(border.locations, spdata)
+highlight.borders(border.locations, sfdata)
 }
 
 \arguments{
@@ -24,20 +24,18 @@ NA for non-neighbouring areas; 0 for borders between neighbouring areas to be
 highlighted on a map; and 1 for borders between neighbouring areas not to be 
 highlighted on a map.
 }
-  \item{spdata}{
-The SpatialPolygonsDataFrame object used for plotting the data and creating the 
-original neighbourhood matrix W.
+  \item{sfdata}{
+The MULTIPOLYGON (from the sf package) object used for plotting the data and 
+creating the original neighbourhood matrix W.
 }
 }
 
 
 
 \value{
-\item{ }{A SpatialPoints object from the sp package, which contains
-the vertices of all the borders to be highlighted on the map.  The mapping can 
-be done using the leaflet package, see the vignette accompanying this package
-for an example.
-}
+A MULTIPOINT object from the sf package, which contains the vertices of all the 
+borders to be highlighted on the map.  The mapping can be done using the leaflet 
+package, see the vignette accompanying this package for an example.
 }
 
 \author{

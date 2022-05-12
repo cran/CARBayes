@@ -1,48 +1,52 @@
-highlight.borders <- function(border.locations, spdata)
+highlight.borders <- function(border.locations, sfdata)
 {
 #### This function takes in an n by n matrix where values of one represent non-borders and
-#### values equal to zero represent borders. The function then links this matrix with a
-#### spatialpolygonsdataframe object to identify the borders. The result is a spatialPoints object which can be
-#### plotted.
+#### values equal to zero represent borders. The function then links this matrix with an sf
+#### object to identify the borders. The result is a multilinestring (output=lines) or 
+#### multipoint (output=points) object which can be plotted.
 
-############################
-#### Identify the boundaries
-############################
+#############################################
+#### Create the object to save the results in
+#############################################
 n <- nrow(border.locations)
 border.locations[is.na(border.locations)] <- 2
-boundary.all <- array(c(NA, NA), c(1,2))
-colnames(boundary.all) <- c("X", "Y")
-polygons <- spdata@polygons
+n.boundaries <- sum(border.locations==0) / 2
+boundary.all <- array(c(NA, NA), c(1,2))   
 
 
+
+#####################################
+#### Identify and save the boundaries
+#####################################
      for(i in 1:n)
      {
           for(j in 1:n)
           {
-               if(border.locations[i,j]==0 & i>j)
-               {
-               #### Obtain the points from the spdata object    
-               points1 <- polygons[[i]]@Polygons[[1]]@coords     
-               points2 <- polygons[[j]]@Polygons[[1]]@coords
-                    
-                    
-               #### Determine the points in common
-               which.points <- which(!is.na(match(points1[ ,1], points2[ ,1])) & !is.na(match(points1[ ,2], points2[ ,2])))     
-               common.points <- points1[which.points, ]
-               boundary.all <- rbind(boundary.all, common.points)
-               }else
-               {
-               }
-               
-               
-          }
+                if(border.locations[i,j]==0 & i>j)
+                {
+                #### Obtain the intersection points
+                b1 <- st_boundary(sfdata$geometry[i])
+                b2 <- st_boundary(sfdata$geometry[j])
+                intersect.points <- st_intersection(x=b1, y=b2)
+                intersect.points2 <- st_cast(x=intersect.points, to="MULTIPOINT") 
+                intersect.points3 <- st_coordinates(intersect.points2)[ ,1:2]
+                
+                #### Save them to the boundary object
+                boundary.all <- rbind(boundary.all, intersect.points3)
+                }else
+                {
+                }
+           }
      }
 
 
-#### Create a spatial points object
+
+###############################
+#### Create a MULTIPOINT object
+###############################
 boundary.all <- boundary.all[-1, ]
 boundary.all2 <- boundary.all[!duplicated(boundary.all), ]
-rownames(boundary.all2) <- 1:nrow(boundary.all2)
-boundary.final <- SpatialPoints(boundary.all2)
+boundary.final <- st_multipoint(x=boundary.all2)
 return(boundary.final) 
 }
+

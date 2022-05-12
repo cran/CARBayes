@@ -81,11 +81,11 @@ diffs <- apply(Y, 1, sum, na.rm=T) - trials
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
-    if(is.null(prior.Sigma.df)) prior.Sigma.df <- J
-    if(is.null(prior.Sigma.scale)) prior.Sigma.scale <- diag(rep(1,J)) / 1000
+    if(is.null(prior.Sigma.df)) prior.Sigma.df <- 2
+    if(is.null(prior.Sigma.scale)) prior.Sigma.scale <- rep(100000, (J-1))
 common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
-common.prior.varmat.check(prior.Sigma.scale, J-1) 
-    
+    if(!is.numeric(prior.Sigma.scale)) stop("prior.Sigma.scale has non-numeric values.", call.=FALSE)    
+    if(sum(is.na(prior.Sigma.scale))!=0) stop("prior.Sigma.scale has missing values.", call.=FALSE)   
 
 #### Compute the blocking structure for beta   
 block.temp <- common.betablock(p, 5)
@@ -126,6 +126,8 @@ phi.vec <- rnorm(n=N.re, mean=0, sd=res.sd)
 phi <- matrix(phi.vec, nrow=K, byrow=TRUE)
 Sigma <- cov(phi)
 Sigma.inv <- solve(Sigma)    
+Sigma.a <- rep(1, (J-1))
+
 
 
 ###############################    
@@ -136,6 +138,7 @@ n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, (J-1)*p))
 samples.phi <- array(NA, c(n.keep, N.re))
 samples.Sigma <- array(NA, c(n.keep, (J-1), (J-1)))
+samples.Sigma.a <- array(NA, c(n.keep, (J-1)))
     if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
 samples.loglike <- array(NA, c(n.keep, K.present))
 samples.fitted <- array(NA, c(n.keep, N.all))
@@ -148,7 +151,8 @@ proposal.sd.beta <- rep(0.01, (J-1))
 accept <- rep(0,4)
 proposal.sd.phi <- 0.1
 proposal.sd.rho <- 0.02
-Sigma.post.df <- prior.Sigma.df + K  
+Sigma.post.df <- prior.Sigma.df + K  + J - 2
+Sigma.a.post.shape <- (prior.Sigma.df + J-1) / 2
 
 
 
@@ -184,8 +188,7 @@ W.islands <- n.comp.nb(W.nb)
 islands <- W.islands$comp.id
 islands.all <- rep(islands,J)
 n.islands <- max(W.islands$nc)
-    if(rho==1) Sigma.post.df <- prior.Sigma.df + K - n.islands   
-
+    if(rho==1) Sigma.post.df <- prior.Sigma.df + K  + J - 2 - n.islands   
 
 
 
@@ -261,24 +264,34 @@ n.islands <- max(W.islands$nc)
     ##################
     den.offset <- rho * W.triplet.sum + 1 - rho
     phi.offset <- regression + offset
-    temp1 <- multinomialmcarupdateRW(W.triplet, W.begfin, K, J, phi, Y.DA, phi.offset, den.offset, Sigma.inv, rho,  proposal.sd.phi)      
+    Chol.Sigma <- t(chol(proposal.sd.phi*Sigma))
+    z.mat <- matrix(rnorm(n=N.all-K, mean=0, sd=1), nrow=J-1, ncol=K)
+    innovations <- t(Chol.Sigma %*% z.mat)
+    temp1 <- multinomialmcarupdateRW(W.triplet, W.begfin, K, J, phi, Y.DA, phi.offset, den.offset, Sigma.inv, rho,  proposal.sd.phi, innovations)      
     phi <- temp1[[1]]
-        for(r in 1:(J-1))
-        {
-        phi[ ,r] <- phi[ ,r] - mean(phi[ ,r])    
-        }
+            for(r in 1:(J-1))
+            {
+            phi[ ,r] <- phi[ ,r] - mean(phi[ ,r])    
+            }
     accept[1] <- accept[1] + temp1[[2]]
     accept[2] <- accept[2] + K    
     
     
     
-    ####################    
+    ####################
     ## Sample from Sigma
     ####################
-    Sigma.post.scale <- t(phi) %*% Q %*% phi + prior.Sigma.scale
+    Sigma.post.scale <- 2 * prior.Sigma.df * diag(1 / Sigma.a) + t(phi) %*% Q %*% phi
     Sigma <- riwish(Sigma.post.df, Sigma.post.scale)
     Sigma.inv <- solve(Sigma)
-    
+        
+
+    ######################
+    ## Sample from Sigma.a
+    ######################
+    Sigma.a.posterior.scale <- prior.Sigma.df * diag(Sigma.inv) + 1 / prior.Sigma.scale^2
+    Sigma.a <- 1 / rgamma((J-1), Sigma.a.post.shape, scale=(1/Sigma.a.posterior.scale))   
+
     
     
     ##################    
@@ -330,6 +343,8 @@ n.islands <- max(W.islands$nc)
         samples.beta[ele, ] <- as.numeric(beta)
         samples.phi[ele, ] <- as.numeric(t(phi))
         samples.Sigma[ele, , ] <- Sigma
+        samples.Sigma.a[ele, ] <- Sigma.a
+        samples.Sigma.a[ele, ] <- Sigma.a
             if(!fix.rho) samples.rho[ele, ] <- rho
         samples.loglike[ele, ] <- loglike
         samples.fitted[ele, ] <- as.numeric(t(fitted))
@@ -428,7 +443,7 @@ samples.beta.orig <- samples.beta
     
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,(J-1)*p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 col.name <- rep(NA, p*(J-1))
 
@@ -446,10 +461,10 @@ if(is.null(colnames(Y)))
     }
 }
 rownames(summary.beta) <- col.name
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 summary.hyper <- array(NA, c(J ,7))
-summary.hyper[1:(J-1), 1] <- diag(apply(samples.Sigma, c(2,3), quantile, c(0.5)))
+summary.hyper[1:(J-1), 1] <- diag(apply(samples.Sigma, c(2,3), mean))
 summary.hyper[1:(J-1), 2] <- diag(apply(samples.Sigma, c(2,3), quantile, c(0.025)))
 summary.hyper[1:(J-1), 3] <- diag(apply(samples.Sigma, c(2,3), quantile, c(0.975)))
 summary.hyper[1:(J-1), 4] <- n.keep
@@ -462,7 +477,7 @@ summary.hyper[1:(J-1), 6] <- diag(apply(samples.Sigma, c(2,3), effectiveSize))
 
     if(!fix.rho)
     {
-    summary.hyper[J, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
+    summary.hyper[J, 1:3] <- c(mean(samples.rho), quantile(samples.rho, c(0.025, 0.975)))
     summary.hyper[J, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
     }else
     {

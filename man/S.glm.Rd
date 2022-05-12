@@ -27,7 +27,7 @@ For a full model specification see the vignette accompanying this package.
 \usage{
 S.glm(formula, formula.omega=NULL, family, data=NULL,  trials=NULL, burnin, n.sample, 
 thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL, 
-prior.mean.delta=NULL, prior.var.delta=NULL, MALA=FALSE, verbose=TRUE)
+prior.mean.delta=NULL, prior.var.delta=NULL, MALA=TRUE, verbose=TRUE)
 }
 
 
@@ -82,7 +82,7 @@ assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors 
-are assumed). Defaults to a vector with values 100000.
+are assumed). Defaults to a vector with values 100,000.
 }  
   \item{prior.nu2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -91,16 +91,16 @@ prior for nu2. Defaults to c(1, 0.01) and only used if family="Gaussian".
   \item{prior.mean.delta}{
 A vector of prior means for the regression parameters delta (Gaussian priors are 
 assumed) for the zero probability logistic regression component of the model. 
-Defaults to a vector of zeros.
+Defaults to a vector of zeros. Only used if family="multinomial".
 }
   \item{prior.var.delta}{
 A vector of prior variances for the regression parameters delta (Gaussian priors 
 are assumed) for the zero probability logistic regression component of the model. 
-Defaults to a vector with values 100000.
+Defaults to a vector with values 100,000. Only used if family="multinomial".
 }
 \item{MALA}{
 Logical, should the function use Metropolis adjusted Langevin algorithm (MALA) 
-    updates (TRUE) or simple random walk (FALSE, default) updates for the regression 
+    updates (TRUE, default) or simple random walk updates (FALSE) for the regression 
     parameters. Not applicable if family="gaussian" or family="multinomial".   
 }
     \item{verbose}{
@@ -114,7 +114,7 @@ Logical, should the function update the user on its progress.
 \value{
 \item{summary.results }{A summary table of the parameters.}
 \item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{The fitted values based on posterior medians from the model. 
+\item{fitted.values }{The fitted values based on posterior means from the model. 
 For the univariate data models this is a vector, while for the multivariate data 
 models this is a matrix.}
 \item{residuals }{If the family is "binomial", "gaussian" or "poisson",

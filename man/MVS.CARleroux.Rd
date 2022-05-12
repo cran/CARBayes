@@ -36,7 +36,7 @@
 \usage{
 MVS.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin, 
 n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL,
-prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=FALSE, 
+prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=TRUE, 
 verbose=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -88,19 +88,27 @@ it is a vector of length K.
 }
 \item{prior.var.beta}{
     A vector of prior variances for the regression parameters beta (Gaussian priors 
-     are assumed). Defaults to a vector with values 100000.
+     are assumed). Defaults to a vector with values 100,000.
 }
   \item{prior.nu2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
 prior for nu2. Defaults to c(1, 0.01) and only used if family="Gaussian".   
 }
 \item{prior.Sigma.df}{
-    The prior degrees of freedom for the Inverse-Wishart prior for Sigma. 
-    Defaults to J+1.   
+    The degrees of freedom for the Inverse-Wishart prior formulation for the 
+    covariance matrix Sigma. This prior formulation follows the marginally 
+    weakly-informative specification proposed by Huang and Wand (2013). Defaults 
+    to 2, which corresponds to non-informative uniform priors on the interval [-1,1]
+    being assigned to each correlation parameter within the Sigma matrix. 
 }
 \item{prior.Sigma.scale}{
-    The prior J times J scale matrix for the Inverse-Wishart prior for Sigma. 
-    Defaults to the identity matrix divided by 1000.
+    The J times 1  vector of prior scales for the  square roots of the diagonal 
+    elements of the covariance matrix Sigma. This prior formulation is the marginally 
+    weakly-informative prior specification proposed by Huang and Wand (2013). Thus,
+    the jth element of this vector is the scale parameter for the zero centred
+    half-t prior (with shape given by prior.Sigma.df) assumed for the standard 
+    deviation of the random effects corresponding to the jth outcome. Defaults to 
+    a vector of values of 100,000.
 }
      \item{rho}{
 The value in the interval [0, 1] that the spatial dependence parameter rho is 
@@ -109,11 +117,9 @@ estimated in the model.
 }
 \item{MALA}{
         Logical, should the function use Metropolis adjusted Langevin algorithm 
-        (MALA) updates (TRUE) or simple random walk (FALSE, default) updates for 
-        the regression parameters and the random effects. If family="gaussian" the 
-        MALA argument only applies to the random effects as the regression parameters 
-        are Gibbs sampled. Not applicable if family="multinomial" where random walk 
-        updates are used.  
+        (MALA) updates (TRUE, default) or simple random walk updates (FALSE) for 
+        the regression parameters. Not applicable if family="gaussian" or  
+        family="multinomial".  
 }
 \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -126,8 +132,8 @@ Logical, should the function update the user on its progress.
 \value{
 \item{summary.results }{A summary table of the parameters.}
 \item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{A matrix of fitted values for each area and response 
-variable.}
+\item{fitted.values }{A matrix of fitted values based on posterior means from the model.
+Each row of a matrix relates to an area and each column to a response (category).}
 \item{residuals }{A list with 2 elements, where each element is a matrix of a type  
         of residuals. Each row of a matrix relates to an area and each column to a 
         response (category). The types of residual are "response" (raw), and 
@@ -148,6 +154,9 @@ offset parts of the model}
 \references{
 Gelfand, A and Vounatsou, P (2003). Proper multivariate conditional autoregressive
 models for spatial data analysis, Biostatistics, 4, 11-25.
+
+Huang, A., and Wand, M (2013). Simple Marginally Noninformative Prior Distributions 
+for Covariance Matrices. Bayesian Analysis, 8, 439-452.
 
 Kavanagh, L., D. Lee, and G. Pryce (2016). Is Poverty Decentralising? Quantifying 
 Uncertainty in the Decentralisation of Urban Poverty, Annals of the American 

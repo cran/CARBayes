@@ -5,7 +5,7 @@ residuals <- object$residuals
 
 #### The multivariate models provides lists the univariate models provide matrices
 
-    if(class(residuals)=="list")
+    if(is.list(residuals))
     {
     #### Return one of two types of residuals
         if(type=="response")

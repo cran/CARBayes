@@ -17,9 +17,8 @@ is modelled by  a set of random effects that are assigned a conditional
 autoregressive (CAR) prior distribution. A number of different models are 
 available for univariate spatial data, including models with no random effects as 
 well as random effects modelled by different types of CAR prior, including the 
-BYM model (Besag et al. (1991) <doi:10.1007/BF00116466>), the Leroux model 
-(Leroux et al. (2000) <doi:10.1007/978-1-4612-1284-3_4>) and the localised model 
-(Lee et al. (2015) <doi:10.1002/env.2348>). Additionally,  a multivariate CAR 
+BYM model (Besag et al., 1991, <doi:10.1007/BF00116466>) and the Leroux model 
+(Leroux et al., 2000, <doi:10.1007/978-1-4612-1284-3_4>). Additionally,  a multivariate CAR 
 (MCAR) model for multivariate spatial data is available, as is a two-level 
 hierarchical  model for modelling data relating to individuals within areas. Full 
 details are given in the vignette accompanying this package. The initial creation 
@@ -34,8 +33,8 @@ grant NE/N007352/1 and the TB Alliance.
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 5.2.5\cr
-Date: \tab 2021-09-30\cr
+Version: \tab 5.3\cr
+Date: \tab 2022-05-13\cr
 License: \tab GPL (>= 2)\cr
 }
 }

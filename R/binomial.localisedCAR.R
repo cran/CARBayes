@@ -1,4 +1,4 @@
-binomial.localisedCAR <- function(formula, data=NULL, trials, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=FALSE, verbose=TRUE)
+binomial.localisedCAR <- function(formula, data=NULL, trials, G, W, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.delta = NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -205,14 +205,8 @@ W.begfin <- W.quants$W.begfin
      ##################
      ## Sample from phi
      ##################
-     beta.offset <- regression.vec + offset  + lambda[Z]
-        if(MALA)
-        {
-        temp1 <- binomialcarupdateMALA(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, trials=trials, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
-        }else
-        {
-        temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=beta.offset)
-        }
+     phi.offset <- regression.vec + offset  + lambda[Z]
+     temp1 <- binomialcarupdateRW(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, nsites=K, phi=phi, tau2=tau2, y=Y, failures=failures, phi_tune=proposal.sd.phi, rho=1, offset=phi.offset)
      phi <- temp1[[1]]
           for(i in 1:G)
           {
@@ -425,13 +419,13 @@ modelfit <- common.modelfit(samples.loglike, deviance.fitted)
 
 #### Create a summary object   
 summary.hyper <- array(NA, c(2 ,7))
-summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper[1, 1:3] <- c(mean(samples.tau2), quantile(samples.tau2, c(0.025, 0.975)))
 summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
-summary.hyper[2, 1:3] <- quantile(samples.delta, c(0.5, 0.025, 0.975))
+summary.hyper[2, 1:3] <- c(mean(samples.delta), quantile(samples.delta, c(0.025, 0.975)))
 summary.hyper[2, 4:7] <- c(n.keep, accept.delta, effectiveSize(samples.delta), geweke.diag(samples.delta)$z)
 
 samples.lambda <- mcmc(samples.lambda)
-summary.lambda <- t(apply(samples.lambda, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.lambda <- t(rbind(apply(samples.lambda, 2, mean), apply(samples.lambda, 2, quantile, c(0.025, 0.975)))) 
 summary.lambda <- cbind(summary.lambda, rep(n.keep, G), rep(accept.lambda, G), effectiveSize(samples.lambda), geweke.diag(samples.lambda)$z)
 Z.used <- as.numeric(names(table(samples.Z)))
 summary.lambda <- summary.lambda[Z.used, ]
@@ -439,19 +433,19 @@ summary.lambda <- summary.lambda[Z.used, ]
     if(!is.null(X))
     {
     samples.beta.orig <- mcmc(samples.beta.orig)
-    summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+    summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
     summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
     rownames(summary.beta) <- colnames(X)
     summary.results <- rbind(summary.beta, summary.lambda, summary.hyper)  
     row.names(summary.results)[(p+1):nrow(summary.results)] <- c(paste("lambda", Z.used, sep=""), "tau2", "delta")
-    colnames(summary.results) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+    colnames(summary.results) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
     summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
     summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
     }else
     {
     summary.results <- rbind(summary.lambda, summary.hyper)
     row.names(summary.results) <- c(paste("lambda", Z.used, sep=""), "tau2", "delta")
-    colnames(summary.results) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+    colnames(summary.results) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
     summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
     summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
     }

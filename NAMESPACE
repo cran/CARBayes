@@ -1,6 +1,5 @@
 useDynLib(CARBayes, .registration = TRUE)
 export(
-     combine.data.shapefile,
 	 highlight.borders,
 	 MVS.CARleroux,
      S.CARbym, 
@@ -8,9 +7,7 @@ export(
      S.CARleroux,
      S.CARlocalised,
 	 S.CARmultilevel,
-	 S.glm,
-     summarise.lincomb,
-     summarise.samples
+	 S.glm
      )
 S3method(print, CARBayes)
 S3method(fitted, CARBayes)
@@ -22,14 +19,13 @@ import(Rcpp)
 import(CARBayesdata)
 import(leaflet)
 import(MASS)
+import(sf)
 importFrom(truncnorm, rtruncnorm, dtruncnorm)
 importFrom(spam, as.spam,  chol.spam, diag, rowSums)
 importFrom(coda, mcmc, geweke.diag, effectiveSize)
 importFrom(GGally, ggpairs)
 importFrom(dplyr, mutate)
-importFrom(sp, Polygon,  Polygons, SpatialPolygons, SpatialPolygonsDataFrame, SpatialPoints)
 importFrom(spdep, mat2listw, n.comp.nb)
 importFrom(utils, setTxtProgressBar, txtProgressBar)
-import(rgdal)
 import(stats)
 importFrom(MCMCpack, riwish)

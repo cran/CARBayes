@@ -1,4 +1,4 @@
-poisson.multilevelCAR <- function(formula, data=NULL,  W, ind.area, ind.re=NULL, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, prior.sigma2=NULL, rho=NULL,  MALA=FALSE, verbose=TRUE)
+poisson.multilevelCAR <- function(formula, data=NULL,  W, ind.area, burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.tau2=NULL, rho=NULL,  MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -82,35 +82,12 @@ n.individual.miss <- rep(0,K)
     }
 
 
-#### Checks and formatting for ind.re
-    if(!is.null(ind.re))
-    {
-        if(!is.factor(ind.re)) stop("ind.re is not a factor.", call.=FALSE)
-    ind.re.unique <- levels(ind.re)
-    q <- length(ind.re.unique)
-    ind.re.list <- as.list(rep(NA,q))
-    ind.re.num <- rep(NA, n)
-        for(r in 1:q)
-        {
-        which.re.ind <- which(ind.re==ind.re.unique[r])
-        ind.re.list[[r]] <- which.re.ind
-        ind.re.num[which.re.ind] <- r
-        }
-    n.re <- as.numeric(lapply(ind.re.list,length))
-    }else
-    {
-    cat("There are no individual level effects in this model\n")    
-    }
-
-    
 #### Priors
     if(is.null(prior.mean.beta)) prior.mean.beta <- rep(0, p)
     if(is.null(prior.var.beta)) prior.var.beta <- rep(100000, p)
     if(is.null(prior.tau2)) prior.tau2 <- c(1, 0.01)
-    if(is.null(prior.sigma2)) prior.sigma2 <- c(1, 0.01)   
 common.prior.beta.check(prior.mean.beta, prior.var.beta, p)
 common.prior.var.check(prior.tau2)    
-common.prior.var.check(prior.sigma2)  
 
 
 #### Compute the blocking structure for beta     
@@ -147,16 +124,7 @@ res.sd <- sd(res.temp, na.rm=TRUE)/5
 phi <- rnorm(n=K, mean=rep(0,K), sd=res.sd)
 phi.extend <- phi[ind.area]
 tau2 <- var(phi) / 10
-    if(!is.null(ind.re))
-    {
-    psi <- rnorm(n=q, mean=rep(0,q), sd=res.sd/5)
-    psi.extend <- psi[ind.re.num]
-    sigma2 <- var(psi) / 10
-    }else
-    {
-    psi.extend <- rep(0, n)
-    }
-lp <- as.numeric(X.standardised %*% beta) + phi.extend + psi.extend + offset
+lp <- as.numeric(X.standardised %*% beta) + phi.extend + offset
 fitted <- exp(lp)
 
 
@@ -169,8 +137,6 @@ n.keep <- floor((n.sample - burnin)/thin)
 samples.beta <- array(NA, c(n.keep, p))
 samples.phi <- array(NA, c(n.keep, K))
 samples.tau2 <- array(NA, c(n.keep, 1))
-    if(!is.null(ind.re)) samples.psi <- array(NA, c(n.keep, q))
-    if(!is.null(ind.re)) samples.sigma2 <- array(NA, c(n.keep, 1))
     if(!fix.rho) samples.rho <- array(NA, c(n.keep, 1))
 samples.loglike <- array(NA, c(n.keep, n))
 samples.fitted <- array(NA, c(n.keep, n))
@@ -178,13 +144,11 @@ samples.fitted <- array(NA, c(n.keep, n))
     
 
 #### Metropolis quantities
-accept <- rep(0,8)
+accept <- rep(0,6)
 proposal.sd.beta <- 0.01
 proposal.sd.phi <- 0.1
-    if(!is.null(ind.re)) proposal.sd.psi <- 0.1
 proposal.sd.rho <- 0.02
 tau2.posterior.shape <- prior.tau2[1] + 0.5 * K
-    if(!is.null(ind.re)) sigma2.posterior.shape <- prior.sigma2[1] + 0.5 * q     
     
  
 #### Check for islands
@@ -229,7 +193,7 @@ n.islands <- max(W.islands$nc)
     ####################
     ## Sample from beta
     ####################
-    offset.temp <- phi.extend + offset + psi.extend
+    offset.temp <- phi.extend + offset
         if(MALA)
         {
         temp <- poissonbetaupdateMALA(X.standardised, n, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
@@ -246,7 +210,7 @@ n.islands <- max(W.islands$nc)
     ####################
     ## Sample from phi
     ####################
-    beta.offset <- X.standardised %*% beta + offset + psi.extend
+    beta.offset <- X.standardised %*% beta + offset
     temp1 <- poissoncarmultilevelupdate(Wtriplet=W.triplet, Wbegfin=W.begfin, Wtripletsum=W.triplet.sum, ind_area_list=ind.area.list, n_individual=n.individual, nsites=K, phi=phi, tau2=tau2, y=Y.DA, phi_tune=proposal.sd.phi, rho=rho, offset=beta.offset)
     phi <- temp1[[1]]
         if(rho<1)
@@ -259,28 +223,6 @@ n.islands <- max(W.islands$nc)
     accept[3] <- accept[3] + temp1[[2]]
     accept[4] <- accept[4] + K    
     phi.extend <- phi[ind.area]
-        
-       
-    
-    #############################
-    ## Sample from psi and sigma2
-    #############################
-        if(!is.null(ind.re))
-        {
-        #### Update psi 
-        beta.offset <- X.standardised %*% beta + offset + phi.extend
-        temp1b <-  poissoncarmultilevelupdateindiv(ind_re_list=ind.re.list, n_re=n.re, q=q, psi=psi, sigma2=sigma2, y=Y.DA, psi_tune=proposal.sd.psi, offset=beta.offset)
-        psi <- temp1b[[1]] - mean(temp1b[[1]])
-        accept[7] <- accept[7] + temp1b[[2]]
-        accept[8] <- accept[8] + q    
-        psi.extend <- psi[ind.re.num]        
-           
-           
-        #### Update sigma2    
-        sigma2.posterior.scale <- 0.5 * sum(psi^2) + prior.sigma2[2] 
-        sigma2 <- 1 / rgamma(1, sigma2.posterior.shape, scale=(1/sigma2.posterior.scale))
-        }else
-        {}
         
         
         
@@ -324,7 +266,7 @@ n.islands <- max(W.islands$nc)
     #########################
     ## Calculate the deviance
     #########################
-    lp <- as.numeric(X.standardised %*% beta) + phi.extend + psi.extend + offset
+    lp <- as.numeric(X.standardised %*% beta) + phi.extend + offset
     fitted <- exp(lp)
     loglike <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
         
@@ -339,8 +281,6 @@ n.islands <- max(W.islands$nc)
         samples.beta[ele, ] <- beta
         samples.phi[ele, ] <- phi
         samples.tau2[ele, ] <- tau2
-            if(!is.null(ind.re)) samples.psi[ele, ] <- psi
-            if(!is.null(ind.re)) samples.sigma2[ele, ] <- sigma2
             if(!fix.rho) samples.rho[ele, ] <- rho
         samples.loglike[ele, ] <- loglike
         samples.fitted[ele, ] <- fitted
@@ -365,8 +305,7 @@ n.islands <- max(W.islands$nc)
             }
         proposal.sd.phi <- common.accceptrates1(accept[3:4], proposal.sd.phi, 40, 50)
             if(!fix.rho) proposal.sd.rho <- common.accceptrates2(accept[5:6], proposal.sd.rho, 40, 50, 0.5)
-            if(!is.null(ind.re)) proposal.sd.psi <- common.accceptrates1(accept[7:8], proposal.sd.psi, 40, 50)
-        accept <- rep(0,8)
+        accept <- rep(0,6)
         }else
         {}
         
@@ -405,33 +344,16 @@ accept.phi <- 100 * accept[3] / accept[4]
     {
     accept.rho <- NA    
     }
-    if(!is.null(ind.re))
-    {
-    accept.psi <- 100 * accept[7] / accept[8]
-    accept.sigma2 <- 100
-    }else
-    {
-    accept.psi <- NA
-    accept.sigma2 <- NA
-    }
 accept.tau2 <- 100
-accept.final <- c(accept.beta, accept.phi, accept.psi, accept.rho, accept.tau2, accept.sigma2)
-names(accept.final) <- c("beta", "phi","psi", "rho", "tau2", "sigma2")
+accept.final <- c(accept.beta, accept.phi, accept.rho, accept.tau2)
+names(accept.final) <- c("beta", "phi","rho", "tau2")
     
     
 #### Compute the fitted deviance
 mean.beta <- apply(samples.beta, 2, mean)
 mean.phi <- apply(samples.phi, 2, mean)
 mean.phi.extend <-  mean.phi[ind.area]
-    if(!is.null(ind.re))
-    {
-    mean.psi <- apply(samples.psi, 2, mean)
-    mean.psi.extend <-  mean.psi[ind.re.num]
-    }else
-    {
-    mean.psi.extend <- rep(0,n)
-    }
-fitted.mean <- exp(X.standardised %*% mean.beta + mean.phi.extend + mean.psi.extend + offset)
+fitted.mean <- exp(X.standardised %*% mean.beta + mean.phi.extend + offset)
 deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE), na.rm=TRUE)
   
   
@@ -445,38 +367,29 @@ samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.s
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
     
-summary.hyper <- array(NA, c(3 ,7))
-summary.hyper[1, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper <- array(NA, c(2 ,7))
+summary.hyper[1, 1:3] <- c(mean(samples.tau2), quantile(samples.tau2, c(0.025, 0.975)))
 summary.hyper[1, 4:7] <- c(n.keep, accept.tau2, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
-    if(!is.null(ind.re))
+     if(!fix.rho)
     {
-    summary.hyper[2, 1:3] <- quantile(samples.sigma2, c(0.5, 0.025, 0.975))
-    summary.hyper[2, 4:7] <- c(n.keep, 100, effectiveSize(samples.sigma2), geweke.diag(samples.sigma2)$z)
+    summary.hyper[2, 1:3] <- c(mean(samples.rho), quantile(samples.rho, c(0.025, 0.975)))
+    summary.hyper[2, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
     }else
     {
-    summary.hyper[2, ] <- rep(NA, 7)   
-    }
-    if(!fix.rho)
-    {
-    summary.hyper[3, 1:3] <- quantile(samples.rho, c(0.5, 0.025, 0.975))
-    summary.hyper[3, 4:7] <- c(n.keep, accept.rho, effectiveSize(samples.rho), geweke.diag(samples.rho)$z)
-    }else
-    {
-    summary.hyper[3, 1:3] <- c(rho, rho, rho)
-    summary.hyper[3, 4:7] <- rep(NA, 4)
+    summary.hyper[2, 1:3] <- c(rho, rho, rho)
+    summary.hyper[2, 4:7] <- rep(NA, 4)
     }
     
 summary.results <- rbind(summary.beta, summary.hyper)
-rownames(summary.results)[(nrow(summary.results)-2):nrow(summary.results)] <- c("tau2", "sigma2", "rho")
+rownames(summary.results)[(nrow(summary.results)-1):nrow(summary.results)] <- c("tau2", "rho")
 summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
 summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
-    if(is.null(ind.re)) summary.results <- summary.results[-(nrow(summary.results)-1), ]      
-    
+
 
 #### Create the Fitted values and residuals
 fitted.values <- apply(samples.fitted, 2, mean)
@@ -486,19 +399,11 @@ residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
 
     
 #### Compile and return the results
-    if(is.null(ind.re))
-    {
-    model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Multilevel Leroux CAR\n")
-    }else
-    {
-    model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Multilevel Leroux CAR with factor random effects\n")
-    }
+model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - Multilevel Leroux CAR\n")
     if(fix.rho) samples.rho=NA
     if(n.miss==0) samples.Y = NA
-    if(is.null(ind.re)) samples.sigma2 = NA    
-    if(is.null(ind.re)) samples.psi = NA  
 
-samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), zeta=mcmc(samples.psi), tau2=mcmc(samples.tau2), sigma2=mcmc(samples.sigma2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
+samples <- list(beta=samples.beta.orig, phi=mcmc(samples.phi), tau2=mcmc(samples.tau2), rho=mcmc(samples.rho), fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
 results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
 class(results) <- "CARBayes"
     

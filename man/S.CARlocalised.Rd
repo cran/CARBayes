@@ -24,7 +24,7 @@ accompanying this package.
 \usage{
 S.CARlocalised(formula, family, data=NULL, G, trials=NULL, W,
 burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL,
-prior.tau2=NULL,prior.delta=NULL, MALA=FALSE, verbose=TRUE)
+prior.tau2=NULL,prior.delta=NULL, MALA=TRUE, verbose=TRUE)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -73,7 +73,7 @@ assumed). Defaults to a vector of zeros.
 }
   \item{prior.var.beta}{
 A vector of prior variances for the regression parameters beta (Gaussian priors 
-are assumed). Defaults to a vector with values 100000.
+are assumed). Defaults to a vector with values 100,000.
 }  
      \item{prior.tau2}{
 The prior shape and scale in the form of c(shape, scale) for an Inverse-Gamma(shape, scale) 
@@ -84,8 +84,8 @@ The prior maximum for the cluster smoothing parameter delta. Defaults to 10.
 }
     \item{MALA}{
         Logical, should the function use Metropolis adjusted Langevin algorithm 
-        (MALA) updates (TRUE) or simple random walk (FALSE, default) updates for 
-        the regression parameters and random effects.   
+        (MALA) updates (TRUE, default) or simple random walk updates (FALSE) for 
+        the regression parameters.   
 }
   \item{verbose}{
 Logical, should the function update the user on its progress.  
@@ -97,7 +97,7 @@ Logical, should the function update the user on its progress.
 \value{
 \item{summary.results }{A summary table of the parameters.}
 \item{samples }{A list containing the MCMC samples from the model.}
-\item{fitted.values }{A vector of fitted values for each area.}
+\item{fitted.values }{The fitted values based on posterior means from the model.}
 \item{residuals }{A matrix with 2 columns where each column is a type of 
         residual and each row relates to an area. The types are "response" (raw), 
         and "pearson".}

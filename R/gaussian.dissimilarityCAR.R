@@ -24,7 +24,7 @@ Y.DA <- Y
 
 
 #### Dissimilarity metric matrix
-    if(class(Z)!="list") stop("Z is not a list object.", call.=FALSE)
+    if(!is.list(Z)) stop("Z is not a list object.", call.=FALSE)
     if(sum(is.na(as.numeric(lapply(Z, sum, na.rm=FALSE))))>0) stop("Z contains missing 'NA' values.", call.=FALSE)
 q <- length(Z)
 	if(sum(as.numeric(lapply(Z,nrow))==K) <q) stop("Z contains matrices of the wrong size.", call.=FALSE)
@@ -365,13 +365,13 @@ samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.s
 
 #### Create a summary object
 samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(apply(samples.beta.orig, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
 summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(100,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
 rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Median", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
 
 samples.alpha <- mcmc(samples.alpha)
-summary.alpha <- t(apply(samples.alpha, 2, quantile, c(0.5, 0.025, 0.975))) 
+summary.alpha <- t(rbind(apply(samples.alpha, 2, mean), apply(samples.alpha, 2, quantile, c(0.025, 0.975)))) 
 summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q), effectiveSize(samples.alpha), geweke.diag(samples.alpha)$z)
 
 	if(!is.null(names(Z)))
@@ -388,9 +388,9 @@ summary.alpha <- cbind(summary.alpha, rep(n.keep, q), rep(accept.alpha,q), effec
 	}
 
 summary.hyper <- array(NA, c(2 ,7))
-summary.hyper[1, 1:3] <- quantile(samples.nu2, c(0.5, 0.025, 0.975))
+summary.hyper[1, 1:3] <- c(mean(samples.nu2), quantile(samples.nu2, c(0.025, 0.975)))
 summary.hyper[1, 4:7] <- c(n.keep, 100, effectiveSize(samples.nu2), geweke.diag(samples.nu2)$z)
-summary.hyper[2, 1:3] <- quantile(samples.tau2, c(0.5, 0.025, 0.975))
+summary.hyper[2, 1:3] <- c(mean(samples.tau2), quantile(samples.tau2, c(0.025, 0.975)))
 summary.hyper[2, 4:7] <- c(n.keep, 100, effectiveSize(samples.tau2), geweke.diag(samples.tau2)$z)
 
 summary.results <- rbind(summary.beta, summary.hyper, summary.alpha)

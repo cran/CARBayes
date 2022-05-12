@@ -5,6 +5,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // linpredcompute
 NumericVector linpredcompute(NumericMatrix X, const int nsites, const int p, NumericVector beta, NumericVector offset);
 RcppExport SEXP _CARBayes_linpredcompute(SEXP XSEXP, SEXP nsitesSEXP, SEXP pSEXP, SEXP betaSEXP, SEXP offsetSEXP) {
@@ -37,25 +42,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// binomialcarupdateMALA
-List binomialcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const NumericVector failures, NumericVector trials, const double phi_tune, double rho, NumericVector offset);
-RcppExport SEXP _CARBayes_binomialcarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP trialsSEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP) {
+// binomialindepupdateRW
+List binomialindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const NumericVector failures, const double theta_tune, NumericVector offset);
+RcppExport SEXP _CARBayes_binomialindepupdateRW(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type Wtripletsum(WtripletsumSEXP);
     Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< double >::type tau2(tau2SEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
     Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
     Rcpp::traits::input_parameter< const NumericVector >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type trials(trialsSEXP);
-    Rcpp::traits::input_parameter< const double >::type phi_tune(phi_tuneSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialcarupdateMALA(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, trials, phi_tune, rho, offset));
+    rcpp_result_gen = Rcpp::wrap(binomialindepupdateRW(nsites, theta, sigma2, y, failures, theta_tune, offset));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -77,6 +77,28 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
     rcpp_result_gen = Rcpp::wrap(binomialcarupdateRW(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, failures, phi_tune, rho, offset));
+    return rcpp_result_gen;
+END_RCPP
+}
+// binomialbetaupdateRW
+List binomialbetaupdateRW(NumericMatrix X, const int nsites, const int p, NumericVector beta, NumericVector offset, NumericVector y, NumericVector failures, NumericVector prior_meanbeta, NumericVector prior_varbeta, const int nblock, double beta_tune, List block_list);
+RcppExport SEXP _CARBayes_binomialbetaupdateRW(SEXP XSEXP, SEXP nsitesSEXP, SEXP pSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP prior_meanbetaSEXP, SEXP prior_varbetaSEXP, SEXP nblockSEXP, SEXP beta_tuneSEXP, SEXP block_listSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
+    Rcpp::traits::input_parameter< const int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type y(ySEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type failures(failuresSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type prior_meanbeta(prior_meanbetaSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type prior_varbeta(prior_varbetaSEXP);
+    Rcpp::traits::input_parameter< const int >::type nblock(nblockSEXP);
+    Rcpp::traits::input_parameter< double >::type beta_tune(beta_tuneSEXP);
+    Rcpp::traits::input_parameter< List >::type block_list(block_listSEXP);
+    rcpp_result_gen = Rcpp::wrap(binomialbetaupdateRW(X, nsites, p, beta, offset, y, failures, prior_meanbeta, prior_varbeta, nblock, beta_tune, block_list));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -103,79 +125,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// binomialbetaupdateRW
-List binomialbetaupdateRW(NumericMatrix X, const int nsites, const int p, NumericVector beta, NumericVector offset, NumericVector y, NumericVector failures, NumericVector prior_meanbeta, NumericVector prior_varbeta, const int nblock, double beta_tune, List block_list);
-RcppExport SEXP _CARBayes_binomialbetaupdateRW(SEXP XSEXP, SEXP nsitesSEXP, SEXP pSEXP, SEXP betaSEXP, SEXP offsetSEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP prior_meanbetaSEXP, SEXP prior_varbetaSEXP, SEXP nblockSEXP, SEXP beta_tuneSEXP, SEXP block_listSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type X(XSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< const int >::type p(pSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type prior_meanbeta(prior_meanbetaSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type prior_varbeta(prior_varbetaSEXP);
-    Rcpp::traits::input_parameter< const int >::type nblock(nblockSEXP);
-    Rcpp::traits::input_parameter< double >::type beta_tune(beta_tuneSEXP);
-    Rcpp::traits::input_parameter< List >::type block_list(block_listSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialbetaupdateRW(X, nsites, p, beta, offset, y, failures, prior_meanbeta, prior_varbeta, nblock, beta_tune, block_list));
-    return rcpp_result_gen;
-END_RCPP
-}
-// binomialindepupdateMALA
-List binomialindepupdateMALA(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const NumericVector failures, const NumericVector trials, const double theta_tune, NumericVector offset);
-RcppExport SEXP _CARBayes_binomialindepupdateMALA(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP trialsSEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type trials(trialsSEXP);
-    Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialindepupdateMALA(nsites, theta, sigma2, y, failures, trials, theta_tune, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
-// binomialindepupdateRW
-List binomialindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const NumericVector failures, const double theta_tune, NumericVector offset);
-RcppExport SEXP _CARBayes_binomialindepupdateRW(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialindepupdateRW(nsites, theta, sigma2, y, failures, theta_tune, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
-// poissonindepupdateMALA
-List poissonindepupdateMALA(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const double theta_tune, NumericVector offset);
-RcppExport SEXP _CARBayes_poissonindepupdateMALA(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissonindepupdateMALA(nsites, theta, sigma2, y, theta_tune, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
 // poissonindepupdateRW
 List poissonindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const double theta_tune, NumericVector offset);
 RcppExport SEXP _CARBayes_poissonindepupdateRW(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP) {
@@ -189,6 +138,26 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
     rcpp_result_gen = Rcpp::wrap(poissonindepupdateRW(nsites, theta, sigma2, y, theta_tune, offset));
+    return rcpp_result_gen;
+END_RCPP
+}
+// poissoncarupdateRW
+List poissoncarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const double phi_tune, double rho, NumericVector offset);
+RcppExport SEXP _CARBayes_poissoncarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type Wtripletsum(WtripletsumSEXP);
+    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type phi(phiSEXP);
+    Rcpp::traits::input_parameter< double >::type tau2(tau2SEXP);
+    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const double >::type phi_tune(phi_tuneSEXP);
+    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
+    rcpp_result_gen = Rcpp::wrap(poissoncarupdateRW(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -234,46 +203,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// poissoncarupdateMALA
-List poissoncarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const double phi_tune, double rho, NumericVector offset);
-RcppExport SEXP _CARBayes_poissoncarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type Wtripletsum(WtripletsumSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< double >::type tau2(tau2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type phi_tune(phi_tuneSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissoncarupdateMALA(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
-// poissoncarupdateRW
-List poissoncarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const double phi_tune, double rho, NumericVector offset);
-RcppExport SEXP _CARBayes_poissoncarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type Wtripletsum(WtripletsumSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< double >::type tau2(tau2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type phi_tune(phi_tuneSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissoncarupdateRW(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
 // zipcarupdateRW
 List zipcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const double phi_tune, double rho, NumericVector offset, NumericVector poiind);
 RcppExport SEXP _CARBayes_zipcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP, SEXP poiindSEXP) {
@@ -295,27 +224,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// zipcarupdateMALA
-List zipcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, NumericVector Wtripletsum, const int nsites, NumericVector phi, double tau2, const NumericVector y, const double phi_tune, double rho, NumericVector offset, NumericVector poiind);
-RcppExport SEXP _CARBayes_zipcarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP WtripletsumSEXP, SEXP nsitesSEXP, SEXP phiSEXP, SEXP tau2SEXP, SEXP ySEXP, SEXP phi_tuneSEXP, SEXP rhoSEXP, SEXP offsetSEXP, SEXP poiindSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type Wtripletsum(WtripletsumSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< double >::type tau2(tau2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type phi_tune(phi_tuneSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type poiind(poiindSEXP);
-    rcpp_result_gen = Rcpp::wrap(zipcarupdateMALA(Wtriplet, Wbegfin, Wtripletsum, nsites, phi, tau2, y, phi_tune, rho, offset, poiind));
-    return rcpp_result_gen;
-END_RCPP
-}
 // zipindepupdateRW
 List zipindepupdateRW(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const double theta_tune, NumericVector offset, NumericVector poiind);
 RcppExport SEXP _CARBayes_zipindepupdateRW(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP, SEXP poiindSEXP) {
@@ -330,23 +238,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type poiind(poiindSEXP);
     rcpp_result_gen = Rcpp::wrap(zipindepupdateRW(nsites, theta, sigma2, y, theta_tune, offset, poiind));
-    return rcpp_result_gen;
-END_RCPP
-}
-// zipindepupdateMALA
-List zipindepupdateMALA(const int nsites, NumericVector theta, double sigma2, const NumericVector y, const double theta_tune, NumericVector offset, NumericVector poiind);
-RcppExport SEXP _CARBayes_zipindepupdateMALA(SEXP nsitesSEXP, SEXP thetaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP theta_tuneSEXP, SEXP offsetSEXP, SEXP poiindSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type theta_tune(theta_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type poiind(poiindSEXP);
-    rcpp_result_gen = Rcpp::wrap(zipindepupdateMALA(nsites, theta, sigma2, y, theta_tune, offset, poiind));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -369,32 +260,9 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// binomialmcarupdateMALA
-List binomialmcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix failures, NumericMatrix trials, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune);
-RcppExport SEXP _CARBayes_binomialmcarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP failuresSEXP, SEXP trialsSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< const int >::type nvar(nvarSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type trials(trialsSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phioffset(phioffsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type denoffset(denoffsetSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialmcarupdateMALA(Wtriplet, Wbegfin, nsites, nvar, phi, Y, failures, trials, phioffset, denoffset, Sigmainv, rho, phi_tune));
-    return rcpp_result_gen;
-END_RCPP
-}
 // binomialmcarupdateRW
-List binomialmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix failures, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune);
-RcppExport SEXP _CARBayes_binomialmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP failuresSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP) {
+List binomialmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix failures, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune, NumericMatrix innovations);
+RcppExport SEXP _CARBayes_binomialmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP failuresSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP, SEXP innovationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -410,34 +278,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
     Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
     Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, failures, phioffset, denoffset, Sigmainv, rho, phi_tune));
-    return rcpp_result_gen;
-END_RCPP
-}
-// poissonmcarupdateMALA
-List poissonmcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune);
-RcppExport SEXP _CARBayes_poissonmcarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< const int >::type nvar(nvarSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phioffset(phioffsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type denoffset(denoffsetSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissonmcarupdateMALA(Wtriplet, Wbegfin, nsites, nvar, phi, Y, phioffset, denoffset, Sigmainv, rho, phi_tune));
+    Rcpp::traits::input_parameter< NumericMatrix >::type innovations(innovationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(binomialmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, failures, phioffset, denoffset, Sigmainv, rho, phi_tune, innovations));
     return rcpp_result_gen;
 END_RCPP
 }
 // poissonmcarupdateRW
-List poissonmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune);
-RcppExport SEXP _CARBayes_poissonmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP) {
+List poissonmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune, NumericMatrix innovations);
+RcppExport SEXP _CARBayes_poissonmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP, SEXP innovationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -452,13 +300,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
     Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
     Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissonmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, phioffset, denoffset, Sigmainv, rho, phi_tune));
+    Rcpp::traits::input_parameter< NumericMatrix >::type innovations(innovationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(poissonmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, phioffset, denoffset, Sigmainv, rho, phi_tune, innovations));
     return rcpp_result_gen;
 END_RCPP
 }
 // gaussianmcarupdateRW
-List gaussianmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, NumericVector nu2, double phi_tune);
-RcppExport SEXP _CARBayes_gaussianmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP nu2SEXP, SEXP phi_tuneSEXP) {
+List gaussianmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, NumericVector nu2, double phi_tune, NumericMatrix innovations);
+RcppExport SEXP _CARBayes_gaussianmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP nu2SEXP, SEXP phi_tuneSEXP, SEXP innovationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -473,28 +322,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type nu2(nu2SEXP);
     Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(gaussianmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, phioffset, denoffset, Sigmainv, rho, nu2, phi_tune));
-    return rcpp_result_gen;
-END_RCPP
-}
-// gaussianmcarupdateMALA
-List gaussianmcarupdateMALA(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, NumericVector nu2, double phi_tune);
-RcppExport SEXP _CARBayes_gaussianmcarupdateMALA(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP nu2SEXP, SEXP phi_tuneSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wtriplet(WtripletSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Wbegfin(WbegfinSEXP);
-    Rcpp::traits::input_parameter< const int >::type nsites(nsitesSEXP);
-    Rcpp::traits::input_parameter< const int >::type nvar(nvarSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type phioffset(phioffsetSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type denoffset(denoffsetSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
-    Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type nu2(nu2SEXP);
-    Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(gaussianmcarupdateMALA(Wtriplet, Wbegfin, nsites, nvar, phi, phioffset, denoffset, Sigmainv, rho, nu2, phi_tune));
+    Rcpp::traits::input_parameter< NumericMatrix >::type innovations(innovationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(gaussianmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, phioffset, denoffset, Sigmainv, rho, nu2, phi_tune, innovations));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -523,8 +352,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // multinomialmcarupdateRW
-List multinomialmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune);
-RcppExport SEXP _CARBayes_multinomialmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP) {
+List multinomialmcarupdateRW(NumericMatrix Wtriplet, NumericMatrix Wbegfin, const int nsites, const int nvar, NumericMatrix phi, NumericMatrix Y, NumericMatrix phioffset, NumericVector denoffset, NumericMatrix Sigmainv, double rho, double phi_tune, NumericMatrix innovations);
+RcppExport SEXP _CARBayes_multinomialmcarupdateRW(SEXP WtripletSEXP, SEXP WbegfinSEXP, SEXP nsitesSEXP, SEXP nvarSEXP, SEXP phiSEXP, SEXP YSEXP, SEXP phioffsetSEXP, SEXP denoffsetSEXP, SEXP SigmainvSEXP, SEXP rhoSEXP, SEXP phi_tuneSEXP, SEXP innovationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -539,7 +368,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix >::type Sigmainv(SigmainvSEXP);
     Rcpp::traits::input_parameter< double >::type rho(rhoSEXP);
     Rcpp::traits::input_parameter< double >::type phi_tune(phi_tuneSEXP);
-    rcpp_result_gen = Rcpp::wrap(multinomialmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, phioffset, denoffset, Sigmainv, rho, phi_tune));
+    Rcpp::traits::input_parameter< NumericMatrix >::type innovations(innovationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(multinomialmcarupdateRW(Wtriplet, Wbegfin, nsites, nvar, phi, Y, phioffset, denoffset, Sigmainv, rho, phi_tune, innovations));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -608,95 +438,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// poissoncarmultilevelupdateindiv
-List poissoncarmultilevelupdateindiv(List ind_re_list, NumericVector n_re, const int q, NumericVector psi, double sigma2, const NumericVector y, const double psi_tune, NumericVector offset);
-RcppExport SEXP _CARBayes_poissoncarmultilevelupdateindiv(SEXP ind_re_listSEXP, SEXP n_reSEXP, SEXP qSEXP, SEXP psiSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP psi_tuneSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< List >::type ind_re_list(ind_re_listSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type n_re(n_reSEXP);
-    Rcpp::traits::input_parameter< const int >::type q(qSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type psi(psiSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const double >::type psi_tune(psi_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(poissoncarmultilevelupdateindiv(ind_re_list, n_re, q, psi, sigma2, y, psi_tune, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
-// binomialcarmultilevelupdateindiv
-List binomialcarmultilevelupdateindiv(List ind_re_list, NumericVector n_re, const int q, NumericVector psi, double sigma2, const NumericVector y, const NumericVector failures, const double psi_tune, NumericVector offset);
-RcppExport SEXP _CARBayes_binomialcarmultilevelupdateindiv(SEXP ind_re_listSEXP, SEXP n_reSEXP, SEXP qSEXP, SEXP psiSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP failuresSEXP, SEXP psi_tuneSEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< List >::type ind_re_list(ind_re_listSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type n_re(n_reSEXP);
-    Rcpp::traits::input_parameter< const int >::type q(qSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type psi(psiSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const NumericVector >::type failures(failuresSEXP);
-    Rcpp::traits::input_parameter< const double >::type psi_tune(psi_tuneSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(binomialcarmultilevelupdateindiv(ind_re_list, n_re, q, psi, sigma2, y, failures, psi_tune, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
-// gaussiancarmultilevelupdateindiv
-NumericVector gaussiancarmultilevelupdateindiv(List ind_re_list, NumericVector n_re, const int q, NumericVector psi, double sigma2, double nu2, NumericVector offset);
-RcppExport SEXP _CARBayes_gaussiancarmultilevelupdateindiv(SEXP ind_re_listSEXP, SEXP n_reSEXP, SEXP qSEXP, SEXP psiSEXP, SEXP sigma2SEXP, SEXP nu2SEXP, SEXP offsetSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< List >::type ind_re_list(ind_re_listSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type n_re(n_reSEXP);
-    Rcpp::traits::input_parameter< const int >::type q(qSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type psi(psiSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< double >::type nu2(nu2SEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    rcpp_result_gen = Rcpp::wrap(gaussiancarmultilevelupdateindiv(ind_re_list, n_re, q, psi, sigma2, nu2, offset));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_CARBayes_linpredcompute", (DL_FUNC) &_CARBayes_linpredcompute, 5},
     {"_CARBayes_quadform", (DL_FUNC) &_CARBayes_quadform, 7},
-    {"_CARBayes_binomialcarupdateMALA", (DL_FUNC) &_CARBayes_binomialcarupdateMALA, 12},
-    {"_CARBayes_binomialcarupdateRW", (DL_FUNC) &_CARBayes_binomialcarupdateRW, 11},
-    {"_CARBayes_binomialbetaupdateMALA", (DL_FUNC) &_CARBayes_binomialbetaupdateMALA, 13},
-    {"_CARBayes_binomialbetaupdateRW", (DL_FUNC) &_CARBayes_binomialbetaupdateRW, 12},
-    {"_CARBayes_binomialindepupdateMALA", (DL_FUNC) &_CARBayes_binomialindepupdateMALA, 8},
     {"_CARBayes_binomialindepupdateRW", (DL_FUNC) &_CARBayes_binomialindepupdateRW, 7},
-    {"_CARBayes_poissonindepupdateMALA", (DL_FUNC) &_CARBayes_poissonindepupdateMALA, 6},
+    {"_CARBayes_binomialcarupdateRW", (DL_FUNC) &_CARBayes_binomialcarupdateRW, 11},
+    {"_CARBayes_binomialbetaupdateRW", (DL_FUNC) &_CARBayes_binomialbetaupdateRW, 12},
+    {"_CARBayes_binomialbetaupdateMALA", (DL_FUNC) &_CARBayes_binomialbetaupdateMALA, 13},
     {"_CARBayes_poissonindepupdateRW", (DL_FUNC) &_CARBayes_poissonindepupdateRW, 6},
+    {"_CARBayes_poissoncarupdateRW", (DL_FUNC) &_CARBayes_poissoncarupdateRW, 10},
     {"_CARBayes_poissonbetaupdateMALA", (DL_FUNC) &_CARBayes_poissonbetaupdateMALA, 11},
     {"_CARBayes_poissonbetaupdateRW", (DL_FUNC) &_CARBayes_poissonbetaupdateRW, 11},
-    {"_CARBayes_poissoncarupdateMALA", (DL_FUNC) &_CARBayes_poissoncarupdateMALA, 10},
-    {"_CARBayes_poissoncarupdateRW", (DL_FUNC) &_CARBayes_poissoncarupdateRW, 10},
     {"_CARBayes_zipcarupdateRW", (DL_FUNC) &_CARBayes_zipcarupdateRW, 11},
-    {"_CARBayes_zipcarupdateMALA", (DL_FUNC) &_CARBayes_zipcarupdateMALA, 11},
     {"_CARBayes_zipindepupdateRW", (DL_FUNC) &_CARBayes_zipindepupdateRW, 7},
-    {"_CARBayes_zipindepupdateMALA", (DL_FUNC) &_CARBayes_zipindepupdateMALA, 7},
     {"_CARBayes_gaussiancarupdate", (DL_FUNC) &_CARBayes_gaussiancarupdate, 9},
-    {"_CARBayes_binomialmcarupdateMALA", (DL_FUNC) &_CARBayes_binomialmcarupdateMALA, 13},
-    {"_CARBayes_binomialmcarupdateRW", (DL_FUNC) &_CARBayes_binomialmcarupdateRW, 12},
-    {"_CARBayes_poissonmcarupdateMALA", (DL_FUNC) &_CARBayes_poissonmcarupdateMALA, 11},
-    {"_CARBayes_poissonmcarupdateRW", (DL_FUNC) &_CARBayes_poissonmcarupdateRW, 11},
-    {"_CARBayes_gaussianmcarupdateRW", (DL_FUNC) &_CARBayes_gaussianmcarupdateRW, 11},
-    {"_CARBayes_gaussianmcarupdateMALA", (DL_FUNC) &_CARBayes_gaussianmcarupdateMALA, 11},
+    {"_CARBayes_binomialmcarupdateRW", (DL_FUNC) &_CARBayes_binomialmcarupdateRW, 13},
+    {"_CARBayes_poissonmcarupdateRW", (DL_FUNC) &_CARBayes_poissonmcarupdateRW, 12},
+    {"_CARBayes_gaussianmcarupdateRW", (DL_FUNC) &_CARBayes_gaussianmcarupdateRW, 12},
     {"_CARBayes_multinomialbetaupdateRW", (DL_FUNC) &_CARBayes_multinomialbetaupdateRW, 14},
-    {"_CARBayes_multinomialmcarupdateRW", (DL_FUNC) &_CARBayes_multinomialmcarupdateRW, 11},
+    {"_CARBayes_multinomialmcarupdateRW", (DL_FUNC) &_CARBayes_multinomialmcarupdateRW, 12},
     {"_CARBayes_gaussiancarmultilevelupdate", (DL_FUNC) &_CARBayes_gaussiancarmultilevelupdate, 10},
     {"_CARBayes_binomialcarmultilevelupdate", (DL_FUNC) &_CARBayes_binomialcarmultilevelupdate, 13},
     {"_CARBayes_poissoncarmultilevelupdate", (DL_FUNC) &_CARBayes_poissoncarmultilevelupdate, 12},
-    {"_CARBayes_poissoncarmultilevelupdateindiv", (DL_FUNC) &_CARBayes_poissoncarmultilevelupdateindiv, 8},
-    {"_CARBayes_binomialcarmultilevelupdateindiv", (DL_FUNC) &_CARBayes_binomialcarmultilevelupdateindiv, 9},
-    {"_CARBayes_gaussiancarmultilevelupdateindiv", (DL_FUNC) &_CARBayes_gaussiancarmultilevelupdateindiv, 7},
     {NULL, NULL, 0}
 };
 
