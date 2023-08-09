@@ -1,19 +1,14 @@
 citHeader("To cite CARBayes in publications use:")
 
-citEntry(entry = "Article",
-  title        = "{CARBayes}: An {R} Package for {B}ayesian Spatial Modeling with Conditional Autoregressive Priors",
-  author       = personList(as.person("Duncan Lee")),
-  journal      = "Journal of Statistical Software",
-  year         = "2013",
-  volume       = "55",
-  number       = "13",
-  pages        = "1--24",
-  url          = "https://www.jstatsoft.org/htaccess.php?volume=55&type=i&issue=13",
-
-  textVersion  =
-  paste("Duncan Lee (2013).",
-        "CARBayes: An R Package for Bayesian Spatial Modeling with Conditional Autoregressive Priors.",
-        "Journal of Statistical Software, 55(13), 1-24.",
-        "URL https://www.jstatsoft.org/htaccess.php?volume=55&type=i&issue=13.")
+bibentry(bibtype = "Article",
+  author = "Duncan Lee",
+  title = "{CARBayes}: An {R} Package for {B}ayesian Spatial Modeling with Conditional Autoregressive Priors",
+  year = 2013,
+  journal = "{Journal of Statistical Software}",
+  doi = "10.18637/jss.v055.i13",
+  url = "https://www.jstatsoft.org/htaccess.php?volume=55&type=i&issue=13",
+  pages = "1--24",
+  volume = 55,
+  number = 13,
+  textVersion = "Lee, D., 2013. CARBayes: An R Package for Bayesian Spatial Modeling with Conditional Autoregressive Priors. Journal of Statistical Software 55 (13), 1-24, https://www.jstatsoft.org/htaccess.php?volume=55&type=i&issue=13"
 )
-

@@ -23,16 +23,16 @@
 
 %% almost as usual
 \author{Duncan Lee\\University of Glasgow }
-\title{\pkg{CARBayes} version 5.3: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
+\title{\pkg{CARBayes} version 6.0: An \proglang{R} Package for Spatial Areal Unit Modelling  with Conditional Autoregressive Priors}
 
 %% for pretty printing and a nice hypersummary also set:
 \Plainauthor{Duncan Lee} %% comma-separated
-\Plaintitle{CARBayes version 5.3: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
+\Plaintitle{CARBayes version 6.0: An R package for spatial areal unit modelling  with conditional autoregressive priors} %% without formatting
 \Shorttitle{\pkg{CARBayes}: Bayesian Conditional Autoregressive modelling} %% a short title (if necessary)
 
 %% an abstract and keywords
 \Abstract{
-This is a vignette for the \proglang{R} package \pkg{CARBayes} version 5.3, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. The package implements univariate and multivariate spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation. The response variable can be binomial, Gaussian, multinomial, Poisson or zero-inflated Poisson (ZIP), and spatial autocorrelation is modelled by  a set of random effects that are assigned a conditional autoregressive (CAR) prior distribution. A number of different models are available for univariate spatial data, including models with no random effects as well as random effects modelled by different types of CAR prior. Additionally, a multivariate CAR (MCAR) model for multivariate spatial data is available, as is a two-level hierarchical model for modelling data relating to individuals within areas. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development has been supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1, ESRC grant ES/K006460/1, Innovate UK / Natural Environment Research Council (NERC) grant NE/N007352/1, and the TB Alliance. 
+This is a vignette for the \proglang{R} package \pkg{CARBayes} version 6.0, and is an updated version of a paper in the Journal of Statistical Software in 2013 Volume 55 Issue 13 by the same author. The package implements univariate and multivariate spatial generalised linear mixed models for areal unit data, with inference in a Bayesian setting using Markov chain Monte Carlo (MCMC) simulation using a single or multiple Markov chains.. The response variable can be binomial, Gaussian, multinomial, Poisson or zero-inflated Poisson (ZIP), and spatial autocorrelation is modelled by  a set of random effects that are assigned a conditional autoregressive (CAR) prior distribution. A number of different models are available for univariate spatial data, including models with no random effects as well as random effects modelled by different types of CAR prior. Additionally, a multivariate CAR (MCAR) model for multivariate spatial data is available, as is a two-level hierarchical model for modelling data relating to individuals within areas. The initial creation of this package was supported by the Economic and Social Research Council (ESRC) grant RES-000-22-4256, and on-going development has been supported by the Engineering and Physical Science Research Council (EPSRC) grant EP/J017442/1, ESRC grant ES/K006460/1, Innovate UK / Natural Environment Research Council (NERC) grant NE/N007352/1, and the TB Alliance. The new functionality in version 6.0 is that you can now generate multiple MCMC chains in one model run using the \code{n.chains} argument, and the multiple chains can either be run in parallel (if \code{n.cores} $>1$) for increased computational speed or in series (\code{n.cores=1}) if you do not want to use multiple cores.
 }
 
 \Keywords{Bayesian inference, conditional autoregressive priors, \proglang{R} package}
@@ -67,13 +67,13 @@ options(prompt = "R> ")
 
 
 \section{Introduction}
-Data relating to a set of non-overlapping spatial areal units are prevalent in many fields, including agriculture (\cite{besag1999}), ecology (\cite{brewer2007}), education (\cite{wall2004}), epidemiology (\cite{lee2011}) and image analysis (\cite{gavin1997}).  There are numerous motivations for modelling such data, including ecological regression  (see \cite{wakefield2007} and \cite{lee2009}), disease mapping (see \cite{green2002} and \cite{lee2011}) and Wombling (see \cite{lu2007}, \cite{ma2007}). The set of areal units on which data are recorded can form a regular lattice or differ largely in both shape and size, with examples of the latter including the set of electoral wards or census tracts corresponding to a city or country. In either case such data typically exhibit spatial autocorrelation, with observations from areal units close together tending to have similar values. A proportion of this spatial autocorrelation may be modelled by known covariate risk factors in a regression model, but it is common for  spatial structure to remain in the residuals after accounting for these covariate effects. This residual spatial autocorrelation can be induced by unmeasured confounding, neighbourhood effects, and grouping effects.
+Data relating to a set of non-overlapping spatial areal units are prevalent in many fields, including agriculture (\citealp{besag1999}), ecology (\citealp{brewer2007}), education (\citealp{wall2004}), epidemiology (\citealp{lee2011}) and image analysis (\citealp{gavin1997}).  There are numerous motivations for modelling such data, including ecological regression  (see \citealp{wakefield2007} and \citealp{lee2009}), disease mapping (see \citealp{green2002} and \citealp{lee2011}) and Wombling (see \citealp{lu2007}, \citealp{ma2007}). The set of areal units on which data are recorded can form a regular lattice or differ largely in both shape and size, with examples of the latter including the set of electoral wards or census tracts corresponding to a city or country. In either case such data typically exhibit spatial autocorrelation, with observations from areal units close together tending to have similar values. A proportion of this spatial autocorrelation may be modelled by known covariate risk factors in a regression model, but it is common for  spatial structure to remain in the residuals after accounting for these covariate effects. This residual spatial autocorrelation can be induced by unmeasured confounding, neighbourhood effects, and grouping effects.
 
-\hspace{1cm} The most common remedy for this residual autocorrelation is to augment the linear predictor with a set of spatially autocorrelated random effects, as part of a Bayesian hierarchical model. These random effects are typically represented with a conditional autoregressive (CAR, \cite{besag1991}) prior,  which induces spatial autocorrelation through the adjacency structure of the areal units. A number of CAR priors have been proposed in the literature, including the intrinsic and Besag-York-Molli\'{e} (BYM) models (both \cite{besag1991}), as well as the alternative  developed by \cite{leroux2000}. 
+\hspace{1cm} The most common remedy for this residual autocorrelation is to augment the linear predictor with a set of spatially autocorrelated random effects, as part of a Bayesian hierarchical model. These random effects are typically represented with a conditional autoregressive (CAR, \citealp{besag1991}) prior,  which induces spatial autocorrelation through the adjacency structure of the areal units. A number of CAR priors have been proposed in the literature, including the intrinsic and Besag-York-Molli\'{e} (BYM) models (both \citealp{besag1991}), as well as the alternative  developed by \cite{leroux2000}. 
 
 \hspace{1cm} However, these CAR priors force the random effects to exhibit a single global level of spatial autocorrelation, ranging from independence through to strong spatial smoothness. Such a uniform level of spatial autocorrelation for the entire region maybe unrealistic for real data, which instead may exhibit sub-regions of spatial autocorrelation separated by discontinuities. A number of approaches have been proposed for extending the class of CAR priors to deal with localised spatial smoothing amongst the random effects, including \cite{lee2012}, and \cite{lee2015}.
 
-\hspace{1cm} The models described above are typically implemented in a Bayesian setting, where inference is based on Markov chain Monte Carlo (MCMC) simulation. The most commonly used software to implement this class of models is the \proglang{BUGS} project (\cite{lunn2009}, \proglang{WinBUGS} and \proglang{OpenBUGS}), which has in-built functions to implement the intrinsic and BYM models. CAR models can also be implemented in \proglang{R} using Integrated Nested Laplace Approximations (INLA, \emph{http://www.r-inla.org/}), using the package \pkg{INLA} (\citealp{rue2009}).
+\hspace{1cm} The models described above are typically implemented in a Bayesian setting, where inference is based on Markov chain Monte Carlo (MCMC) simulation. The most commonly used software to implement this class of models is the \proglang{BUGS} project (\citealp{lunn2009}, \proglang{WinBUGS} and \proglang{OpenBUGS}), which has in-built functions to implement the intrinsic and BYM models. CAR models can also be implemented in \proglang{R} using Integrated Nested Laplace Approximations (INLA, \emph{http://www.r-inla.org/}), using the package \pkg{INLA} (\citealp{rue2009}).
 
 \hspace{1cm} \pkg{CARBayes} (\citealp{lee2013}) is the premier \proglang{R} package for modelling spatial areal unit data with conditional autoregressive type spatial autocorrelation structures in a Bayesian setting using MCMC simulation. Its main advantages are firstly ease of use because: (1) the spatial adjacency information is easy to specify as a neighbourhood (adjacency) matrix; and (2) given the neighbourhood matrix, models can be implemented by a single function call. Secondly, \pkg{CARBayes} can implement a much wider class of spatial areal unit models than say \proglang{WinBUGS}, and the univariate or multivariate response data can follow binomial, Gaussian, multinomial, Poisson or zero-inflated Poisson (ZIP) distributions, while a range of CAR priors can be specified for the random effects. Additionally, a two-level hierarchical model is available for modelling data relating to individuals within areas. Spatio-temporal models for areal unit data using CAR type priors can be implemented using the sister package \pkg{CARBayesST} (\citealp{carbayesst}).
 
@@ -112,7 +112,7 @@ The expected value of $Y_{k}$ is denoted by $\E(Y_{k})=\mu_{k}$, while $\nu^{2}$
 $$\ln(\mu_{k})~=~\mathbf{x}_{k}^{\top}\bd{\beta} + O_{k} + \psi_{k}\hspace{1cm}
 \ln\left(\frac{\omega_k}{1-\omega_k}\right)~=~\mathbf{v}_{k}^{\top}\bd{\delta} + O^{(2)}_{k}.$$
 
-Here $(\mathbf{v}_{k}, O^{(2)}_{k})$ are respectively covariates and an offset term that determine the probability that observation $Y_k$ is in the point mass distribution, while $\bd{\delta}$ are the corresponding regression parameters. In implementing the model a binary random variable $Z_k$ is sampled for each observation $Y_k$, where $Z_k=1$ if $Y_k$ comes from the point mass distribution, and $Z_k=0$ if $Y_k$ comes from the Poisson distribution. Further details about ZIP models are given by \cite{ugarte2004}.
+Here $(\mathbf{v}_{k}, O^{(2)}_{k})$ are respectively covariates and an offset term that determine the probability that observation $Y_k$ is in the point mass distribution, while $\bd{\delta}$ are the corresponding regression parameters. In implementing the model a binary random variable $Z_k$ is sampled for each observation $Y_k$ such that $Y_k=0$, where $Z_k=1$ if $Y_k$ comes from the point mass distribution, and $Z_k=0$ if $Y_k$ comes from the Poisson distribution. Further details about ZIP models are given by \cite{ugarte2004}.
 \end{itemize}
 
 
@@ -127,7 +127,7 @@ Here $(\mathbf{v}_{k}, O^{(2)}_{k})$ are respectively covariates and an offset t
 
 \code{S.CARleroux()} & (\ref{equation leroux}) & fits the CAR model proposed by \cite{leroux2000}. This model can also fit the intrinsic CAR model proposed by \cite{besag1991}, as well as a model with independent random effects. This model can be implemented with binomial, Gaussian, Poisson and ZIP data likelihoods.\\\hline
 
-\code{S.CARdissimilarity()} &(\ref{equation binary neighbourhood}) and (\ref{equation nonbinary neighbourhood}) & fits the localised spatial autocorrelation model proposed by \cite{lee2012}. This model can be implemented with binomial, Gaussian and Poisson data likelihoods.\\\hline
+\code{S.CARdissimilarity()} &(\ref{equation binary neighbourhood}) - (\ref{equation nonbinary neighbourhood}) & fits the localised spatial autocorrelation model proposed by \cite{lee2012}. This model can be implemented with binomial, Gaussian and Poisson data likelihoods.\\\hline
 
 \code{S.CARlocalised()} & (\ref{equation cluster})& fits the localised spatial autocorrelation model proposed by \cite{lee2015}. This model can be implemented with binomial and Poisson data likelihoods.\\\hline
 \end{tabular}
@@ -209,7 +209,7 @@ The $q$ regression parameters $\bd{\alpha}=(\alpha_{1},\ldots,\alpha_{q})$ deter
 
 
 \code{S.CARlocalised()}\\
-An alternative to the above is to augment the set of spatially smooth random effects with a piecewise constant intercept or cluster model, thus allowing large jumps in the mean surface between adjacent areal units in different clusters. \cite{lee2015} proposed a model that partitions the $K$ areal units into a maximum of $G$ clusters, each with their own intercept term $(\lambda_{1},\ldots,\lambda_{G})$. The  model is given by
+An alternative to the above is to augment the set of spatially smooth random effects with a piecewise constant intercept model, thus allowing large jumps in the mean surface between adjacent areal units with different intercepts. \cite{lee2015} proposed a model that partitions the $K$ areal units into a maximum of $G$ groups, each with their own intercept term $(\lambda_{1},\ldots,\lambda_{G})$. The  model is given by
 
 
 \begin{eqnarray}
@@ -221,7 +221,7 @@ f(Z_{k})&=&\frac{\exp(-\delta(Z_{k}-G^{*})^{2})}{\sum_{r=1}^{G}\exp(-\delta(r-G^
 \delta&\sim&\mbox{Uniform}(1, M).\nonumber
 \end{eqnarray}
 
-The cluster means $(\lambda_{1},\ldots,\lambda_{G})$ are ordered so that $\lambda_{1}<\lambda_{2}<\ldots<\lambda_{G}$, which prevents the label switching problem common in mixture models, and for completeness $\lambda_{0}=-\infty$ and $\lambda_{G+1}=\infty$.  Area $k$ is assigned to one of the $G$ intercepts by $Z_{k}\in\{1,\ldots,G\}$, and $G$ is the maximum number of different intercept terms. Here we penalise $Z_{k}$ towards the middle intercept value, so that the extreme intercept classes (e.g. $1$ or $G$) may be empty. This is achieved by the penalty term $\delta(Z_{k}-G^{*})^{2}$ in the prior for $Z_{k}$, where $G^{*}=(G+1)/2$ if $G$ is odd and $G^{*}=G/2$ if $G$ is even, and is the middle group. A weakly informative uniform prior is specified for the penalty parameter $\delta\sim\mbox{Uniform}(1,M)$ (by default $M=10$), so that the data play the dominant role in estimating its value. Note, a Gaussian likelihood is not allowed with this model because of a lack of identifiability among the parameters, and missing values are not allowed in the response for the same reasons.
+The group means $(\lambda_{1},\ldots,\lambda_{G})$ are ordered so that $\lambda_{1}<\lambda_{2}<\ldots<\lambda_{G}$, which prevents the label switching problem common in mixture models, and for completeness $\lambda_{0}=-\infty$ and $\lambda_{G+1}=\infty$.  Area $k$ is assigned to one of the $G$ intercepts by $Z_{k}\in\{1,\ldots,G\}$, and $G$ is the maximum number of different intercept terms. Here we penalise $Z_{k}$ towards the middle intercept value, so that the extreme intercept classes (e.g. $1$ or $G$) may be empty. This is achieved by the penalty term $\delta(Z_{k}-G^{*})^{2}$ in the prior for $Z_{k}$, where $G^{*}=(G+1)/2$ if $G$ is odd and $G^{*}=G/2$ if $G$ is even, and is the middle group. A weakly informative uniform prior is specified for the penalty parameter $\delta\sim\mbox{Uniform}(1,M)$ (by default $M=10$), so that the data play the dominant role in estimating its value. Note, a Gaussian likelihood is not allowed with this model because of a lack of identifiability among the parameters, and missing values are not allowed in the response for the same reasons.
 
 
 \subsection{Multivariate spatial data models}
@@ -282,7 +282,7 @@ Here $\mathbf{Q}(\mathbf{W},\rho)=\rho[\mbox{diag}(\mathbf{W}\mathbf{1}) - \math
 where $\bd{\phi}_{-k}$ denotes the vector of random effects except those relating to the $k$th areal unit. We specify the marginally weakly-informative prior for $\bd{\Sigma}$ that was designed for covariance matrices by \cite{huang2013}, which comes from the Inverse-Wishart family with degrees of freedom $df=\nu + J-1$ and scale $\bd{\Omega}=2\nu\mbox{diag}(1/A_1,\ldots,1/A_J)$, where $J$ is the number of outcome variables being modelled. Here, $\mbox{diag}(1/A_1,\ldots,1/A_J)$ denotes a diagonal matrix with diagonal entries $(A_1,\ldots,A_J)$. Thus in the prior specification the user can specify the degrees of freedom $\nu$ via the scalar argument \code{prior.Sigma.df}, while the vector of scales $(A_1,\ldots,A_J)$ are specified by the vector argument \code{prior.Sigma.scale} in the function call. This prior is chosen because  \cite{huang2013} show that it is marginally weakly-informative, in the sense that:
 
 \begin{itemize}
-\item The standard deviation of the $j$th vector of random effects $\sqrt{\bd{\Sigma}}_{jj}$ is modelled by a zero centred half-t$(\nu, A_j)$ distribution with degrees of freedom $\nu$ and scale $A_j$. The default value used by the software is 100,000, so that the prior is only weakly informative. 
+\item The standard deviation of the $j$th vector of random effects $\sqrt{\bd{\Sigma}}_{jj}$ is modelled by a zero centred half-t$(\nu, A_j)$ distribution with degrees of freedom $\nu$ and scale $A_j$. The default value used by the software is $A_j=100,000$, so that the prior is only weakly informative. 
 
 \item The correlation parameters $\bd{\Sigma}_{ij}/\sqrt{\bd{\Sigma}_{ii}\bd{\Sigma}_{jj}}$, where $i\neq j$ are modelled with a non-informative Uniform$(-1,1)$ prior as long as $\nu=2$, which is the default value used by the software. 
 \end{itemize}
@@ -331,7 +331,7 @@ The spatial variation is modelled by $\bd{\phi}=(\phi_1,\ldots,\phi_K)$, which i
 
 
 \subsection{Inference}
-All models in this package are fitted in a Bayesian setting using MCMC simulation, via a combination of Gibbs sampling (when the appropriate full conditional distributions are proportional to standard distributions) and Metropolis-Hastings steps. The Metropolis-Hastings steps for the regression parameters  use simple random walk Metropolis steps by setting \code{MALA=FALSE} in the function call, or the Metropolis adjusted Langevin algorithm (MALA, \citealp{roberts1998}) if you set \code{MALA=TRUE}, the latter  being the default. The overall functions that implement the MCMC algorithms are written in \proglang{R}, while the computationally intensive updating steps are written as computationally efficient  \proglang{C++} routines using the \proglang{R} package \pkg{Rcpp} (\citealp{eddelbuettel2011}). Additionally, the sparsity of the neighbourhood matrix $\mathbf{W}$ is utilised via its triplet form when updating the random effects  within the algorithms, which increases the computational efficiency of the software. Additionally, matrix identities and Kronecker product forms are used to speed up the computation where possible. Missing values are allowed in the response variable $\mathbf{Y}$ for most models (not the \code{S.CARlocalised()} model), and are treated as additional parameters to be updated in the MCMC algorithm using a data augmentation approach (\citealp{tanner1987}).
+All models in this package are fitted in a Bayesian setting using MCMC simulation, and the new functionality in version 6.0 is that you can now generate multiple MCMC chains in one model run. This can be done by setting the \code{n.chains} argument to be greater than 1, and the multiple chains can either be run in parallel (if \code{n.cores} $>1$) for increased computational speed or in series (\code{n.cores=1}) if you do not want to use multiple cores. The MCMC samples are generated via a combination of Gibbs sampling (when the appropriate full conditional distributions are proportional to standard distributions) and Metropolis-Hastings steps. The Metropolis-Hastings steps for the regression parameters  use simple random walk Metropolis steps by setting \code{MALA=FALSE} in the function call, or the Metropolis adjusted Langevin algorithm (MALA, \citealp{roberts1998}) if you set \code{MALA=TRUE}, the latter  being the default. The overall functions that implement the MCMC algorithms are written in \proglang{R}, while the computationally intensive updating steps are written as computationally efficient  \proglang{C++} routines using the \proglang{R} package \pkg{Rcpp} (\citealp{eddelbuettel2011}). Additionally, the sparsity of the neighbourhood matrix $\mathbf{W}$ is utilised via its triplet form when updating the random effects  within the algorithms, which increases the computational efficiency of the software. Additionally, matrix identities and Kronecker product forms are used to speed up the computation where possible. Missing values are allowed in the response variable $\mathbf{Y}$ for most models (not the \code{S.CARlocalised()} model), and are treated as additional parameters to be updated in the MCMC algorithm using a data augmentation approach (\citealp{tanner1987}).
 
 
 
@@ -341,7 +341,7 @@ All models in this package are fitted in a Bayesian setting using MCMC simulatio
 \section{Loading and using the software}
 
 \subsection{Loading the software}
-\pkg{CARBayes} is an add-on package to the statistical software \proglang{R}, and is freely available to download from the Comprehensive R Archive Network (CRAN, http://cran.r-project.org/) for Windows, Linux and Apple platforms. The package requires \proglang{R} ($\geq$ 3.5.0) and depends on packages \pkg{MASS} (\citealp{mass2002}), and \pkg{Rcpp} ($\geq$ 0.11.5). Additionally, it imports functionality from the following other packages: \pkg{CARBayesdata} (\citealp{carbayesdata}), \pkg{coda} (\citealp{coda2006}), \pkg{leaflet} (\citealp{leaflet}), \pkg{matrixcalc} (\citealp{matrixcalc}), \pkg{MCMCpack} (\citealp{mcmcpack}), \pkg{sf} (\citealp{sf}), \pkg{spam} (\citealp{spam2010}), \pkg{spdep}, \pkg{stats}, \pkg{truncnorm} (\citealp{truncnorm2014}) and \pkg{utils}. Once installed it can be loaded using the command \code{library(CARBayes)}. Note, certain functionality from the packages listed in the previous paragraph are automatically loaded upon loading \pkg{CARBayes}, but only for use within the package. However, a complete spatial analysis will typically also include the creation of the neighbourhood matrix $\mathbf{W}$ from a shapefile, the production of spatial maps of the fitted values and residuals, and tests for the presence of spatial autocorrelation, which are achieved using other packages.
+\pkg{CARBayes} is an add-on package to the statistical software \proglang{R}, and is freely available to download from the Comprehensive R Archive Network (CRAN, http://cran.r-project.org/) for Windows, Linux and Apple platforms. The package requires \proglang{R} ($\geq$ 3.5.0) and depends on packages \pkg{MASS} (\citealp{mass2002}), and \pkg{Rcpp} ($\geq$ 0.11.5). Additionally, it imports functionality from the following other packages: \pkg{CARBayesdata} (\citealp{carbayesdata}), \pkg{coda} (\citealp{coda2006}), \pkg{mapview} (\citealp{mapview}), \pkg{matrixcalc} (\citealp{matrixcalc}), \pkg{MCMCpack} (\citealp{mcmcpack}), \pkg{parallel}, \pkg{RColorBrewer} (\citealp{RColorBrewer}), \pkg{sf} (\citealp{sf}), \pkg{spam} (\citealp{spam2010}), \pkg{spdep} (\citealp{bivand2013b}), \pkg{stats}, \pkg{truncnorm} (\citealp{truncnorm2014}) and \pkg{utils}. Once installed it can be loaded using the command \code{library(CARBayes)}. Note, certain functionality from the packages listed in the previous paragraph are automatically loaded upon loading \pkg{CARBayes}, but only for use within the package. However, a complete spatial analysis will typically also include the creation of the neighbourhood matrix $\mathbf{W}$ from a shapefile, the production of spatial maps of the fitted values and residuals, and tests for the presence of spatial autocorrelation, which are achieved using the other packages.
 
 
 
@@ -351,7 +351,7 @@ The software can fit  seven models: \code{S.glm()},  \code{S.CARbym()}, \code{S.
 \begin{itemize}
 \item \code{formula} - A formula for the covariate part of the model using the same syntax as the \code{lm()} function. Offsets can be included here using the \code{offset()} function.
 
-\item \code{family} - The likelihood model which must  be one of \code{"binomial"}, \code{"gaussian"}, \code{"multinomial"}, \code{"poisson"} or \code{"zip"}.
+\item \code{family} - The data likelihood model which must  be one of \code{"binomial"}, \code{"gaussian"}, \code{"multinomial"}, \code{"poisson"} or \code{"zip"}.
 
 \item \code{trials} - This is only needed if  \code{family="binomial"} or \code{family="multinomial"}, and is a vector the same length as the response containing the total number of trials  for each area. 
 
@@ -362,25 +362,29 @@ The software can fit  seven models: \code{S.glm()},  \code{S.CARbym()}, \code{S.
 \item \code{n.sample} - The number of MCMC samples to generate.
 
 \item \code{thin} - The level of thinning to apply to the MCMC samples to reduce their temporal autocorrelation. Defaults to 1 (no thinning).
+
+\item \code{n.chains} - The number of MCMC chains to run when fitting the model. Defaults to 1.
+
+\item \code{n.cores} - The number of computer cores to run the MCMC chains on. Must be less than or 
+equal to \code{n.chains}. Defaults to 1.
 \end{itemize}
 
 When a model has been fitted in \pkg{CARBayes}, the software provides the following summary extractor functions: 
 
 
 \begin{itemize}
-\item \code{coef()} - returns the estimated (posterior mean) regression coefficients. 
 \item \code{fitted()} - returns the fitted values based on the posterior mean.
 \item \code{logLik()} - returns the estimated loglikelihood based on the posterior mean.
 \item \code{model.matrix()} - returns the design matrix of covariates.
 \item \code{print()} - prints a summary of the fitted model to the screen, including both parameter summaries and convergence diagnostics for the MCMC run.
-\item \code{residuals()} - returns either the ``response" (raw) or ``pearson", residuals from the model (based on posterior means).
+\item \code{residuals()} - returns either the `response' (raw) or `pearson', residuals from the model (based on posterior means).
 \end{itemize}
 
-The software updates the user on its progress to the \proglang{R} console, which allows the user to monitor the function's progress. However, using the \code{verbose=FALSE} option will disable this feature. Once run, each model returns a list object with the following components. 
+If \code{n.chains} is greater than 1 and \code{n.cores} is greater than 1 then the software updates the user on the progress of each model run by writing it to the file \emph{CARBayesprogress.txt} in the current working directory. In contrast, if either \code{n.chains} equals 1 or \code{n.cores} equals 1 then the progress of the current model run is written to the \proglang{R} console. However, using the \code{verbose=FALSE} option will disable this feature. Once run, each model returns a list object with the following components. 
 
 
 \begin{itemize}
-\item \code{summary.results} - A summary table of selected parameters that is presented when using the \code{print()} function. The table includes the posterior mean (\code{Mean}) and 95$\%$ credible interval (\code{2.5\%, 97.5\%}), the acceptance rates of the Markov chains, the number of samples generated after burnin and thinning, the effective number of independent samples using the  \code{effectiveSize()} function from the \pkg{coda} package (\code{n.effective}), and the convergence  diagnostic proposed by \cite{geweke1992} and implemented in the \pkg{coda} package (\code{Geweke.diag}). This diagnostic takes the form of a Z-score, so that convergence is suggested by the statistic being within the range (-1.96, 1.96).
+\item \code{summary.results} - A summary table of selected parameters that is presented when using the \code{print()} function. The table includes the posterior mean (\code{Mean}) and 95$\%$ credible interval (\code{2.5\%, 97.5\%}), the acceptance rates of the Markov chains, the number of samples generated after burnin and thinning, the effective number of independent samples using the  \code{effectiveSize()} function from the \pkg{coda} package (\code{n.effective}), and a convergence diagnostic for the Markov chains also from the \pkg{coda} package. If more than one chain is generated by the model (i.e. if \code{n.chains} is greater than 1) then this diagnostic is the Upper C.I. of the potential scale reduction factor (PSRF, \citealp{gelman2003}), and a a value less than 1.1 is indicative of convergence. If only 1 Markov chain is generated by the model (i.e. if \code{n.chains} equals 1) then this diagnostic is the Z-score statistic proposed by \cite{geweke1992}, and values within the range (-1.96, 1.96) are indicative of convergence.
 
 \item \code{samples} - A list containing the MCMC samples generated from the model, where each element in the list is a matrix. The names of these matrix objects correspond to the parameters defined in Section 2 of this vignette, and each column of a matrix contains the set of samples for a single parameter. This list includes samples from the posterior distribution of the fitted values for each data point (\code{fitted}). Additionally, if the response variable $\mathbf{Y}$ contains missing values, then samples from its posterior predictive distribution obtained via data augmentation are available (\code{Y}).
 
@@ -388,7 +392,7 @@ The software updates the user on its progress to the \proglang{R} console, which
 
 \item \code{residuals} - For the univariate data models this is a matrix with 2 columns, where each column is a type of residual and each row relates to a single data point. The types are \emph{response} (raw) and \emph{pearson}. For the multivariate data models this is a list with 2 $K\times J$ matrix elements, where each matrix element is a type of residual (\emph{response} or \emph{pearson}). 
 
-\item \code{modelfit} - Model fit criteria including the Deviance Information Criterion (DIC, \cite{spiegelhalter2002}) and its corresponding estimated effective number of parameters (p.d), the Watanabe-Akaike Information Criterion (WAIC, \cite{watanabe2010}) and its corresponding estimated number of effective parameters (p.w), the Log Marginal Predictive Likelihood (LMPL, \cite{congdon2005}), and the loglikelihood. The best fitting model is one that minimises the DIC and WAIC but maximises the LMPL. If the response data contains missing data, the DIC is computed based on only the observed data (see \cite{celeux2006}).
+\item \code{modelfit} - Model fit criteria including the Deviance Information Criterion (DIC, \citealp{spiegelhalter2002}) and its corresponding estimated effective number of parameters (p.d), the Watanabe-Akaike Information Criterion (WAIC, \citealp{watanabe2010}) and its corresponding estimated number of effective parameters (p.w), the Log Marginal Predictive Likelihood (LMPL, \citealp{congdon2005}), and the loglikelihood. The best fitting model is one that minimises the DIC and WAIC but maximises the LMPL. If the response data contains missing data, the DIC is computed based on only the observed data (see \citealp{celeux2006}).
 
 \item \code{accept }{The acceptance probabilities for the parameters after burnin.}
 
@@ -398,14 +402,14 @@ The software updates the user on its progress to the \proglang{R} console, which
 
 \item \code{model}- A text string describing the model that has been fitted.
 
+\item \code{mcmc.info} - A vector giving details of the numbers of MCMC samples generated.
+
 \item \code{X} - The design matrix of covariates inherited from the \code{formula} argument.
 \end{itemize}
 
 
 
 The remainder of this vignette illustrates the \pkg{CARBayes} software via 2 worked examples.
-
-
 
 
 \section{Example 1 - property prices in Greater Glasgow}
@@ -483,7 +487,7 @@ pricedata.sf <- merge(x=GGHB.IZ, y=pricedata, by="IZ", all.x=FALSE)
 @
     
 
-Then a spatial map of the \code{price} variable can be overlaid on an OpenStreetMap using the functionality of the \pkg{leaflet} package. However, first the \code{pricedata.sf} object needs to have its coordinate reference system changed to longitude and latitude as this is what the \pkg{leaflet} package requires, which can be done using the following \proglang{R} code.
+Then a spatial map of the \code{price} variable can be overlaid on a map of the region using the functionality of the \pkg{mapview} package. However, first the \code{pricedata.sf} object needs to have its coordinate reference system changed to longitude and latitude as this is what the \pkg{mapview} package requires, which can be done using the following \proglang{R} code.
 
 
 
@@ -495,16 +499,12 @@ pricedata.sf <- st_transform(x=pricedata.sf,
 Then a map of \code{price} can be drawn using the following code.
 
 <<>>=
-library(leaflet)
-colours <- colorNumeric(palette = "YlOrRd", domain = pricedata.sf$price)
-map1 <- leaflet(data=pricedata.sf) %>% 
-    addTiles() %>% 
-    addPolygons(fillColor = ~colours(price), color="", weight=1, 
-                fillOpacity = 0.7) %>%
-    addLegend(pal = colours, values = pricedata.sf$price, opacity = 1, 
-              title="Price") %>%
-    addScaleBar(position="bottomleft")
-map1
+library(mapview)
+library(RColorBrewer)
+map1 <- mapview(pricedata.sf, zcol = "price", col.regions=brewer.pal(9, "YlOrRd"), 
+            alpha.regions=0.6, layer.name="Price", lwd=0.5, col="grey90", 
+            homebutton=FALSE) 
+removeMapJunk(map1, junk = c("zoomControl", "layersControl"))
 @
 
 
@@ -546,19 +546,15 @@ The residual spatial autocorrelation observed above can be accounted for by addi
 W <- nb2mat(W.nb, style="B")
 @
 
-Then the model can be run for 3 parallel Markov chains as follows.
+Then the model can be run with 3 parallel Markov chains on 3 processors of the same computer as follows, which is much computationally quicker than running the 3 chains one after the other. 
 
 \begin{CodeInput}
 R> library(CARBayes)
-R> chain1 <- S.CARleroux(formula=form, data=pricedata.sf, family="gaussian", W=W, 
-+      burnin=100000, n.sample=300000, thin=100)
-R> chain2 <- S.CARleroux(formula=form, data=pricedata.sf, family="gaussian", W=W, 
-+      burnin=100000, n.sample=300000, thin=100)
-R> chain3 <- S.CARleroux(formula=form, data=pricedata.sf, family="gaussian", W=W, 
-+      burnin=100000, n.sample=300000, thin=100)
+R> chain <- S.CARleroux(formula=form, data=pricedata.sf, family="gaussian", W=W, 
++       burnin=100000, n.sample=300000, thin=100, n.chains=3, n.cores=3)
 \end{CodeInput}
 
-In the above model runs the covariate and offset component defined by \code{formula} is the same as for the simple linear model fitted earlier, and the neighbourhood matrix \code{W} is binary and defined by whether or not two areas share a common border. Inference for this model is based on 3 parallel Markov chains, each of which has been run for 300,000 samples, the first 100,000 of which have been removed as the burn-in period. The remaining 200,000 samples are thinned by 100 to reduce their temporal autocorrelation, resulting in 6,000 samples for inference across the 3 Markov chains. A summary of one of the chains can be made using the \code{print()} function as shown below.
+In the above model run the covariate and offset component defined by \code{formula} is the same as for the simple linear model fitted earlier, and the neighbourhood matrix \code{W} is binary and defined by whether or not two areas share a common border. Inference for this model is based on 3 parallel Markov chains, each of which has been run for 300,000 samples, the first 100,000 of which have been removed as the burn-in period. The remaining 200,000 samples are thinned by 100 to reduce their temporal autocorrelation, resulting in 6,000 samples for inference across the 3 Markov chains. A summary of the model output can be obtained using the \code{print()} function as shown below.
 
 \begin{CodeInput}
 R> print(chain1)
@@ -571,38 +567,45 @@ R> print(chain1)
 Likelihood model - Gaussian (identity link function) 
 Random effects model - Leroux CAR
 Regression equation - logprice ~ crime + rooms + sales + factor(type) + driveshop
-Number of missing observations - 0
+
+#################
+#### MCMC details
+#################
+Total number of post burnin and thinned MCMC samples generated - 6000
+Number of MCMC chains used - 3
+Length of the burnin period used for each chain - 1e+05
+Amount of thinning used - 100
 
 ############
 #### Results
 ############
 Posterior quantities and DIC
 
-                     Mean    2.5%   97.5% n.effective Geweke.diag
-(Intercept)          4.1318  3.8755  4.3893      3220.4        -0.1
-crime               -0.0001 -0.0002 -0.0001      2000.0         0.2
-rooms                0.2346  0.1856  0.2833      3299.6        -0.1
-sales                0.0023  0.0017  0.0029      2000.0         1.1
-factor(type)flat    -0.2951 -0.3996 -0.1945      2000.0        -0.5
-factor(type)semi    -0.1737 -0.2695 -0.0844      2000.0        -0.2
-factor(type)terrace -0.3218 -0.4434 -0.1995      2000.0         0.2
-driveshop            0.0027 -0.0317  0.0385      2000.0         0.3
-nu2                  0.0223  0.0116  0.0327      2000.0        -0.7
-tau2                 0.0522  0.0241  0.0952      1845.2         0.5
-rho                  0.9302  0.7357  0.9912      2000.0        -0.7
+                       Mean    2.5%   97.5% n.effective PSRF (upper 95% CI)
+(Intercept)          4.1337  3.8640  4.4063      6000.0                   1
+crime               -0.0001 -0.0002 -0.0001      6000.0                   1
+rooms                0.2336  0.1816  0.2840      6000.0                   1
+sales                0.0023  0.0017  0.0029      6143.8                   1
+factor(type)flat    -0.2946 -0.4066 -0.1862      5792.9                   1
+factor(type)semi    -0.1714 -0.2676 -0.0721      5980.2                   1
+factor(type)terrace -0.3236 -0.4475 -0.2058      6000.0                   1
+driveshop            0.0036 -0.0309  0.0381      6015.6                   1
+nu2                  0.0224  0.0114  0.0324      6000.0                   1
+tau2                 0.0536  0.0243  0.0964      5822.4                   1
+rho                  0.9110  0.7272  0.9906      6000.0                   1
 
-DIC =  -162.7164       p.d =  104.7069       LMPL =  60.83 
+DIC =  -162.4       p.d =  104.7452       LMPL =  58.42 
 \end{CodeOutput}
 
 
-The Summary is presented in two parts, the first of which describes the model that has been fit. The second summarises the results, and includes the following information for selected parameters (not the random effects): (i) posterior mean (\code{Mean}); (ii) 95\% credible intervals (\code{2.5\%, 97.5\%}); (iii) the effective number of independent samples (\code{n.effective}); and (iv) the convergence diagnostic proposed by \cite{geweke1992} (\code{Geweke.diag}) as a Z-score. Finally, the DIC and LMPL  model fit criteria are displayed. In addition to producing the summary above, the model returns a list object with the following components:
+This model summary is presented in three parts, the first of which describes the model that has been fitted while the second describes the number of MCMC samples generated. The third part summarises the results, and includes the following information for selected parameters (not the random effects): (i) posterior mean (\code{Mean}); (ii) 95\% credible intervals (\code{2.5\%, 97.5\%}); (iii) the effective number of independent samples (\code{n.effective}); and (iv) the potential scale reduction factor (PSRF) upper C.I. proposed by \cite{gelman2003}. Finally, the DIC and LMPL  model fit criteria are displayed. In addition to producing the summary above, the model returns a list object with the following components:
 
 \begin{CodeInput}
 R> summary(chain1)
 \end{CodeInput}
 
 \begin{CodeOutput}
-                   Length Class      Mode     
+                    Length Class      Mode     
 summary.results       77   -none-     numeric  
 samples                7   -none-     list     
 fitted.values        270   -none-     numeric  
@@ -612,12 +615,13 @@ accept                 5   -none-     numeric
 localised.structure    0   -none-     NULL     
 formula                3   formula    call     
 model                  2   -none-     character
+mcmc.info              4   -none-     numeric  
 X                   2160   -none-     numeric  
 \end{CodeOutput}
 
 
 
-The first element is the summary results table used by the \code{print()} function. The next element is a list containing matrices of the thinned and post burn-in MCMC samples for each set of parameters.  The next two elements in the list \code{fitted.values}  and \code{residuals} contain  the fitted values and residuals from the model, while \code{modelfit} gives a selection of model fit criteria. These criteria include the Deviance Information Criterion (DIC), the log Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion (WAIC), and the log likelihood. For further details about Bayesian modelling and model fit criteria see \cite{gelman2003}. The item \code{accept} contains the acceptance rates for the Markov chain, while \code{localised.structure} is \code{NULL} for this model and is used for compatibility with the other functions in the package. Finally, the \code{formula} and \code{model} elements are text strings describing the formula used and the model fit, while \code{X} gives the design matrix corresponding to the \code{formula} object. 
+The first element is the summary results table used by the \code{print()} function. The next element is a list containing matrices of the thinned and post burn-in MCMC samples for each set of parameters.  The next two elements in the list \code{fitted.values}  and \code{residuals} contain  the fitted values and residuals from the model, while \code{modelfit} gives a selection of model fit criteria. These criteria include the Deviance Information Criterion (DIC), the log Marginal Predictive Likelihood (LMPL), the Watanabe-Akaike Information Criterion (WAIC), and the log likelihood. For further details about Bayesian modelling and model fit criteria see \cite{gelman2003}. The item \code{accept} contains the acceptance rates for the Markov chain, while \code{localised.structure} is \code{NULL} for this model and is used for compatibility with the other functions in the package. Finally, the \code{formula} and \code{model} elements are text strings describing the formula used and the model fit, \code{mcmc.info} details the numbers of MCMC samples generated, while \code{X} gives the design matrix corresponding to the \code{formula} object. 
 
 \hspace{1cm} Before one can draw inference from the model, the convergence of the MCMC samples needs to be assessed. This should be done for all parameters in the model, but as this is impractical for the large number of random effects, a subset of the random effects is often checked. The samples from the model run are stored in the \code{samples} element of the model object, which is a list as shown below
 
@@ -627,27 +631,24 @@ R> summary(chain1$samples)
 
 
 \begin{CodeOutput}
-       Length Class Mode   
-beta    16000 mcmc  numeric
-phi    540000 mcmc  numeric
-tau2     2000 mcmc  numeric
-nu2      2000 mcmc  numeric
-rho      2000 mcmc  numeric
-fitted 540000 mcmc  numeric
-Y           1 mcmc  logical
+       Length Class     Mode
+beta   3      mcmc.list list
+phi    3      mcmc.list list
+rho    3      mcmc.list list
+tau2   3      mcmc.list list
+nu2    3      mcmc.list list
+fitted 3      mcmc.list list
+Y      3      mcmc.list list
 \end{CodeOutput}
 
-Each element of this list corresponds to a different group of parameters and is stored as a  \code{mcmc} object from the \pkg{coda} package. Here the \code{Y} object is \code{NA} as there are no missing $Y_{k}$ observations in this data set. If there had been say $m$ missing values, then the \code{Y} component of the list would have contained $m$ columns, with each one containing posterior predictive samples for one of the missing observations. Before making inference from the model you have to ensure the Markov chains appear to have converged, and one single chain diagnostic is that proposed by Geweke and given in the model summary above (\code{Geweke.diag}). Another method is a traceplot comparing the results from the multiple chains, which for the regression parameters (\code{beta}) can be produced as follows using functionality from the \pkg{coda} package.
+Each element of this list corresponds to a different group of parameters, and is stored as either an \code{mcmc} object if \code{n.chains} equals 1 or an \code{mcmc.list} object if \code{n.chains} is greater than 1. Both these object types come from the \pkg{coda} package. Here the \code{Y} object is \code{NA} as there are no missing $Y_{k}$ observations in this data set. If there had been say $m$ missing values, then the \code{Y} component of the list would have contained $m$ columns, with each one containing posterior predictive samples for one of the missing observations. Before making inference from the model you have to ensure the Markov chains appear to have converged, and as described above the potential scale reduction factor (PSRF) is given in the model summary above (\code{PSRF (upper 95\% CI)}). As this is less than 1.1 in all cases then convergence is indicated. Another method for assessing MCMC convergence is a traceplot comparing the results from the multiple chains, which for the regression parameters (\code{beta}) can be produced as follows.
 
 \begin{CodeInput}
 R> library(coda)
-R> beta.samples <- mcmc.list(chain1$samples$beta, chain2$samples$beta, 
-+      chain3$samples$beta)
 R> plot(beta.samples[ ,2:4])
 \end{CodeInput}
 
-A plot of the samples for the 2$nd$ (crime) to the 4$th$ (sales) regression parameters is shown in Figure \ref{priceMCMC} and superficially shows good mixing between and convergence of the chains, as they all have very similar means and show little trend from left to right. The other commonly used diagnostic is the potential scale reduction factor (PSRF, \cite{gelman2003}), and a value less than 1.1 is suggestive of convergence. The PSRF is computed using the code
-
+A plot of the samples for the 2$nd$ (crime) to the 4$th$ (sales) regression parameters is shown in Figure \ref{priceMCMC} and superficially shows good mixing between and convergence of the chains, as they all have very similar means and show little trend from left to right. 
 
 \begin{figure}
 \centering 
@@ -656,65 +657,38 @@ A plot of the samples for the 2$nd$ (crime) to the 4$th$ (sales) regression para
 \end{figure} 
 
 
-
-
-\begin{CodeInput}
-R> gelman.diag(beta.samples)
-\end{CodeInput}
-
-
-\begin{CodeOutput}
-Potential scale reduction factors:
-
-     Point est. Upper C.I.
-[1,]          1          1
-[2,]          1          1
-[3,]          1          1
-[4,]          1          1
-[5,]          1          1
-[6,]          1          1
-[7,]          1          1
-[8,]          1          1
-
-Multivariate psrf
-
-1
-\end{CodeOutput}
-
-which again suggests that the 3 chains are sufficient for making inference. 
-
-
 \subsection{Inference}
-For this model inference centres around the regression parameters $\bd{\beta}$, and the samples are combined across all 3 Markov chains using the following code
+For this model inference centres around the regression parameters $\bd{\beta}$, and the samples are combined across all 3 Markov chains and summarised using the following code
 
 \begin{CodeInput}
-R> beta.samples.matrix <- rbind(chain1$samples$beta, chain2$samples$beta, 
-+      chain3$samples$beta)
-R> colnames(beta.samples.matrix) <- colnames(chain1$X)
+R> summary.beta <- summary(chain$samples$beta, quantiles=c(0.025, 0.975))
 \end{CodeInput}
 
-Then posterior means and 95\% credible intervals can be computed as follows:
+Then from this summary output a table of posterior means and 95\% credible intervals can be computed as follows:
 
 
 \begin{CodeInput}
-R> round(t(rbind(apply(beta.samples.matrix, 2, mean), apply(beta.samples.matrix, 
-+       2, quantile, c(0.025, 0.975)))), 5) 
+R> beta.mean <- summary.beta$statistics[ ,"Mean"]
+R> beta.ci <- summary.beta$quantiles
+R> beta.results <- cbind(beta.mean, beta.ci)
+R> rownames(beta.results) <- colnames(chain$X)
+R> round(beta.results, 5)
 \end{CodeInput}
 
 
 \begin{CodeOutput}
-                                 2.5%    97.5%
-(Intercept)          4.13582  3.87097  4.39146
-crime               -0.00014 -0.00024 -0.00005
-rooms                0.23376  0.18488  0.28285
-sales                0.00231  0.00169  0.00292
-factor(type)flat    -0.29435 -0.40201 -0.18927
-factor(type)semi    -0.17167 -0.26880 -0.07444
-factor(type)terrace -0.32288 -0.44481 -0.20378
-driveshop            0.00296 -0.03193  0.03822
+                    beta.mean     2.5%    97.5%
+(Intercept)           4.13372  3.86401  4.40626
+crime                -0.00014 -0.00024 -0.00005
+rooms                 0.23364  0.18157  0.28404
+sales                 0.00231  0.00169  0.00294
+factor(type)flat     -0.29463 -0.40660 -0.18623
+factor(type)semi     -0.17144 -0.26762 -0.07206
+factor(type)terrace  -0.32364 -0.44746 -0.20580
+driveshop             0.00355 -0.03087  0.03815
 \end{CodeOutput}
 
-The results show a significant negative effect of crime rate on property price, while increases in the number of rooms and sales rates increases property prices. Areas where the predominant property type is `Detached' (baseline level) have higher prices than the other three types, because the latter all have significantly negative regression effects. Finally, the time taken to drive to a shop has no significant effect on property prices. 
+The results show a significant negative effect of crime rate on property price, while increases in the number of rooms and sales rates increases property prices. Areas where the predominant property type is `Detached' (baseline level) have higher prices than the other three types, because the latter all have significantly negative regression effects. Finally, the time taken to drive to a shop has no significant effect on property prices because the 95\% credible interval contains zero. 
 
 
 
@@ -756,21 +730,17 @@ respiratorydata.sf <- st_transform(x=respiratorydata.sf,
                                    crs='+proj=longlat +datum=WGS84 +no_defs')
 @
 
-Then the map can be drawn using \pkg{leaflet} via the following code, which is displayed in Figure \ref{smrmap}.
+Then the map can be drawn using \pkg{mapview} via the following code, which is displayed in Figure \ref{smrmap}.
 
 
 
 <<>>=
-library(leaflet)
-colours <- colorNumeric(palette = "YlOrRd", domain = respiratorydata.sf$SMR)
-map2 <- leaflet(data=respiratorydata.sf) %>% 
-  addTiles() %>% 
-  addPolygons(fillColor = ~colours(SMR), color="", weight=1, 
-              fillOpacity = 0.7) %>%
-  addLegend(pal = colours, values = respiratorydata.sf$SMR, opacity = 1, 
-            title="SMR") %>%
-  addScaleBar(position="bottomleft")
-map2
+library(mapview)
+library(RColorBrewer)
+map2 <- mapview(respiratorydata.sf, zcol = "SMR", col.regions=brewer.pal(9, "YlOrRd"), 
+            alpha.regions=0.6, layer.name="SMR", lwd=0.5, col="grey90", 
+            homebutton=FALSE) 
+removeMapJunk(map2, junk = c("zoomControl", "layersControl"))
 @
     
     
@@ -819,7 +789,7 @@ R> chain1 <- S.CARdissimilarity(formula=formula, data=respiratorydata.sf,
 +                W.binary=TRUE, burnin=100000, n.sample=300000, thin=20)
 \end{CodeInput}
 
-Convergence of the  Markov chain can be assessed using traceplots and the Geweke diagnostic outlined in the previous section, which are not shown for brevity. The above model bases inference on 10,000 post burn-in and thinned MCMC samples. A summary of the model can be obtained from the \code{print()} function as follows.
+Here we only use 1 Markov chain (the default value of \code{n.chains} is 1 so this argument can be omitted) to illustrate the slightly altered form of the summary table in this case. Here convergence of the  Markov chain can be assessed using traceplots and the Geweke diagnostic outlined in the previous section, which are not shown for brevity. The above model bases inference on 10,000 post burn-in and thinned MCMC samples. A summary of the model can be obtained from the \code{print()} function as follows.
 
 \begin{CodeInput}
 R> print(chain1)
@@ -834,7 +804,14 @@ Likelihood model - Poisson (log link function)
 Random effects model - Binary dissimilarity CAR 
 Dissimilarity metrics -  Z.incomedep 
 Regression equation - observed ~ offset(log(expected))
-Number of missing observations - 0
+
+#################
+#### MCMC details
+#################
+Total number of post burnin and thinned MCMC samples generated - 10000
+Number of MCMC chains used - 1
+Length of the burnin period used for each chain - 1e+05
+Amount of thinning used - 20
 
 ############
 #### Results
@@ -842,18 +819,18 @@ Number of missing observations - 0
 Posterior quantities and DIC
 
                Mean    2.5%   97.5% n.effective Geweke.diag alpha.min
-(Intercept) -0.2199 -0.2417 -0.1980     10000.0         0.3        NA
-tau2         0.1366  0.0978  0.1936      8626.6         0.3        NA
-Z.incomedep  0.0502  0.0465  0.0513      9654.6        -0.7    0.0139
+(Intercept) -0.2195 -0.2419 -0.1969     10000.0         1.1        NA
+tau2         0.1373  0.0964  0.1897      9470.5         1.6        NA
+Z.incomedep  0.0498  0.0465  0.0513      9401.4        -2.3    0.0139
 
-DIC =  1071.637       p.d =  105.9407       LMPL =  -610.09 
+DIC =  1058.256       p.d =  99.07107       LMPL =  -570.44 
 
 The number of stepchanges identified in the random effect surface
      no stepchange stepchange
 [1,]           261         99
 \end{CodeOutput}
 
-The model represents the log risk surface $\{\ln(\theta_k)\}$ with only an intercept term and the random effects, which means that the boundaries identified in the random effects surface can also be interpreted as boundaries in the risk surface. The model summary printed above contains a column in the parameter summary table headed \code{alpha.min}, which only applies to the dissimilarity metrics and is hence \code{NA} for the remaining parameters. The value of \code{alpha.min} is the threshold value for the regression parameter $\alpha$, below which the dissimilarity metric has no effect in identifying boundaries in the response (random effects) surface. A brief description is given in Section 2.1, while full details are given in \cite{lee2012}. For these data the posterior mean and 95$\%$ credible interval lie completely above this threshold, suggesting that the income deprivation dissimilarity metric has identified a number of boundaries.
+The model represents the log risk surface $\{\ln(\theta_k)\}$ with an intercept term and the random effects, which means that the boundaries identified in the random effects surface can also be interpreted as boundaries in the risk surface. The model summary table displayed above has the same format as the previous example with two exceptions. Firstly, because only a single Markov chain is generated in this example, the potential scale reduction factor (PSRF) cannot be computed, so instead the convergence Z-score diagnostic proposed by \cite{geweke1992} (\code{Geweke.diag}) is presented. Secondly, the model summary also contains a column in the parameter summary table headed \code{alpha.min}, which only applies to the dissimilarity metrics and is hence \code{NA} for the remaining parameters. The value of \code{alpha.min} is the threshold value for the regression parameter $\alpha$, below which the dissimilarity metric has no effect in identifying boundaries in the response (random effects) surface. A brief description is given in Section 2.1, while full details are given in \cite{lee2012}. For these data the posterior mean and 95$\%$ credible interval lie completely above this threshold, suggesting that the income deprivation dissimilarity metric has identified a number of boundaries.
 
 \hspace{1cm}The number and locations of these boundaries are summarised in the element of the output list called \code{chain1$localised.structure$W.posterior}, which is a $K\times K$ symmetric matrix containing the posterior median for the set $\{w_{kj}|k\sim j\}$, where $k\sim j$ denotes that areas $(\mathcal{S}_k, \mathcal{S}_j)$ share a common border. Values equal to zero represent a boundary, values equal to one correspond to no boundary, while \code{NA} values correspond to non-adjacent areas. The locations of these boundaries can be overlaid on a map of the estimated disease risk (that is the posterior mean of $\{\theta_k\}$). This is done in two steps, the first being the creation of the boundaries as a \code{SpatialPoints} object using the following code. 
 
@@ -863,31 +840,27 @@ R> respiratorydata.sf$risk <- chain1$fitted.values /
 +                                      respiratorydata.sf$expected
 R> boundary.final <- highlight.borders(border.locations=border.locations, 
 +                        sfdata=respiratorydata.sf)
+R> st_crs(boundary.final) <- '+proj=longlat +datum=WGS84 +no_defs'
 \end{CodeInput}
 
-The first line saves the matrix of border locations, while the second adds the estimated risk values to the \code{respiratorydata.sf} object. The next line identifies the boundary points using the \pkg{CARBayes} function \code{highlight.borders()} and formats them to enable plotting. Then plotting can be done using the code below, and the result is presented in Figure \ref{figure_boundary}.
+
+The first line saves the matrix of border locations, while the second adds the estimated risk values to the \code{respiratorydata.sf} object. The next line identifies the boundary points using the \pkg{CARBayes} function \code{highlight.borders()} and formats them to enable plotting. Then the final line specifies that this object has a longitude and latitude coordinate reference system. Then plotting can be done using the code below, and the result is presented in Figure \ref{figure_boundary}.
 
 
 \begin{CodeInput}
-R> boundary.coordinates <- st_coordinates(boundary.final)
-R> colours <- colorNumeric(palette = "YlOrRd", domain = respiratorydata.sf$risk)
-R> map3 <- leaflet(data=respiratorydata.sf) %>% 
-+  addTiles() %>% 
-+  addPolygons(fillColor = ~colours(risk), color="", weight=1, 
-+              fillOpacity = 0.7) %>%
-+  addLegend(pal = colours, values = respiratorydata.sf$risk, opacity = 1, 
-+            title="Risk") %>%
-+  addCircles(lng = ~boundary.coordinates[ ,1], lat = ~boundary.coordinates[ ,2],
-+            weight = 1, radius = 2) %>%
-+  addScaleBar(position="bottomleft")
-R> map3
+R> map3 <- mapview(respiratorydata.sf, zcol = "risk", 
++                col.regions=brewer.pal(9, "YlOrRd"), alpha.regions=0.6, 
++                layer.name="Risk", lwd=0, homebutton=FALSE) + 
++          mapview(boundary.final, color="blue", alpha.regions=1,  lwd=3, 
++                legend=FALSE, homebutton=FALSE)
+R> removeMapJunk(map3, junk = c("zoomControl", "layersControl"))
 \end{CodeInput}
 
 \begin{figure}
 \begin{center}
 \scalebox{1.2}{\includegraphics{map3.png}}
 \end{center}
-\vspace{-1cm}\caption{Map displaying the estimated risk and the locations of the boundaries for the northern part of Greater Glasgow.}\label{figure_boundary}
+\vspace{-0.5cm}\caption{Map displaying the estimated risk and the locations of the boundaries for the northern part of Greater Glasgow.}\label{figure_boundary}
 \end{figure}
 
 

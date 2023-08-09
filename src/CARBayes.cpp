@@ -66,14 +66,10 @@ double quadform(NumericMatrix Wtriplet, NumericVector Wtripletsum, const int n_t
 // Create new objects 
 double tau2_posteriorscale;
 double tau2_quadform = 0, tau2_phisq = 0;
-int row, col;
-   
-   
+
 // Compute the off diagonal elements of the quadratic form
      for(int l = 0; l < n_triplet; l++)
      {
-     row = Wtriplet(l,0) - 1;
-     col = Wtriplet(l,1) - 1;
      tau2_quadform = tau2_quadform + phi[(Wtriplet(l,0) - 1)] * theta[(Wtriplet(l,1) - 1)] * Wtriplet(l,2); 
      }
  

@@ -1,4 +1,4 @@
-poisson.glm <- function(formula, data=NULL,  burnin, n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, MALA=TRUE, verbose=TRUE)
+poisson.glm <- function(formula, data=NULL,  burnin, n.sample, thin=1, n.chains=1, n.cores=1, prior.mean.beta=NULL, prior.var.beta=NULL, MALA=TRUE, verbose=TRUE)
 {
 ##############################################
 #### Format the arguments and check for errors
@@ -20,7 +20,6 @@ offset <- frame.results$offset
 Y <- frame.results$Y
 which.miss <- frame.results$which.miss
 n.miss <- frame.results$n.miss  
-Y.DA <- Y
 
 
 #### Check on MALA argument
@@ -52,194 +51,164 @@ common.burnin.nsample.thin.check(burnin, n.sample, thin)
     
     
     
-#############################
-#### Initial parameter values
-#############################
-#### Initial parameter values
-mod.glm <- glm(Y~X.standardised-1, offset=offset, family="quasipoisson")
-beta.mean <- mod.glm$coefficients
-beta.sd <- sqrt(diag(summary(mod.glm)$cov.scaled))
-beta <- rnorm(n=length(beta.mean), mean=beta.mean, sd=beta.sd)
-fitted <- exp(as.numeric(X.standardised %*% beta) + offset)     
+########################
+#### Run the MCMC chains
+########################
+   if(n.chains==1)
+   {
+   #### Only 1 chain
+   results <- poisson.glmMCMC(Y=Y, offset=offset, X.standardised=X.standardised, K=K, p=p, which.miss=which.miss, n.miss=n.miss, burnin=burnin, n.sample=n.sample, thin=thin, MALA=MALA, n.beta.block=n.beta.block, list.block=list.block, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, verbose=verbose, chain=1)
+   }else if(n.chains > 1 & ceiling(n.chains)==floor(n.chains) & n.cores==1)
+   {
+   #### Multiple chains in  series
+   results <- as.list(rep(NA, n.chains))
+         for(i in 1:n.chains)
+         {
+         results[[i]] <- poisson.glmMCMC(Y=Y, offset=offset, X.standardised=X.standardised, K=K, p=p, which.miss=which.miss, n.miss=n.miss, burnin=burnin, n.sample=n.sample, thin=thin, MALA=MALA, n.beta.block=n.beta.block, list.block=list.block, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, verbose=verbose, chain=i)
+         }
+   }else if(n.chains > 1 & ceiling(n.chains)==floor(n.chains) & n.cores>1 & ceiling(n.cores)==floor(n.cores))   
+   {   
+   #### Multiple chains in parallel
+   results <- as.list(rep(NA, n.chains))
+      if(verbose)
+      {
+      compclust <- makeCluster(n.cores, outfile="CARBayesprogress.txt")
+      cat("The current progress of the model fitting algorithm has been output to CARBayesprogress.txt in the working directory")
+      }else
+      {
+      compclust <- makeCluster(n.cores)
+      }
+   results <- clusterCall(compclust, fun=poisson.glmMCMC, Y=Y, offset=offset, X.standardised=X.standardised, K=K, p=p, which.miss=which.miss, n.miss=n.miss, burnin=burnin, n.sample=n.sample, thin=thin, MALA=MALA, n.beta.block=n.beta.block, list.block=list.block, prior.mean.beta=prior.mean.beta, prior.var.beta=prior.var.beta, verbose=verbose, chain="all")
+   stopCluster(compclust)
+   }else
+   {
+   stop("n.chains or n.cores are not positive integers.", call.=FALSE)  
+   }
     
-    
-###############################    
-#### Set up the MCMC quantities    
-###############################
-#### Matrices to store samples   
-n.keep <- floor((n.sample - burnin)/thin)
-samples.beta <- array(NA, c(n.keep, p))
-samples.loglike <- array(NA, c(n.keep, K))
-samples.fitted <- array(NA, c(n.keep, K))
-    if(n.miss>0) samples.Y <- array(NA, c(n.keep, n.miss))
-    
-    
-#### Metropolis quantities
-accept <- rep(0,2)
-proposal.sd.beta <- 0.01
 
-    
-
-###########################
-#### Run the Bayesian model
-###########################
-#### Start timer
-    if(verbose)
-    {
-    cat("Generating", n.keep, "post burnin and thinned (if requested) samples.\n", sep = " ")
-    progressBar <- txtProgressBar(style = 3)
-    percentage.points<-round((1:100/100)*n.sample)
-    }else
-    {
-    percentage.points<-round((1:100/100)*n.sample)     
-    }
-    
-    
-#### Create the MCMC samples      
-    for(j in 1:n.sample)
-    {
-    ####################################
-    ## Sample from Y - data augmentation
-    ####################################
-        if(n.miss>0)
-        {
-        Y.DA[which.miss==0] <- rpois(n=n.miss, lambda=fitted[which.miss==0])    
-        }else
-        {}
-         
-        
-           
-    ####################
-    ## Sample from beta
-    ####################
-    offset.temp <- offset
-        if(MALA)
-        {
-        temp <- poissonbetaupdateMALA(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
-        }else
-        {
-        temp <- poissonbetaupdateRW(X.standardised, K, p, beta, offset.temp, Y.DA, prior.mean.beta, prior.var.beta, n.beta.block, proposal.sd.beta, list.block)
-        }
-    beta <- temp[[1]]
-    accept[1] <- accept[1] + temp[[2]]
-    accept[2] <- accept[2] + n.beta.block  
-        
-   
-         
-    #########################
-    ## Calculate the deviance
-    #########################
-    lp <- as.numeric(X.standardised %*% beta) + offset
-    fitted <- exp(lp)
-    loglike <- dpois(x=as.numeric(Y), lambda=fitted, log=TRUE)
-
-        
-        
-        
-    ###################
-    ## Save the results
-    ###################
-        if(j > burnin & (j-burnin)%%thin==0)
-        {
-        ele <- (j - burnin) / thin
-        samples.beta[ele, ] <- beta
-        samples.loglike[ele, ] <- loglike
-        samples.fitted[ele, ] <- fitted
-            if(n.miss>0) samples.Y[ele, ] <-Y.DA[which.miss==0]
-        }else
-        {}
-        
-        
-    
-    ########################################
-    ## Self tune the acceptance probabilties
-    ########################################
-        if(ceiling(j/100)==floor(j/100) & j < burnin)
-        {
-        #### Update the proposal sds
-            if(p>2)
-            {
-            proposal.sd.beta <- common.accceptrates1(accept[1:2], proposal.sd.beta, 40, 50)
-            }else
-            {
-            proposal.sd.beta <- common.accceptrates1(accept[1:2], proposal.sd.beta, 30, 40)    
-            }
-            accept <- rep(0,2)
-        }else
-        {}
-        
-        
-        
-    ################################       
-    ## print progress to the console
-    ################################
-        if(j %in% percentage.points & verbose)
-        {
-        setTxtProgressBar(progressBar, j/n.sample)
-        }
-}
-    
-    
 #### end timer
     if(verbose)
     {
-    cat("\nSummarising results.")
-    close(progressBar)
+    cat("\nSummarising results.\n")
     }else
     {}
-    
-    
-    
+
+
+
 ###################################
 #### Summarise and save the results 
 ###################################
-#### Compute the acceptance rates
-accept.beta <- 100 * accept[1] / accept[2]
-accept.final <- c(accept.beta)
-names(accept.final) <- c("beta")
+   if(n.chains==1)
+   {
+   ## Compute the acceptance rates
+   accept.beta <- 100 * results$accept[1] / results$accept[2]
+   accept.final <- c(accept.beta)
+   names(accept.final) <- c("beta")
     
+   ## Compute the model fit criterion
+   mean.beta <- apply(results$samples.beta, 2, mean)
+   fitted.mean <- exp(X.standardised %*% mean.beta  + offset)
+   deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE), na.rm=TRUE)
+   modelfit <- common.modelfit(results$samples.loglike, deviance.fitted)
+
+   ## Create the Fitted values and residuals
+   fitted.values <- apply(results$samples.fitted, 2, mean)
+   response.residuals <- as.numeric(Y) - fitted.values
+   pearson.residuals <- response.residuals /sqrt(fitted.values)
+   residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
+
+   ## Create MCMC objects and back transform the regression parameters
+   samples.beta.orig <- common.betatransform(results$samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
+   samples <- list(beta=mcmc(samples.beta.orig), fitted=mcmc(results$samples.fitted), Y=mcmc(results$samples.Y))
     
-#### Compute the fitted deviance
-mean.beta <- apply(samples.beta, 2, mean)
-fitted.mean <- exp(X.standardised %*% mean.beta  + offset)
-deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE), na.rm=TRUE)
+   #### Create a summary object
+   n.keep <- floor((n.sample - burnin)/thin)
+   summary.beta <- t(rbind(apply(samples$beta, 2, mean), apply(samples$beta, 2, quantile, c(0.025, 0.975)))) 
+   summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
+   rownames(summary.beta) <- colnames(X)
+   colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
+   summary.results <- summary.beta
+   summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
+   summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
+   }else
+   {
+   ## Compute the acceptance rates
+   accept.temp <- lapply(results, function(l) l[["accept"]])
+   accept.temp2 <- do.call(what=rbind, args=accept.temp)
+   accept.beta <- 100 * sum(accept.temp2[ ,1]) / sum(accept.temp2[ ,2])
+   accept.final <- c(accept.beta)
+   names(accept.final) <- c("beta")
+
+   ## Extract the samples into separate lists
+   samples.beta.list <- lapply(results, function(l) l[["samples.beta"]])
+   samples.loglike.list <- lapply(results, function(l) l[["samples.loglike"]])
+   samples.fitted.list <- lapply(results, function(l) l[["samples.fitted"]])
+   samples.Y.list <- lapply(results, function(l) l[["samples.Y"]])
+
+   ## Convert the samples into separate matrix objects
+   samples.beta.matrix <- do.call(what=rbind, args=samples.beta.list)
+   samples.loglike.matrix <- do.call(what=rbind, args=samples.loglike.list)
+   samples.fitted.matrix <- do.call(what=rbind, args=samples.fitted.list)
+
+   ## Compute the model fit criteria
+   mean.beta <- apply(samples.beta.matrix, 2, mean)
+   fitted.mean <- exp(X.standardised %*% mean.beta  + offset)
+   deviance.fitted <- -2 * sum(dpois(x=Y, lambda=fitted.mean, log=TRUE), na.rm=TRUE)
+   modelfit <- common.modelfit(samples.loglike.matrix, deviance.fitted)
+
+   ## Create the Fitted values and residuals
+   fitted.values <- apply(samples.fitted.matrix, 2, mean)
+   response.residuals <- as.numeric(Y) - fitted.values
+   pearson.residuals <- response.residuals /sqrt(fitted.values)
+   residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
+
+   ## Backtransform the regression parameters
+   samples.beta.list <- samples.beta.list
+      for(j in 1:n.chains)
+      {
+      samples.beta.list[[j]] <- common.betatransform(samples.beta.list[[j]], X.indicator, X.mean, X.sd, p, FALSE)  
+      }
+   samples.beta.matrix <- do.call(what=rbind, args=samples.beta.list)
+
+   ## Create MCMC objects
+   beta.temp <- samples.beta.list
+   loglike.temp <- samples.loglike.list
+   fitted.temp <- samples.fitted.list
+   Y.temp <- samples.Y.list
+      for(j in 1:n.chains)
+      {
+      beta.temp[[j]] <- mcmc(samples.beta.list[[j]])   
+      loglike.temp[[j]] <- mcmc(samples.loglike.list[[j]])   
+      fitted.temp[[j]] <- mcmc(samples.fitted.list[[j]])   
+      Y.temp[[j]] <- mcmc(samples.Y.list[[j]])   
+      }
+   beta.mcmc <- as.mcmc.list(beta.temp)
+   fitted.mcmc <- as.mcmc.list(fitted.temp)
+   Y.mcmc <- as.mcmc.list(Y.temp)
+   samples <- list(beta=beta.mcmc, fitted=fitted.mcmc, Y=Y.mcmc)
+
+   ## Create a summary object
+   n.keep <- floor((n.sample - burnin)/thin)
+   summary.beta <- t(rbind(apply(samples.beta.matrix, 2, mean), apply(samples.beta.matrix, 2, quantile, c(0.025, 0.975)))) 
+   summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(beta.mcmc), gelman.diag(beta.mcmc)$psrf[ ,2])
+   rownames(summary.beta) <- colnames(X)
+   colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "PSRF (upper 95% CI)")
+   summary.results <- summary.beta
+   summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
+   summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
+   }
 
 
-#### Model fit criteria
-modelfit <- common.modelfit(samples.loglike, deviance.fitted)
 
-    
-#### transform the parameters back to the origianl covariate scale.
-samples.beta.orig <- common.betatransform(samples.beta, X.indicator, X.mean, X.sd, p, FALSE)
-    
-    
-#### Create a summary object
-samples.beta.orig <- mcmc(samples.beta.orig)
-summary.beta <- t(rbind(apply(samples.beta.orig, 2, mean), apply(samples.beta.orig, 2, quantile, c(0.025, 0.975)))) 
-summary.beta <- cbind(summary.beta, rep(n.keep, p), rep(accept.beta,p), effectiveSize(samples.beta.orig), geweke.diag(samples.beta.orig)$z)
-rownames(summary.beta) <- colnames(X)
-colnames(summary.beta) <- c("Mean", "2.5%", "97.5%", "n.sample", "% accept", "n.effective", "Geweke.diag")
-summary.results <- summary.beta
-summary.results[ , 1:3] <- round(summary.results[ , 1:3], 4)
-summary.results[ , 4:7] <- round(summary.results[ , 4:7], 1)
-    
-#### Create the Fitted values and residuals
-fitted.values <- apply(samples.fitted, 2, mean)
-response.residuals <- as.numeric(Y) - fitted.values
-pearson.residuals <- response.residuals /sqrt(fitted.values)
-residuals <- data.frame(response=response.residuals, pearson=pearson.residuals)
-    
-    
+###################################
 #### Compile and return the results
+###################################
 model.string <- c("Likelihood model - Poisson (log link function)", "\nRandom effects model - None\n")
-    if(n.miss==0) samples.Y = NA
-
-samples <- list(beta=samples.beta.orig, fitted=mcmc(samples.fitted), Y=mcmc(samples.Y))
-results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, X=X)
+n.total <- floor((n.sample - burnin) / thin) * n.chains
+mcmc.info <- c(n.total, n.sample, burnin, thin, n.chains)
+names(mcmc.info) <- c("Total samples", "n.sample", "burnin", "thin", "n.chains")
+results <- list(summary.results=summary.results, samples=samples, fitted.values=fitted.values, residuals=residuals, modelfit=modelfit, accept=accept.final, localised.structure=NULL,  formula=formula, model=model.string, mcmc.info=mcmc.info, X=X)
 class(results) <- "CARBayes"
-    
-    
-#### Finish by stating the time taken  
     if(verbose)
     {
     b<-proc.time()

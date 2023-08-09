@@ -1,14 +1,6 @@
 print.CARBayes <- function(x,...)
 {
-#### Check for missingness
-    if(length(x$samples$Y)==1)
-    {
-    n.miss <- 0    
-    }else
-    {
-    n.miss <- ncol(x$samples$Y)
-    }
-    
+
     if(is.list(x$localised.structure))
     {
         #### Print out the model fitted
@@ -18,8 +10,22 @@ print.CARBayes <- function(x,...)
         cat(x$model)
         cat("Regression equation - ")
         print(x$formula)
-        cat("Number of missing observations - ")
-        cat(n.miss)
+        cat("\n")
+
+        cat("\n#################\n")
+        cat("#### MCMC details\n")
+        cat("#################\n")
+        cat("Total number of post burnin and thinned MCMC samples generated - ")
+        cat(x$mcmc.info[1])
+        cat("\n")
+        cat("Number of MCMC chains used - ")
+        cat(x$mcmc.info[5])
+        cat("\n")        
+        cat("Length of the burnin period used for each chain - ")
+        cat(x$mcmc.info[3])
+        cat("\n")
+        cat("Amount of thinning used - ")
+        cat(x$mcmc.info[4])        
         cat("\n")
         
         #### Print out the results
@@ -49,8 +55,22 @@ print.CARBayes <- function(x,...)
         cat(x$model)
         cat("Regression equation - ")
         print(x$formula)
-        cat("Number of missing observations - ")
-        cat(n.miss)
+        cat("\n")
+
+        cat("\n#################\n")
+        cat("#### MCMC details\n")
+        cat("#################\n")
+        cat("Total number of post burnin and thinned MCMC samples generated - ")
+        cat(x$mcmc.info[1])
+        cat("\n")
+        cat("Number of MCMC chains used - ")
+        cat(x$mcmc.info[5])
+        cat("\n")        
+        cat("Length of the burnin period used for each chain - ")
+        cat(x$mcmc.info[3])
+        cat("\n")
+        cat("Amount of thinning used - ")
+        cat(x$mcmc.info[4])        
         cat("\n")
         
         #### Print out the results
@@ -81,9 +101,22 @@ print.CARBayes <- function(x,...)
             cat("Zero probability equation - ")
             print(x$formula[[2]])   
             }
+        cat("\n")
         
-        cat("Number of missing observations - ")
-        cat(n.miss)
+        cat("\n#################\n")
+        cat("#### MCMC details\n")
+        cat("#################\n")
+        cat("Total number of post burnin and thinned MCMC samples generated - ")
+        cat(x$mcmc.info[1])
+        cat("\n")
+        cat("Number of MCMC chains used - ")
+        cat(x$mcmc.info[5])
+        cat("\n")        
+        cat("Length of the burnin period used for each chain - ")
+        cat(x$mcmc.info[3])
+        cat("\n")
+        cat("Amount of thinning used - ")
+        cat(x$mcmc.info[4])        
         cat("\n")
         
         #### Print out the results

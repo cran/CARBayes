@@ -34,9 +34,9 @@
 
 
 \usage{
-MVS.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin, 
-n.sample, thin=1, prior.mean.beta=NULL, prior.var.beta=NULL, prior.nu2=NULL,
-prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=TRUE, 
+MVS.CARleroux(formula, family, data=NULL,  trials=NULL, W, burnin, n.sample, 
+thin=1, n.chains=1, n.cores=1, prior.mean.beta=NULL, prior.var.beta=NULL, 
+prior.nu2=NULL, prior.Sigma.df=NULL, prior.Sigma.scale=NULL, rho=NULL, MALA=TRUE, 
 verbose=TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -72,15 +72,22 @@ it is a vector of length K.
     and is zero otherwise. The matrix can be non-binary, but each row must contain 
     at least one non-zero entry.
 }
-\item{burnin}{
-    The number of MCMC samples to discard as the burn-in period.
+  \item{burnin}{
+The number of MCMC samples to discard as the burn-in period in each chain.
 }
-\item{n.sample}{
-    The number of MCMC samples to generate.
+  \item{n.sample}{
+The overall number of MCMC samples to generate in each chain.
 }
-\item{thin}{
-    The level of thinning to apply to the MCMC samples to reduce their temporal 
-    autocorrelation. Defaults to 1 (no thinning).
+  \item{thin}{
+The level of thinning to apply to the MCMC samples in each chain to reduce their 
+autocorrelation. Defaults to 1 (no thinning).
+}
+  \item{n.chains}{
+The number of MCMC chains to run when fitting the model. Defaults to 1.
+}
+  \item{n.cores}{
+The number of computer cores to run the MCMC chains on. Must be less than or 
+equal to n.chains. Defaults to 1.
 }
 \item{prior.mean.beta}{
     A vector of prior means for the regression parameters beta (Gaussian priors are 
@@ -148,6 +155,7 @@ the loglikelihood.}
 \item{formula }{The formula (as a text string) for the response, covariate and 
 offset parts of the model}
 \item{model }{A text string describing the model fit.}
+\item{mcmc.info }{A vector giving details of the numbers of MCMC samples generated.}
 \item{X }{The design matrix of covariates.}
 }
 
