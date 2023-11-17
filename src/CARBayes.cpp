@@ -26,7 +26,9 @@ using namespace Rcpp;
 // gaussiancarmultilevelupdateindiv - Gaussian indep random effect updates
 // poissoncarmultilevelupdateindiv - Poisson indep random effect updates
 // binomialcarmultilevelupdateindiv - binomial indep random effect updates
-
+// basiscomputelinear - Basis function computation for the RAB model with linear basis functions
+// basiscomputeinv - Basis function computation for the RAB model with inverse basis functions
+// basiscomputeexp - Basis function computation for the RAB model with exponential basis functions
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1522,3 +1524,105 @@ List poissoncarmultilevelupdate(NumericMatrix Wtriplet, NumericMatrix Wbegfin,
 
 
 
+///////////////////////////// Basis function computation for the RAB model //////////////////////
+// [[Rcpp::export]]
+NumericMatrix basiscomputeinverse(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol) 
+  {
+  // Set up a blank matrix to store the final anisotropic basis functions
+  NumericMatrix B(nrows, ncols);
+  NumericVector Iso(nrows), Zabs(nrows), S(nrows);
+  int element = 0;
+  double Zabsmax = 0;
+  
+  
+  // Create the basis functions
+     for(int j = 0; j < ncols; j++)
+     {
+     // Create the isotropic basis function     
+     Iso = 1 / (1 + D(_,j));
+     
+     // Create the similarity metric
+     element = startcol + j - 1;
+     Zabs = abs(Z[element] - Z);  
+     Zabsmax = max(Zabs);
+     S = 2 * ((Zabsmax - Zabs) / Zabsmax - 0.5);
+  
+     // Create the final basis function
+     B(_,j) = Iso * S;
+     }
+  
+  
+  // Return the results
+  return B; 
+}
+
+
+
+
+
+
+// [[Rcpp::export]]
+NumericMatrix basiscomputelinear(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol) 
+  {
+  // Set up a blank matrix to store the final anisotropic basis functions
+  NumericMatrix B(nrows, ncols);
+  NumericVector Iso(nrows), Zabs(nrows), S(nrows), temp(nrows);
+  int element = 0;
+  double Zabsmax = 0;
+  
+  
+  // Create the basis functions
+     for(int j = 0; j < ncols; j++)
+     {
+     // Create the isotropic basis function
+     temp = D(_,j);
+     Iso = 1 - (temp - min(temp)) / (max(temp)-min(temp));
+
+     // Create the similarity metric
+     element = startcol + j - 1;
+     Zabs = abs(Z[element] - Z);  
+     Zabsmax = max(Zabs);
+     S = 2 * ((Zabsmax - Zabs) / Zabsmax - 0.5);
+  
+     // Create the final basis function
+     B(_,j) = Iso * S;
+     }
+  
+  
+  // Return the results
+  return B; 
+}
+
+
+
+
+// [[Rcpp::export]]
+NumericMatrix basiscomputeexponential(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol) 
+  {
+  // Set up a blank matrix to store the final anisotropic basis functions
+  NumericMatrix B(nrows, ncols);
+  NumericVector Iso(nrows), Zabs(nrows), S(nrows), temp(nrows);
+  int element = 0;
+  double Zabsmax = 0;
+  
+  
+  // Create the basis functions
+     for(int j = 0; j < ncols; j++)
+     {
+     // Create the isotropic basis function
+     Iso = exp(-D(_,j));
+     
+     // Create the similarity metric
+     element = startcol + j - 1;
+     Zabs = abs(Z[element] - Z);  
+     Zabsmax = max(Zabs);
+     S = 2 * ((Zabsmax - Zabs) / Zabsmax - 0.5);
+  
+     // Create the final basis function
+     B(_,j) = Iso * S;
+     }
+  
+  
+  // Return the results
+  return B; 
+}

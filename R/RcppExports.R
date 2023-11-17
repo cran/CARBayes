@@ -85,3 +85,15 @@ poissoncarmultilevelupdate <- function(Wtriplet, Wbegfin, Wtripletsum, ind_area_
     .Call(`_CARBayes_poissoncarmultilevelupdate`, Wtriplet, Wbegfin, Wtripletsum, ind_area_list, n_individual, nsites, phi, tau2, y, phi_tune, rho, offset)
 }
 
+basiscomputeinverse <- function(D, nrows, ncols, Z, startcol) {
+    .Call(`_CARBayes_basiscomputeinverse`, D, nrows, ncols, Z, startcol)
+}
+
+basiscomputelinear <- function(D, nrows, ncols, Z, startcol) {
+    .Call(`_CARBayes_basiscomputelinear`, D, nrows, ncols, Z, startcol)
+}
+
+basiscomputeexponential <- function(D, nrows, ncols, Z, startcol) {
+    .Call(`_CARBayes_basiscomputeexponential`, D, nrows, ncols, Z, startcol)
+}
+

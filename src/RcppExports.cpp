@@ -438,6 +438,51 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// basiscomputeinverse
+NumericMatrix basiscomputeinverse(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol);
+RcppExport SEXP _CARBayes_basiscomputeinverse(SEXP DSEXP, SEXP nrowsSEXP, SEXP ncolsSEXP, SEXP ZSEXP, SEXP startcolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type D(DSEXP);
+    Rcpp::traits::input_parameter< int >::type nrows(nrowsSEXP);
+    Rcpp::traits::input_parameter< int >::type ncols(ncolsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< int >::type startcol(startcolSEXP);
+    rcpp_result_gen = Rcpp::wrap(basiscomputeinverse(D, nrows, ncols, Z, startcol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// basiscomputelinear
+NumericMatrix basiscomputelinear(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol);
+RcppExport SEXP _CARBayes_basiscomputelinear(SEXP DSEXP, SEXP nrowsSEXP, SEXP ncolsSEXP, SEXP ZSEXP, SEXP startcolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type D(DSEXP);
+    Rcpp::traits::input_parameter< int >::type nrows(nrowsSEXP);
+    Rcpp::traits::input_parameter< int >::type ncols(ncolsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< int >::type startcol(startcolSEXP);
+    rcpp_result_gen = Rcpp::wrap(basiscomputelinear(D, nrows, ncols, Z, startcol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// basiscomputeexponential
+NumericMatrix basiscomputeexponential(NumericMatrix D, int nrows, int ncols, NumericVector Z, int startcol);
+RcppExport SEXP _CARBayes_basiscomputeexponential(SEXP DSEXP, SEXP nrowsSEXP, SEXP ncolsSEXP, SEXP ZSEXP, SEXP startcolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type D(DSEXP);
+    Rcpp::traits::input_parameter< int >::type nrows(nrowsSEXP);
+    Rcpp::traits::input_parameter< int >::type ncols(ncolsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< int >::type startcol(startcolSEXP);
+    rcpp_result_gen = Rcpp::wrap(basiscomputeexponential(D, nrows, ncols, Z, startcol));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_CARBayes_linpredcompute", (DL_FUNC) &_CARBayes_linpredcompute, 5},
@@ -461,6 +506,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CARBayes_gaussiancarmultilevelupdate", (DL_FUNC) &_CARBayes_gaussiancarmultilevelupdate, 10},
     {"_CARBayes_binomialcarmultilevelupdate", (DL_FUNC) &_CARBayes_binomialcarmultilevelupdate, 13},
     {"_CARBayes_poissoncarmultilevelupdate", (DL_FUNC) &_CARBayes_poissoncarmultilevelupdate, 12},
+    {"_CARBayes_basiscomputeinverse", (DL_FUNC) &_CARBayes_basiscomputeinverse, 5},
+    {"_CARBayes_basiscomputelinear", (DL_FUNC) &_CARBayes_basiscomputelinear, 5},
+    {"_CARBayes_basiscomputeexponential", (DL_FUNC) &_CARBayes_basiscomputeexponential, 5},
     {NULL, NULL, 0}
 };
 

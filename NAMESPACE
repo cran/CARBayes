@@ -7,7 +7,8 @@ export(
      S.CARleroux,
      S.CARlocalised,
 	 S.CARmultilevel,
-	 S.glm
+	 S.glm,
+	 S.RAB
      )
 S3method(print, CARBayes)
 S3method(fitted, CARBayes)
@@ -23,10 +24,12 @@ import(sf)
 importFrom(coda, mcmc, as.mcmc.list, geweke.diag, effectiveSize, gelman.diag)
 importFrom(dplyr, mutate)
 importFrom(GGally, ggpairs)
+importFrom(glmnet, glmnet, predict.glmnet)
+importFrom(igraph, graph.adjacency, shortest.paths)
 importFrom(MCMCpack, riwish)
 importFrom(RColorBrewer, brewer.pal)
 importFrom(spam, as.spam,  chol.spam, diag, rowSums)
-importFrom(spdep, mat2listw, n.comp.nb)
+importFrom(spdep, mat2listw, n.comp.nb, moran.mc)
 import(stats)
 importFrom(truncnorm, rtruncnorm, dtruncnorm)
 importFrom(utils, setTxtProgressBar, txtProgressBar)

@@ -33,8 +33,8 @@ Research Council (NERC) grant NE/N007352/1 and the TB Alliance.
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 6.0\cr
-Date: \tab 2023-08-08\cr
+Version: \tab 6.1\cr
+Date: \tab 2023-11-17\cr
 License: \tab GPL (>= 2)\cr
 }
 }
