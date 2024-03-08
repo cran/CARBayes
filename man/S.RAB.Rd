@@ -74,8 +74,7 @@ Logical, should the function update the user on its progress.
 
 
 \value{
-\item{beta.summary }{A summary table of the estimated regression parameters.}
-\item{beta.covariance }{The estimated covariance matrix for the regression parameters.}
+\item{beta.hat }{The estimated regression parameters.}
 \item{sigma2.hat }{The estimated error variance in the Gaussian data likelihood 
 model. If a Gaussian model is not specified it is NA.}
 \item{lambda.hat }{The estimated ridge regression penalty parameter.}
@@ -93,10 +92,9 @@ offset parts of the model.}
 }
 
 \references{
-Leroux B, Lei X, Breslow N (2000). "Estimation of Disease Rates in SmallAreas: A 
-New Mixed Model for Spatial Dependence." In M Halloran, D Berry (eds.), 
-\emph{Statistical Models in Epidemiology, the Environment and Clinical Trials},
-pp. 179-191. Springer-Verlag, New York.
+Lee, D (2024). Computationally efficient localised spatial smoothing of disease 
+rates using anisotropic basis functions and penalised regression fitting, 
+Spatial Statistics, 59, 100796.
 }
 
 \author{

@@ -33,8 +33,8 @@ Research Council (NERC) grant NE/N007352/1 and the TB Alliance.
 \tabular{ll}{
 Package: \tab CARBayes\cr
 Type: \tab Package\cr
-Version: \tab 6.1\cr
-Date: \tab 2023-11-17\cr
+Version: \tab 6.1.1\cr
+Date: \tab 2024-03-08\cr
 License: \tab GPL (>= 2)\cr
 }
 }
@@ -65,6 +65,10 @@ Biostatistics, 13, 415-426.
 Lee, D and Sarran, C  (2015). Controlling for unmeasured confounding and spatial 
 misalignment in long-term air pollution and health studies, Environmetrics, 26, 
 477-487.
+
+Lee, D (2024). Computationally efficient localised spatial smoothing of disease 
+rates using anisotropic basis functions and penalised regression fitting, 
+Spatial Statistics, 59, 100796.
 
 Leroux B, Lei X, Breslow N (2000). "Estimation of Disease Rates in SmallAreas: A 
 New Mixed Model for Spatial Dependence." In M Halloran, D Berry (eds.), 

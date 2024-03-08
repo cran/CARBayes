@@ -1,4 +1,4 @@
-be28a81ab309a7256e7955011d29177d *DESCRIPTION
+062c48c03ae6f3933247ff5901018b8e *DESCRIPTION
 ce5731b52930e365be17978c6058299d *NAMESPACE
 15dd9fbf0f5804680f879d3bbc0c2541 *R/MVS.CARleroux.R
 296693e258db39c8da0138ede7c377ff *R/RcppExports.R
@@ -11,7 +11,7 @@ eeb5067273280a3d34a3fe1afd3d4280 *R/S.CARbym.R
 b45caccb71538d7de8e9049d5f52fb5a *R/S.glm.R
 59e436f62a501804d59c9fb3450cc48d *R/binomial.MVlerouxCAR.R
 3ff26e783d98c4f888027e1de5f6751b *R/binomial.MVlerouxCARMCMC.R
-5e69b1b9b75431a9d0c1aad244fe83be *R/binomial.RAB.R
+2e6aef1e00389660998b64306541e7fb *R/binomial.RAB.R
 d2b2152a79bc7186bed5c5986d689768 *R/binomial.bymCAR.R
 f1383e7c998d450ff6c5099c038783d7 *R/binomial.bymCARMCMC.R
 0afe2ab797057902f5164f3979878886 *R/binomial.dissimilarityCAR.R
@@ -28,7 +28,7 @@ cab9489ee104768429c02d46cc842dbd *R/binomial.localisedCARMCMC.R
 95efe900e2dfb0991d7433ab2645ee53 *R/fitted.CARBayes.R
 416cc8e993720d0a16b84482788ef527 *R/gaussian.MVlerouxCAR.R
 d4e45e40e69060ce03927bd84a1612a6 *R/gaussian.MVlerouxCARMCMC.R
-933492909d94da2e1d5e1ba8fba6214b *R/gaussian.RAB.R
+38205f88c8454ac5c3f4705ef42cf333 *R/gaussian.RAB.R
 98962fc61c571da50bf3f30a4db05335 *R/gaussian.dissimilarityCAR.R
 604eb38c579d908e3be3b1c1c0788e6a *R/gaussian.dissimilarityCARMCMC.R
 8b1f408450fa856f828e16d06c7f9927 *R/gaussian.glm.R
@@ -46,7 +46,7 @@ c0301e85be1732fee27fda9b48f24650 *R/multinomial.glm.R
 26144adabc6ea3eaaeb036889090bf1e *R/multinomial.glmMCMC.R
 eb6a49a10f4908a2fe0a3a4f67407f1b *R/poisson.MVlerouxCAR.R
 8bf51e6913f9d1ec7dc9eec782e0d44c *R/poisson.MVlerouxCARMCMC.R
-0ba332a2008ab23d39c356b13517112c *R/poisson.RAB.R
+ad6c1f060e56b425f200a8c7eeadf909 *R/poisson.RAB.R
 bee70a260ad5b3d3ed53a6b80312bab0 *R/poisson.bymCAR.R
 909abb17c95a5299c04a39951f191464 *R/poisson.bymCARMCMC.R
 e731cec7b8920e437ac5ac96a396d67e *R/poisson.dissimilarityCAR.R
@@ -67,19 +67,19 @@ d4d655e544e26c7dd7816661bbe6aa8d *R/zip.bymCARMCMC.R
 41f32a062a5d9d862600babccef9765f *R/zip.glmMCMC.R
 e116b75c9819804bb87b33cf4ebcc961 *R/zip.lerouxCAR.R
 616cfd481b9c74cad0b03d9928e427a9 *R/zip.lerouxCARMCMC.R
-289c05b3e7b353fb729b9cfb6e279bbc *build/vignette.rds
+3437519cad064c3defe54b0fdc2631a5 *build/vignette.rds
 152084e722627cd112625a7c1e4b7d5c *inst/CITATION
 36f7b9848c1161d88e7d05d23e3364bf *inst/doc/CARBayes.R
-1384232ae480d49caf42581266410e2c *inst/doc/CARBayes.Rnw
-cb67d48097227f21726cc1a5b77d743d *inst/doc/CARBayes.pdf
-3077cf88d4281256e468d90e1869b679 *man/CARBayes-package.Rd
+d8e51084258f62224f8fbb2453325f61 *inst/doc/CARBayes.Rnw
+f6e65f578dfe02862fcfcbf03dab7574 *inst/doc/CARBayes.pdf
+f9b0050279d303dd354e30abc4d21028 *man/CARBayes-package.Rd
 26237af8568c3548437dd1cc0f96c983 *man/MVS.CARleroux.Rd
 1f4676a1770244d153e9ab9398a3d883 *man/S.CARbym.Rd
 21f4732a81b2aaf208df14daf48df1fd *man/S.CARdissimilarity.Rd
 7dc0e3b9b740c6ba691cf5ff4d61bd7b *man/S.CARleroux.Rd
 040ffad7aaeab9f4bfb9dec98e61f94f *man/S.CARlocalised.Rd
 c3ff46caa60ac285289aefdbed914c9e *man/S.CARmultilevel.Rd
-5178038a63fc4cd9098e6dded3ee08c3 *man/S.RAB.Rd
+01aba619bd6eb76fa0f41b5d94e23422 *man/S.RAB.Rd
 c9f0dd94367ccda5dfc03c205227ca18 *man/S.glm.Rd
 cc94b6b2f796fda011409b25bff9a811 *man/fitted.CARBayes.Rd
 6e624f2ca005da62531c65d7f47f16cf *man/highlight.borders.Rd
@@ -89,7 +89,7 @@ cc94b6b2f796fda011409b25bff9a811 *man/fitted.CARBayes.Rd
 2b604b954b4fb21f099184a788334661 *man/residuals.CARBayes.Rd
 b7526d90aec05315c41e6a53d8878a23 *src/CARBayes.cpp
 4ac2ab1e1c957009b0349867929d2ae1 *src/RcppExports.cpp
-1384232ae480d49caf42581266410e2c *vignettes/CARBayes.Rnw
+d8e51084258f62224f8fbb2453325f61 *vignettes/CARBayes.Rnw
 54fe99fdd3f75f6edb697e78bfe3c23e *vignettes/Rplots-2021-782b46ba4442-winl.pdf
 45faa2d573221be9c215d6e28e50655d *vignettes/jss996.bib
 e6ad22107869207519d6ff621a9b86db *vignettes/map1.png

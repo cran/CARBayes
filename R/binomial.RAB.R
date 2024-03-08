@@ -104,9 +104,9 @@ W.list.train <- mat2listw(W.train, style="B")
 
 #### Fit the models with the 3 different types of basis functions
 penfac <- c(rep(0, p), rep(1,K))
-mod.ridge.exp <- glmnet(x=X.anisotropic.exp.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE)
-mod.ridge.inv <- glmnet(x=X.anisotropic.inv.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE)
-mod.ridge.linear <- glmnet(x=X.anisotropic.linear.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE)
+mod.ridge.exp <- glmnet(x=X.anisotropic.exp.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE, standardize=FALSE)
+mod.ridge.inv <- glmnet(x=X.anisotropic.inv.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE, standardize=FALSE)
+mod.ridge.linear <- glmnet(x=X.anisotropic.linear.train, y=response.train, offset=offset.train, alpha=0, nlambda=nlambda, penalty.factor = penfac, family = "binomial", intercept=TRUE, standardize=FALSE)
 
 
 #### Compute the level of residual spatial autocorrelation for each model and lambda value
@@ -119,7 +119,7 @@ prop[prop==1] <- 0.99
 ## Exponential model
 fits.lp.exp <- predict(object=mod.ridge.exp, newx=X.anisotropic.exp.train, newoffset=offset.train)
 m <- ncol(fits.lp.exp)
-results.exp <- data.frame(lambda=log(mod.ridge.exp$lambda), I=rep(NA, m))
+results.exp <- data.frame(lambda=mod.ridge.exp$lambda, I=rep(NA, m))
     for(j in 1:m)
     {
     resids <- log(prop / (1-prop)) - fits.lp.exp[ ,j]
@@ -131,7 +131,7 @@ moran.exp <- results.exp$I[row.exp]
 ## Inverse model   
 fits.lp.inv <- predict(object=mod.ridge.inv, newx=X.anisotropic.inv.train, newoffset=offset.train)
 m <- ncol(fits.lp.inv)
-results.inv <- data.frame(lambda=log(mod.ridge.inv$lambda), I=rep(NA, m))
+results.inv <- data.frame(lambda=mod.ridge.inv$lambda, I=rep(NA, m))
     for(j in 1:m)
     {
     resids <- log(prop / (1-prop)) - fits.lp.inv[ ,j]
@@ -143,7 +143,7 @@ moran.inv <- results.inv$I[row.inv]
 ## Linear model   
 fits.lp.linear <- predict(object=mod.ridge.linear, newx=X.anisotropic.linear.train, newoffset=offset.train)
 m <- ncol(fits.lp.linear)
-results.linear <- data.frame(lambda=log(mod.ridge.linear$lambda), I=rep(NA, m))
+results.linear <- data.frame(lambda=mod.ridge.linear$lambda, I=rep(NA, m))
     for(j in 1:m)
     {
     resids <- log(prop / (1-prop)) - fits.lp.linear[ ,j]
@@ -163,7 +163,7 @@ model <- which(moran.all == min(moran.all))[1]
       row <- row.exp
       X.final <- X.anisotropic.exp
       X.final.train <- X.final[which.present, ] 
-      lambda.hat <- exp(results.exp$lambda[row])
+      lambda.hat <- results.exp$lambda[row] * K.train
       I <- results.exp$I[row]
       }else if(model==2)
       {
@@ -172,7 +172,7 @@ model <- which(moran.all == min(moran.all))[1]
       row <- row.inv
       X.final <- X.anisotropic.inv
       X.final.train <- X.final[which.present, ] 
-      lambda.hat <- exp(results.inv$lambda[row])
+      lambda.hat <- results.inv$lambda[row] * K.train
       I <- results.inv$I[row]
       }else if(model==3)
       {
@@ -181,23 +181,14 @@ model <- which(moran.all == min(moran.all))[1]
       row <- row.linear
       X.final <- X.anisotropic.linear
       X.final.train <- X.final[which.present, ] 
-      lambda.hat <- exp(results.linear$lambda[row])
+      lambda.hat <- results.linear$lambda[row] * K.train
       I <- results.linear$I[row]
       }else{}
 
 
 
-#### Compute the parameter estimate and covariance for beta
+#### Compute the parameter estimate for beta
 beta.hat <- c(model$a0[row], model$beta[ ,row])
-X.extend.train <- cbind(rep(1, K.train), X.final.train)
-lp.hat <- X.extend.train %*% beta.hat + offset.train
-theta.hat <- as.numeric(exp(lp.hat) / (1 + exp(lp.hat)))
-diag.var <- diag(trials[which.present] * theta.hat * (1 - theta.hat))
-D <- diag(c(rep(0, p+1), rep(1, K)))
-XtX <- t(X.extend.train) %*% diag.var %*% X.extend.train
-XtXpluspen <- XtX + lambda.hat * D
-XtXpluspen.inv <- solve(XtXpluspen)
-beta.covariance <- XtXpluspen.inv %*% XtX %*% XtXpluspen.inv
 
     
     
@@ -206,17 +197,6 @@ beta.covariance <- XtXpluspen.inv %*% XtX %*% XtXpluspen.inv
 #####################################
 #### Update the user on the progress
     if(verbose) cat("\nSummarising results.\n")
-
-
-#### Compute the regression parameter summary
-beta.summary <- array(NA, c(p+K+1, 4))
-colnames(beta.summary) <- c("Estimate", "Std dev", "Lower 95% CI", "Upper 95% CI")
-beta.summary[ ,1] <- beta.hat
-beta.summary[ ,2] <- sqrt(diag(beta.covariance))
-beta.summary[ ,3] <- beta.hat - 1.96 * beta.summary[ ,2]
-beta.summary[ ,4] <- beta.hat + 1.96 * beta.summary[ ,2]
-rownames(beta.summary) <- c("(Intercept)", colnames(X.final))
-rownames(beta.summary)[(p+2):(p+K+1)] <- paste("Basis function", 1:K, sep=" ")
 
 
 #### Compute the final fitted / predicted values and residuals 
@@ -238,7 +218,7 @@ colnames(X.extend)[(p+2):(p+K+1)] <- paste("Basis function", 1:K, sep=" ")
 #######################
 #### Return the results
 #######################
-results <- list(beta.summary=beta.summary, beta.covarince=beta.covariance, sigma2.hat=NA, lambda.hat=lambda.hat, I=I, fitted.values=fitted.values, residuals=residuals, formula=formula, model.string=model.string, X=X.extend, model=model)
+results <- list(beta.hat=beta.hat, sigma2.hat=NA, lambda.hat=lambda.hat, I=I, fitted.values=fitted.values, residuals=residuals, formula=formula, model.string=model.string, X=X.extend, model=model)
     if(verbose)
     {
     b<-proc.time()
